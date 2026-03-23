@@ -366,6 +366,34 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
       return;
     }
 
+    if (!_isBreakAuto) {
+      final manualBreak = int.tryParse(_breakCtrl.text) ?? 0;
+      final actualBreakCount = _flightLocalUlds.where((u) => u['break'] == true).length;
+      if (manualBreak != actualBreakCount) {
+        showDialog(context: context, builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
+          content: Text('If manual Break is set to $manualBreak, you must add exactly $manualBreak ULD(s) marked as Break. Currently you have $actualBreakCount.', style: const TextStyle(color: Color(0xFFcbd5e1))),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+        ));
+        return;
+      }
+    }
+
+    if (!_isNoBreakAuto) {
+      final manualNoBreak = int.tryParse(_noBreakCtrl.text) ?? 0;
+      final actualNoBreakCount = _flightLocalUlds.where((u) => u['break'] == false).length;
+      if (manualNoBreak != actualNoBreakCount) {
+        showDialog(context: context, builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
+          content: Text('If manual No Break is set to $manualNoBreak, you must add exactly $manualNoBreak ULD(s) marked as No Break. Currently you have $actualNoBreakCount.', style: const TextStyle(color: Color(0xFFcbd5e1))),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+        ));
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
     final supabase = Supabase.instance.client;
 
@@ -784,11 +812,11 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                           return TableRow(
                             children: [
                               Padding(padding: const EdgeInsets.all(8), child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(4)), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))))),
-                              Padding(padding: const EdgeInsets.all(8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                              Padding(padding: const EdgeInsets.all(8), child: Text('${a['pieces']} pcs', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                              Padding(padding: const EdgeInsets.all(8), child: Text('${a['total'] ?? 0} ttl', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                              Padding(padding: const EdgeInsets.all(8), child: Text('${a['weight']} kg', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                              Padding(padding: const EdgeInsets.all(8), child: Text(a['remarks']?.isNotEmpty == true ? a['remarks'] : '-', style: const TextStyle(color: Color(0xFF94a3b8), fontStyle: FontStyle.italic, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                              Padding(padding: const EdgeInsets.only(left: 8, right: 32, top: 8, bottom: 8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['pieces']} pcs', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['total'] ?? 0} ttl', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
+                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['weight']} kg', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
+                              Padding(padding: const EdgeInsets.only(left: 16, right: 8, top: 8, bottom: 8), child: Text(a['remarks']?.isNotEmpty == true ? a['remarks'] : '-', style: const TextStyle(color: Color(0xFF94a3b8), fontStyle: FontStyle.italic, fontSize: 12), overflow: TextOverflow.ellipsis)),
                               Padding(padding: const EdgeInsets.all(8), child: Builder(
                                 builder: (ctx) {
                                   final rawH = a['house_number'];
