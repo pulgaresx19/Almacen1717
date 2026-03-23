@@ -1,0 +1,3090 @@
+const supabaseUrl = 'https://cleqppfzfuljynhxjlst.supabase.co';
+const supabaseKey = 'sb_publishable_GxFV2KWcAm9HggC1u-byFg_53EJfJrH';
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const usersTableBody = document.getElementById('users-table-body');
+    const flightsTableBody = document.getElementById('flights-table-body');
+    const totalUsersCounter = document.getElementById('total-users-counter');
+    const sidebarName = document.getElementById('sidebar-name');
+    const sidebarAvatar = document.getElementById('sidebar-avatar');
+    
+    const registerForm = document.getElementById('register-form');
+    const loginForm = document.getElementById('login-form');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    // ------- PROTECCIÓN DE RUTAS -------
+    // SPA Sidebar Navigation Logic
+    const navItems = document.querySelectorAll('.nav-item');
+    const viewSections = document.querySelectorAll('.view-section');
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault(); // Evitamos que el href recargue o mueva la página
+            
+            // 1. Quitar 'active' a todos los links y ponerlo al presionado
+            navItems.forEach(nav => nav.classList.remove('active'));
+            item.classList.add('active');
+
+            // 2. Obtener el ID de la sección objetivo
+            const targetId = item.getAttribute('data-target');
+
+            // 3. Ocultar todas las secciones y mostrar la objetivo con transición
+            viewSections.forEach(section => {
+                if(section.id === targetId) {
+                    section.classList.remove('hidden-section');
+                    section.classList.add('active-section');
+                    
+                    // Pequeña animación de entrada (opcional, ajustando opacidad)
+                    section.style.opacity = '0';
+                    setTimeout(() => section.style.opacity = '1', 50);
+                } else {
+                    section.classList.add('hidden-section');
+                    section.classList.remove('active-section');
+                    section.style.opacity = '0';
+                }
+            });
+        });
+    });
+
+    // Lógica para botones internos (Add Flight y Cancel)
+    const addFlightBtn = document.getElementById('add-flight-btn');
+    const cancelAddFlightBtn = document.getElementById('cancel-add-flight-btn');
+    const backToFlightsBtn = document.getElementById('back-to-flights-btn');
+
+    function showFlightForm() {
+        viewSections.forEach(section => {
+            if(section.id === 'add-flight-section') {
+                section.classList.remove('hidden-section');
+                section.classList.add('active-section');
+                section.style.opacity = '0';
+                setTimeout(() => section.style.opacity = '1', 50);
+            } else {
+                section.classList.add('hidden-section');
+                section.classList.remove('active-section');
+                section.style.opacity = '0';
+            }
+        });
+    }
+
+    function hideFlightForm() {
+        viewSections.forEach(section => {
+            if(section.id === 'flight-section') {
+                section.classList.remove('hidden-section');
+                section.classList.add('active-section');
+                section.style.opacity = '0';
+                setTimeout(() => section.style.opacity = '1', 50);
+            } else {
+                section.classList.add('hidden-section');
+                section.classList.remove('active-section');
+                section.style.opacity = '0';
+            }
+        });
+    }
+
+    if(addFlightBtn) addFlightBtn.addEventListener('click', showFlightForm);
+    if(cancelAddFlightBtn) cancelAddFlightBtn.addEventListener('click', hideFlightForm);
+    if(backToFlightsBtn) backToFlightsBtn.addEventListener('click', hideFlightForm);
+
+    // Lógica para botones internos ULD (Add ULD y Cancel)
+    const showAddUldBtn = document.getElementById('show-add-uld-btn');
+    const cancelAddUldBtn = document.getElementById('cancel-add-uld-btn');
+    const backToUldsBtn = document.getElementById('back-to-ulds-btn');
+
+    function showUldForm() {
+        viewSections.forEach(section => {
+            if(section.id === 'add-uld-section') {
+                section.classList.remove('hidden-section');
+                section.classList.add('active-section');
+                section.style.opacity = '0';
+                setTimeout(() => section.style.opacity = '1', 50);
+            } else {
+                section.classList.add('hidden-section');
+                section.classList.remove('active-section');
+                section.style.opacity = '0';
+            }
+        });
+    }
+
+    function hideUldForm() {
+        viewSections.forEach(section => {
+            if(section.id === 'uld-section') {
+                section.classList.remove('hidden-section');
+                section.classList.add('active-section');
+                section.style.opacity = '0';
+                setTimeout(() => section.style.opacity = '1', 50);
+            } else {
+                section.classList.add('hidden-section');
+                section.classList.remove('active-section');
+                section.style.opacity = '0';
+            }
+        });
+    }
+
+    if(showAddUldBtn) showAddUldBtn.addEventListener('click', showUldForm);
+    if(cancelAddUldBtn) cancelAddUldBtn.addEventListener('click', hideUldForm);
+    if(backToUldsBtn) backToUldsBtn.addEventListener('click', hideUldForm);
+
+    // Revisar si hay un usuario autenticado
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    
+    // Si estamos en la página de listado (index.html, que tiene la tabla) y NO hay sesión, mandar a login
+    if (usersTableBody && !session) {
+        window.location.href = 'login.html';
+        return; // Detener ejecución aquí
+    }
+
+    // Si estamos en login o register y SÍ hay sesión, mandar a index
+    if ((loginForm || registerForm) && session) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // ------- MANEJAR CERRAR SESIÓN -------
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) {
+                console.error("Error al cerrar sesión:", error);
+                alert("Hubo un problema al cerrar sesión.");
+            } else {
+                window.location.href = 'login.html'; 
+            }
+        });
+    }
+
+    // ------- MANEJAR INICIAR SESIÓN (login.html) -------
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btn = loginForm.querySelector('button[type="submit"]');
+
+            // Estado de carga
+            btn.disabled = true;
+            btn.textContent = 'Iniciando sesión...';
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: email,
+                password: password,
+            });
+
+            if (error) {
+                alert('Usuario o contraseña incorrectos.');
+                btn.disabled = false;
+                btn.textContent = 'Iniciar Sesión';
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+    }
+
+    // ------- DASHBOARD - LISTADO DE USUARIOS (index.html) -------
+    if (usersTableBody && session) {
+        
+        // Colocar detalles del usuario autenticado en la barra lateral
+        const userEmail = session.user.email;
+        const userName = session.user.user_metadata?.name || 'User';
+        const userInitial = userName.charAt(0).toUpperCase() || userEmail.charAt(0).toUpperCase();
+
+        if (sidebarName) sidebarName.textContent = userName !== 'User' ? userName : userEmail;
+        if (sidebarAvatar) sidebarAvatar.textContent = userInitial;
+
+        async function fetchUsers() {
+            try {
+                // Intento de llamar a usuarios de Supabase
+                const { data, error, count } = await supabaseClient
+                    .from('profiles')
+                    .select('*', { count: 'exact' });
+                
+                if (error) {
+                    console.log("Mostrando demo fallback (requiere tabla pública 'profiles').");
+                    renderDemoUsers();
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    renderUsers(data, count || data.length);
+                } else {
+                    renderDemoUsers(); 
+                }
+
+            } catch (err) {
+                renderDemoUsers();
+            }
+        }
+
+        function renderUsers(usersMap, totalCount) {
+            usersTableBody.innerHTML = ''; 
+            if(totalUsersCounter) totalUsersCounter.textContent = totalCount;
+
+            usersMap.forEach(user => {
+                const tr = document.createElement('tr');
+                const displayEmail = user.email || 'usuario@correo.com';
+                const displayName = user.name || 'Custom Name';
+                const initial = displayName.charAt(0).toUpperCase() || displayEmail.charAt(0).toUpperCase();
+                // Fecha de creación mockeada o real
+                const date = new Date(user.created_at || Date.now()).toLocaleDateString();
+
+                tr.innerHTML = `
+                    <td>
+                        <div class="member-cell">
+                            <div class="td-avatar">${initial}</div>
+                            <span>${displayName}</span>
+                        </div>
+                    </td>
+                    <td>${displayEmail}</td>
+                    <td>[MEd]</td>
+                    <td>[relative]</td>
+                    <td class="status-active">Active</td>
+                `;
+                usersTableBody.appendChild(tr);
+            });
+        }
+        
+        function renderDemoUsers() {
+            usersTableBody.innerHTML = '';
+            
+            const demoUsers = [
+                { email: userEmail, name: userName, created_at: session.user.created_at || new Date() },
+                { email: 'admin@dominio.com', name: 'Sophia Admin', created_at: new Date('2023-01-15') },
+                { email: 'user@domainname.com', name: 'Custom Name', created_at: new Date('2023-05-22') },
+                { email: 'user@domainname.com', name: 'Custom Name', created_at: new Date('2023-08-11') },
+                { email: 'user@domainname.com', name: 'Custom Name', created_at: new Date('2024-02-10') }
+            ];
+            
+            if(totalUsersCounter) totalUsersCounter.textContent = "56.4k"; // Hardcoded from image
+
+            demoUsers.forEach((user, index) => {
+                const init = user.name.charAt(0).toUpperCase();
+                
+                // Usaremos algunas fotos random de avatar para imitar la visual de la imagen,
+                // si no hay imagen, mostrará la inicial.
+                let avatarHtml = `<div class="td-avatar">${init}</div>`;
+                if(index > 0) {
+                    // Simulando las fotos del mockup
+                    avatarHtml = `<div class="td-avatar"><img src="https://i.pravatar.cc/100?img=${index + 10}" alt="avatar"></div>`;
+                }
+
+                usersTableBody.insertAdjacentHTML('beforeend', `
+                    <tr>
+                        <td>
+                            <div class="member-cell">
+                                ${avatarHtml}
+                                <span>${user.name}</span>
+                            </div>
+                        </td>
+                        <td>${user.email}</td>
+                        <td>[MEd]</td>
+                        <td>[relative]</td>
+                        <td class="status-active">Active</td>
+                    </tr>
+                `);
+            });
+        }
+        // ---------- INICIO LÓGICA DE VUELOS (Flight) ----------
+        if (flightsTableBody) {
+            async function fetchFlights() {
+                try {
+                    // Consultamos la tabla 'Flight' de Supabase (o 'flights', probaremos 'Flight' por tu mensaje)
+                    const { data, error } = await supabaseClient.from('Flight').select('*');
+                    
+                    if (error) {
+                        console.log("Error consultando 'Flight'. Intentando 'flights'...", error.message);
+                        const fallbackResponse = await supabaseClient.from('flights').select('*');
+                        if (fallbackResponse.error) {
+                            renderDemoFlights();
+                            return;
+                        }
+                        if (fallbackResponse.data && fallbackResponse.data.length > 0) {
+                            renderFlights(fallbackResponse.data);
+                        } else {
+                            renderDemoFlights();
+                        }
+                        return;
+                    }
+
+                    if (data && data.length > 0) {
+                        renderFlights(data);
+                    } else {
+                        renderDemoFlights();
+                    }
+
+                } catch (err) {
+                    renderDemoFlights();
+                }
+            }
+
+            function renderFlights(flightsArray) {
+                flightsTableBody.innerHTML = ''; 
+                
+                flightsArray.forEach((flight, index) => {
+                    const tr = document.createElement('tr');
+                    const carrier = flight.carrier || '-';
+                    const number = flight.number || '-';
+                    const breakVal = flight['cant-break'] || '0';
+                    const noBreakVal = flight['cant-noBreak'] || '0';
+                    const dateArrived = flight['date-arrived'] || '-';
+                    const timeArrived = flight['time-arrived'] || '-';
+                    const remarks = flight.remarks || '-';
+                    const status = flight.status || 'Active';
+
+                    tr.innerHTML = `
+                        <td style="text-align: center; color: #94a3b8; font-weight: 500;">${index + 1}</td>
+                        <td style="white-space: nowrap;">
+                            <span style="font-weight:600; color:#334155;">${carrier}</span> <span style="color:#64748b;">${number}</span>
+                        </td>
+                        <td style="text-align: center; font-weight: 500;">${breakVal}</td>
+                        <td style="text-align: center; font-weight: 500;">${noBreakVal}</td>
+                        <td style="white-space: nowrap; color:#64748b;">${dateArrived !== '-' ? new Date(dateArrived).toLocaleDateString() : '-'}</td>
+                        <td style="white-space: nowrap; color:#64748b;">${timeArrived}</td>
+                        <td style="width: 100%; max-width: 0;"><span style="font-size:12px; color:#64748b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width: 100%;" title="${remarks}">${remarks}</span></td>
+                        <td style="white-space: nowrap;" class="status-${(status || '').toLowerCase()}">${status || 'Waiting'}</td>
+                    `;
+                    tr.style.cursor = 'pointer';
+                    
+                    // Add click event for flight drawer
+                    tr.addEventListener('click', async () => {
+                        openFlightDrawer(flight);
+                    });
+
+                    flightsTableBody.appendChild(tr);
+                });
+
+                // Funcionalidad de búsqueda local
+                const searchInput = document.getElementById('flight-search');
+                if (searchInput) {
+                    searchInput.addEventListener('keyup', function() {
+                        const term = this.value.toLowerCase();
+                        const rows = flightsTableBody.querySelectorAll('tr');
+                        rows.forEach(row => {
+                            if (row.querySelector('.loading-td')) return; // No filtrar loading state
+                            const text = row.textContent.toLowerCase();
+                            row.style.display = text.includes(term) ? '' : 'none';
+                        });
+                    });
+                }
+            }
+
+            // ---------- LÓGICA DEL FLIGHT DRAWER ----------
+            const flightDrawer = document.getElementById('flight-drawer');
+            const flightDrawerOverlay = document.getElementById('flight-drawer-overlay');
+            const closeFlightDrawerBtn = document.getElementById('close-flight-drawer-btn');
+            
+            if (closeFlightDrawerBtn) {
+                closeFlightDrawerBtn.addEventListener('click', () => {
+                    flightDrawer.style.right = '-800px';
+                    flightDrawerOverlay.classList.remove('open');
+                });
+            }
+            if (flightDrawerOverlay) {
+                flightDrawerOverlay.addEventListener('click', () => {
+                    flightDrawer.style.right = '-800px';
+                    flightDrawerOverlay.classList.remove('open');
+                });
+            }
+
+            async function openFlightDrawer(flight) {
+                // Formatting reference
+                const carrier = flight.carrier || '';
+                const number = flight.number || '';
+                const dateArrivedRaw = flight['date-arrived'];
+                const fDateStr = dateArrivedRaw ? new Date(dateArrivedRaw).toLocaleDateString() : '';
+                const flightRefString = `${carrier} ${number} ${fDateStr}`.trim();
+                
+                // Set Header Metadata
+                document.getElementById('drawer-flight-title').textContent = `Flight: ${carrier} ${number}`;
+                document.getElementById('drawer-flight-status').textContent = flight.status || 'Waiting';
+                document.getElementById('drawer-flight-date').textContent = fDateStr || '--';
+                document.getElementById('drawer-flight-cbreak').textContent = flight['cant-break'] || '0';
+                document.getElementById('drawer-flight-cno').textContent = flight['cant-noBreak'] || '0';
+                document.getElementById('drawer-flight-rem').textContent = flight.remarks || '--';
+
+                const contentList = document.getElementById('drawer-flight-content-list');
+                contentList.innerHTML = '<div style="text-align:center; padding: 20px;"><span class="loading-td" style="color:#64748b;">Loading ULDs...</span></div>';
+
+                // Open Drawer Animation
+                flightDrawerOverlay.classList.add('open');
+                flightDrawer.style.right = '0';
+
+                // Fetch Database contents
+                try {
+                    const { data: ulds, error: uldErr } = await supabaseClient
+                        .from('ULD')
+                        .select('*')
+                        .eq('refCarrier', carrier)
+                        .eq('refNumber', number)
+                        .eq('refDate', dateArrivedRaw);
+
+                    if (uldErr) throw uldErr;
+
+                    if (!ulds || ulds.length === 0) {
+                        contentList.innerHTML = '<div style="text-align: center; color: #94a3b8; font-size: 13px; font-style: italic; padding: 20px;">No ULDs found directly linked to this flight.</div>';
+                        return;
+                    }
+
+                    // Build string
+                    contentList.innerHTML = '';
+
+                    for (const uld of ulds) {
+                        const uldNum = uld['ULD number'] || uld.uldNumber || uld.id || 'Unknown';
+                        const uHeader = document.createElement('div');
+                        uHeader.style.cssText = 'background: #f1f5f9; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 8px;';
+                        
+                        // ULD Metadata
+                        let htmlChunk = `
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                                <strong style="color: #0f172a; font-size: 13px;">ULD: ${uldNum}</strong>
+                                <span style="font-size: 11px; background: #cbd5e1; padding: 2px 6px; border-radius: 4px; color: #334155;">Pcs: ${uld.pieces || 0} &nbsp;|&nbsp; Wgt: ${uld.weight || 0}</span>
+                            </div>
+                        `;
+
+                        // Fetch AWBs nested within this ULD from Supabase
+                        // (Usually AWBs are mapped via AWB.refULD = ULD.Number OR via the JSONB "data-AWB")
+                        // Wait since the DB is structured where AWBs rows have `refULD` OR exist in array, let's look for matching AWB items where any JSONB object has this refULD.
+                        // For simplicity, we query 'AWB' to see if any have data-AWB containing this refULD, or just fetch all AWBs and filter manually (cheap for small sets).
+                        const { data: awbs, error: awbErr } = await supabaseClient.from('AWB').select('*');
+                        
+                        let matchedAwbs = [];
+                        if (awbs && !awbErr) {
+                            awbs.forEach(awbDoc => {
+                                // If it holds the JSONB array
+                                if (awbDoc['data-AWB'] && Array.isArray(awbDoc['data-AWB'])) {
+                                    awbDoc['data-AWB'].forEach(nested => {
+                                        if (nested.refULD === uldNum &&
+                                            nested.refCarrier === carrier &&
+                                            nested.refNumber === number &&
+                                            nested.refDate === dateArrivedRaw) {
+                                            matchedAwbs.push({
+                                                number: awbDoc['AWB number'] || awbDoc.awb_number,
+                                                pieces: nested.pieces,
+                                                weight: nested.weight,
+                                                total: awbDoc.total,
+                                                remarks: nested.remarks,
+                                                houses: nested.house_number || []
+                                            });
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        if (matchedAwbs.length > 0) {
+                            htmlChunk += `
+                                <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+                                    <thead style="background: white;">
+                                        <tr>
+                                            <th style="padding: 4px 8px; font-size: 10px; color:#64748b; font-weight:600; border-bottom:1px solid #e2e8f0; text-align:left;">AWB</th>
+                                            <th style="padding: 4px 8px; font-size: 10px; color:#64748b; font-weight:600; border-bottom:1px solid #e2e8f0; text-align:left;">Pcs</th>
+                                            <th style="padding: 4px 8px; font-size: 10px; color:#64748b; font-weight:600; border-bottom:1px solid #e2e8f0; text-align:left;">Wgt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                            `;
+                            matchedAwbs.forEach(ma => {
+                                const hStr = Array.isArray(ma.houses) ? ma.houses.join(', ') : '';
+                                htmlChunk += `
+                                    <tr>
+                                        <td style="padding: 4px 8px; font-size: 11px; color:#334155; border-bottom:1px solid #f1f5f9; white-space: nowrap;">${ma.number} <br><span style="font-size:9px; color:#94a3b8;">${hStr}</span></td>
+                                        <td style="padding: 4px 8px; font-size: 11px; color:#64748b; border-bottom:1px solid #f1f5f9;">${ma.pieces || 0}</td>
+                                        <td style="padding: 4px 8px; font-size: 11px; color:#64748b; border-bottom:1px solid #f1f5f9;">${ma.weight || 0}</td>
+                                    </tr>
+                                `;
+                            });
+                            htmlChunk += `</tbody></table>`;
+                        } else {
+                            htmlChunk += `<div style="font-size:11px; color:#94a3b8; font-style:italic; margin-top:5px;">No AWBs stored for this ULD.</div>`;
+                        }
+
+                        uHeader.innerHTML = htmlChunk;
+                        contentList.appendChild(uHeader);
+                    }
+                    
+                } catch (err) {
+                    console.error("Error drawing flight uld/awb info:", err);
+                    contentList.innerHTML = '<div style="text-align: center; color: red; font-size: 13px; font-style: italic; padding: 20px;">Could not load data. Check console.</div>';
+                }
+            }
+
+            function renderDemoFlights() {
+                flightsTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #94a3b8;">No flights available.</td></tr>';
+            }
+
+            fetchFlights();
+        }
+        // ---------- FIN LÓGICA DE VUELOS ----------
+
+        // ---------- LÓGICA AÑADIR VUELO Y ULDs ----------
+        const addFlightForm = document.getElementById('add-flight-form');
+        let localUlds = []; // Array temporal (Legacy para AWB drawer temporalmente si se requiere)
+
+        // ====== LÓGICA DRAWER AWB (LATERAL) ======
+        let currentUldIdForAwb = null;
+        const awbDrawer = document.getElementById('awb-drawer');
+        const awbOverlay = document.getElementById('awb-drawer-overlay');
+        const closeDrawerBtn = document.getElementById('close-drawer-btn');
+        const drawerUldTitle = document.getElementById('drawer-uld-title');
+        
+        const drawerUldPcs = document.getElementById('drawer-uld-pcs');
+        const drawerUldWgt = document.getElementById('drawer-uld-wgt');
+        const drawerUldPrio = document.getElementById('drawer-uld-prio');
+        const drawerUldBrk = document.getElementById('drawer-uld-brk');
+        const drawerUldRem = document.getElementById('drawer-uld-rem');
+
+        const drawerAwbTable = document.getElementById('drawer-awb-table-body');
+        const addAwbBtn = document.getElementById('add-awb-btn');
+
+        // Función abrir panel
+        window.openAwbPanel = function(uldId) {
+            currentUldIdForAwb = uldId;
+            const uld = localUlds.find(u => u.id == uldId || u["ULD number"] == uldId || u.uld_number == uldId);
+            if(!uld) return;
+
+            drawerUldTitle.textContent = `ULD: ${uld["ULD number"] || uld.uld_number || uld.id}`;
+            
+            // Llenar metadatos ULD
+            if(drawerUldPcs) drawerUldPcs.textContent = uld.pieces || '0';
+            if(drawerUldWgt) drawerUldWgt.textContent = (uld.weight || '0') + ' kg';
+            
+            const isPrio = uld.isPriority || uld.priority;
+            const isBrk = uld.isBreak || uld.break;
+
+            if(drawerUldPrio) {
+                drawerUldPrio.innerHTML = isPrio ? '<span style="color:#ef4444; font-weight:600;">Yes</span>' : 'No';
+            }
+            if(drawerUldBrk) {
+                drawerUldBrk.innerHTML = isBrk ? '<span style="color:#4f46e5; font-weight:600;">Yes</span>' : 'No';
+            }
+            if(drawerUldRem) drawerUldRem.textContent = uld.remarks || 'N/A';
+            
+            // Asegurar que el pie del form de AWBs y la columna de Acción se muestren
+            const footer = document.getElementById('awb-drawer-footer');
+            if (footer) footer.style.display = 'block';
+
+            // Refrescar las vistas
+            renderLocalAwbs();
+            renderLocalUlds(); // Repintar la tabla para colocar la fila cálida activa
+            
+            // Abrir Drawer Animado
+            awbDrawer.classList.add('open');
+            awbOverlay.classList.add('open');
+        };
+
+        let currentLocalAwbItems = { agi: [], pre: [], crate: [], box: [], other: [] };
+
+        window.renderLocalAwbItems = function() {
+            let totalChecked = 0;
+            const listContainer = document.getElementById('inline-awb-local-list');
+            if (!listContainer) return;
+
+            // Calculate overall total Checked
+            ['agi', 'pre', 'crate', 'box', 'other'].forEach(type => {
+                currentLocalAwbItems[type].forEach(item => {
+                    totalChecked += item.qty;
+                });
+            });
+
+            let html = '';
+            
+            // 1. Render Agi Skid separately as a sub-collection if it has items
+            if (currentLocalAwbItems.agi.length > 0) {
+                let agiHtml = '';
+                currentLocalAwbItems.agi.forEach((item, index) => {
+                    agiHtml += `
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; animation: fadeIn 0.15s ease;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex: 1; padding-left: 12px;">
+                                <span style="font-size: 13px; color: #64748b; font-weight: 500; min-width: 14px; text-align: center;">${index + 1}</span>
+                                <input type="number" value="${item.qty}" onchange="window.updateAgiVal(${index}, this.value)" style="flex: 1; max-width: 80px; height: 32px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 500; color: #475569; outline: none; transition: all 0.2s;" onfocus="this.style.borderColor='#cbd5e1'; this.style.boxShadow='0 0 0 2px rgba(226, 232, 240, 0.5)';" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none';" placeholder="0" ${window.awbModalReadonly ? 'readonly' : ''}>
+                            </div>
+                            <button onclick="window.removeLocalAwbItem('agi', ${index})" style="border:none; background:none; color: #94a3b8; cursor: pointer; font-size: 18px; line-height: 1; outline: none; transition: color 0.1s; padding-right: 8px; width: 24px;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">&times;</button>
+                        </div>
+                    `;
+                });
+
+                html += `
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 4px; animation: fadeIn 0.2s ease;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; min-width: 34px; height: 24px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11.5px; color: #475569;">
+                                    ${currentLocalAwbItems.agi.length}
+                                </div>
+                                <span style="font-weight: 400; font-size: 14px; color: #0f172a;">Agi Skid</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; border-top: 1px solid #f1f5f9; padding-top: 12px; gap: 4px;">
+                            ${agiHtml}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 2. Render others linearly
+            const labelsMap = {
+                pre: 'Pre Skid',
+                crate: 'Crates',
+                box: 'Box',
+                other: 'Other'
+            };
+
+            ['pre', 'crate', 'box', 'other'].forEach(type => {
+                currentLocalAwbItems[type].forEach((item, index) => {
+                    html += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; animation: fadeIn 0.2s ease;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; min-width: 34px; height: 24px; padding: 0 4px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 11.5px; color: #475569;">
+                                    ${item.qty}
+                                </div>
+                                <span style="font-weight: 400; font-size: 14px; color: #0f172a;">${labelsMap[type]}</span>
+                            </div>
+                            <button onclick="window.removeLocalAwbItem('${type}', ${index})" style="border:none; background:none; color: #64748b; cursor: pointer; font-size: 18px; line-height: 1; padding: 0; outline: none; transition: color 0.1s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">&times;</button>
+                        </div>
+                    `;
+                });
+            });
+
+            listContainer.innerHTML = html;
+            
+            const totalEl = document.getElementById('inline-awb-total-checked');
+            if (totalEl) totalEl.textContent = totalChecked;
+
+        };
+
+        window.addLocalAwbItem = function(type, inputId) {
+            if (window.awbModalReadonly) return;
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            const qty = parseInt(input.value, 10);
+            if(isNaN(qty) || qty <= 0) return;
+
+            if (type === 'agi') {
+                currentLocalAwbItems[type].push({ qty: qty });
+            } else {
+                // all others are single-value only (it replaces)
+                currentLocalAwbItems[type] = [{ qty }];
+            }
+
+            input.value = ''; // Reset input to empty after adding
+            window.renderLocalAwbItems();
+        };
+
+        window.updateAgiVal = function(index, val) {
+            if (window.awbModalReadonly) return;
+            const num = parseInt(val, 10) || 0;
+            if (currentLocalAwbItems.agi[index]) {
+                currentLocalAwbItems.agi[index].qty = num;
+                window.renderLocalAwbItems();
+            }
+        };
+
+        window.removeLocalAwbItem = function(type, index) {
+            if (window.awbModalReadonly) return;
+            currentLocalAwbItems[type].splice(index, 1);
+            window.renderLocalAwbItems();
+        };
+
+        window.openInlineAwbModalText = function(awbId, num, pcs, wgt, hse, rem, rCarrier, rNum, rDate, rULD, existingDataJson) {
+            window.currentAwbEditing = { 
+                id: awbId, 
+                num, 
+                pcs: parseInt(pcs, 10) || 0,
+                refCarrier: rCarrier, 
+                refNumber: rNum, 
+                refDate: rDate, 
+                refULD: rULD 
+            };
+            
+            // Re-established default structure
+            currentLocalAwbItems = { agi: [], pre: [], crate: [], box: [], other: [] };
+            
+            // Try populating if it was previously checked
+            let parsed = null;
+            if (existingDataJson) {
+                try {
+                    parsed = JSON.parse(decodeURIComponent(existingDataJson));
+                } catch(e) {}
+            }
+
+            // Defaults reset
+            ['agi', 'pre', 'crate', 'box', 'other'].forEach(id => {
+                const el = document.getElementById('inline-awb-input-' + id);
+                if(el) el.value = '';
+            });
+            document.querySelectorAll('.loc-pill.selected').forEach(pill => pill.classList.remove('selected'));
+            const otherInput = document.getElementById('inline-awb-loc-other-input');
+            if (otherInput) {
+                otherInput.style.display = 'none';
+                otherInput.value = '';
+            }
+            
+            window.awbModalReadonly = !!parsed;
+            
+            // Toggle edit mode globally
+            const toggleReadonlyState = (isReadonly) => {
+                ['agi', 'pre', 'crate', 'box', 'other'].forEach(id => {
+                    const el = document.getElementById('inline-awb-input-' + id);
+                    if(el) {
+                        el.readOnly = isReadonly;
+                        if(isReadonly) el.blur();
+                    }
+                });
+                
+                if (otherInput) {
+                    otherInput.readOnly = isReadonly;
+                    if(isReadonly) otherInput.blur();
+                }
+                
+                const repEl = document.getElementById('awb-mismatch-report');
+                if (repEl) {
+                    repEl.readOnly = isReadonly;
+                    if(isReadonly) repEl.blur();
+                }
+
+                const svBtn = document.getElementById('inline-awb-save-btn');
+                const edBtn = document.getElementById('inline-awb-edit-btn');
+                
+                if (isReadonly) {
+                    if (svBtn) svBtn.style.display = 'none';
+                    if (edBtn) edBtn.style.display = 'block';
+                } else {
+                    if (svBtn) svBtn.style.display = 'block';
+                    if (edBtn) edBtn.style.display = 'none';
+                }
+            };
+
+            toggleReadonlyState(window.awbModalReadonly);
+
+            // Check status element (new)
+            let statusEl = document.getElementById('inline-awb-status-banner');
+            if (!statusEl) {
+                statusEl = document.createElement('div');
+                statusEl.id = 'inline-awb-status-banner';
+                const hdr = document.querySelector('.modal-hdr');
+                if (hdr) hdr.insertAdjacentElement('afterbegin', statusEl);
+            }
+            
+            // Load if exists
+            if (parsed) {
+                // Load agi array back into state
+                if(Array.isArray(parsed['Agi skid'])) {
+                    parsed['Agi skid'].forEach(qty => {
+                        currentLocalAwbItems.agi.push({qty: qty});
+                    });
+                }
+                if(parsed['Pre skid']) currentLocalAwbItems.pre = [{qty: parsed['Pre skid']}];
+                if(parsed['Crates']) currentLocalAwbItems.crate = [{qty: parsed['Crates']}];
+                if(parsed['Box']) currentLocalAwbItems.box = [{qty: parsed['Box']}];
+                if(parsed['Other']) currentLocalAwbItems.other = [{qty: parsed['Other']}];
+                
+                const repEl = document.getElementById('awb-mismatch-report');
+                const mismatchContainer = document.getElementById('awb-mismatch-container');
+                if (parsed['Mismatch Report']) {
+                    if (repEl) repEl.value = parsed['Mismatch Report'];
+                    if (mismatchContainer) mismatchContainer.style.display = 'block';
+                } else {
+                    if (repEl) repEl.value = '';
+                    if (mismatchContainer) mismatchContainer.style.display = 'none';
+                }
+                
+                // Location map back
+                if (parsed['Location required']) {
+                    const lq = parsed['Location required'].toLowerCase();
+                    let matchedPill = false;
+                    document.querySelectorAll('.loc-pill').forEach(pill => {
+                        const txt = pill.textContent.trim().toLowerCase();
+                        if (txt === lq) {
+                            pill.classList.add('selected');
+                            matchedPill = true;
+                        }
+                    });
+                    if (!matchedPill && parsed['Location required'].trim() !== '') {
+                        const optPill = Array.from(document.querySelectorAll('.loc-pill')).find(p => p.textContent.trim().toLowerCase() === 'other');
+                        if (optPill) {
+                            optPill.classList.add('selected');
+                            if (otherInput) {
+                                otherInput.style.display = 'block';
+                                otherInput.value = parsed['Location required'];
+                            }
+                        }
+                    }
+                }
+                
+                statusEl.innerHTML = `<div style="width: 100%; text-align: center; background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700; padding: 6px; letter-spacing: 0.5px; border-bottom: 1px solid #c7d2fe; text-transform: uppercase;"><i class="fas fa-check-circle" style="margin-right:4px;"></i> Already Checked (Viewing/Editing Values)</div>`;
+            } else {
+                statusEl.innerHTML = ``;
+            }
+
+            window.renderLocalAwbItems();
+
+            document.getElementById('inline-awb-modal-title').textContent = `AWB: ${num}`;
+            document.getElementById('inline-awb-modal-pcs').textContent = pcs || '0';
+            document.getElementById('inline-awb-modal-wgt').textContent = wgt ? `${wgt} kg` : '0 kg';
+            document.getElementById('inline-awb-modal-hses').textContent = hse || '0';
+            
+            const remEl = document.getElementById('inline-awb-modal-rem-full');
+            if(remEl) remEl.textContent = rem || 'No notes provided.';
+
+            if(typeof window.switchAwbModalTab === 'function') {
+                window.switchAwbModalTab('data');
+            }
+            
+            document.getElementById('inline-awb-modal-overlay').classList.add('open');
+            document.getElementById('inline-awb-modal').classList.add('open');
+        };
+
+        window.enableAwbEditMode = function() {
+            window.awbModalReadonly = false;
+            
+            ['agi', 'pre', 'crate', 'box', 'other'].forEach(id => {
+                const el = document.getElementById('inline-awb-input-' + id);
+                if(el) el.readOnly = false;
+            });
+            const otherInput = document.getElementById('inline-awb-loc-other-input');
+            if (otherInput) otherInput.readOnly = false;
+
+            const svBtn = document.getElementById('inline-awb-save-btn');
+            const edBtn = document.getElementById('inline-awb-edit-btn');
+            if (svBtn) svBtn.style.display = 'block';
+            if (edBtn) edBtn.style.display = 'none';
+
+            const statusEl = document.getElementById('inline-awb-status-banner');
+            if (statusEl) {
+                statusEl.innerHTML = `<div style="width: 100%; text-align: center; background: #fef9c3; color: #854d0e; font-size: 11px; font-weight: 700; padding: 6px; letter-spacing: 0.5px; border-bottom: 1px solid #fde047; text-transform: uppercase;"><i class="fas fa-pencil-alt" style="margin-right:4px;"></i> Edit Mode Active</div>`;
+            }
+
+            window.renderLocalAwbItems();
+        };
+
+        window.saveCoordinatorData = async function(btn, overrideMismatch = false) {
+            if (!window.currentAwbEditing || !window.currentAwbEditing.id) return;
+            
+            const originalText = btn ? btn.innerHTML : 'Save';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                btn.disabled = true;
+            }
+
+            try {
+                // Determine location Selected
+                let locVal = '';
+                const selectedPill = document.querySelector('.loc-pill.selected');
+                if (selectedPill) {
+                    if (selectedPill.textContent.trim().toLowerCase() === 'other') {
+                        locVal = document.getElementById('inline-awb-loc-other-input').value.trim();
+                    } else {
+                        locVal = selectedPill.textContent.trim();
+                    }
+                }
+
+                const totalEl = document.getElementById('inline-awb-total-checked');
+                const totalChecked = totalEl ? parseInt(totalEl.innerText, 10) || 0 : 0;
+
+                const mismatchEl = document.getElementById('awb-mismatch-report');
+                let reportValue = mismatchEl ? mismatchEl.value.trim() : "";
+                const otherCount = currentLocalAwbItems.other[0] ? currentLocalAwbItems.other[0].qty : 0;
+                const hasMismatch = window.currentAwbEditing.pcs !== undefined && totalChecked !== window.currentAwbEditing.pcs;
+                const hasOther = otherCount > 0;
+
+                // Mismatch Overlay Check
+                if (!overrideMismatch && (hasMismatch || hasOther)) {
+                    const overlay = document.getElementById('mismatch-overlay-modal');
+                    if (overlay) {
+                        const titleEl = document.getElementById('mismatch-modal-title');
+                        const iconEl = document.getElementById('mismatch-modal-icon');
+                        const descEl = document.getElementById('mismatch-modal-desc');
+
+                        if (hasMismatch && hasOther) {
+                            titleEl.innerHTML = `<i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> <span>Discrepancy & "Other" Found</span>`;
+                            descEl.innerHTML = `The Total Checked pieces (<b>${totalChecked}</b>) do not match the expected AWB pieces (<b>${window.currentAwbEditing.pcs}</b>), AND you have recorded pieces as "Other".<br><br>Please provide a brief report explaining the situation before saving:`;
+                        } else if (hasMismatch) {
+                } catch(e) {}
+            }
+
+            // Defaults reset
+            ['agi', 'pre', 'crate', 'box', 'other'].forEach(id => {
+                const el = document.getElementById('inline-awb-input-' + id);
+                if(el) el.value = '';
+            });
+            document.querySelectorAll('.loc-pill.selected').forEach(pill => pill.classList.remove('selected'));
+            const otherInput = document.getElementById('inline-awb-loc-other-input');
+            if (otherInput) {
+                otherInput.style.display = 'none';
+                otherInput.value = '';
+            }
+            
+            window.awbModalReadonly = !!parsed;
+            
+            // Toggle edit mode globally
+            const toggleReadonlyState = (isReadonly) => {
+                ['agi', 'pre', 'crate', 'box', 'other'].forEach(id => {
+                    const el = document.getElementById('inline-awb-input-' + id);
+                    if(el) {
+                        el.readOnly = isReadonly;
+                        if(isReadonly) el.blur();
+                    }
+                });
+                
+                if (otherInput) {
+                    otherInput.readOnly = isReadonly;
+                    if(isReadonly) otherInput.blur();
+                }
+                
+                const repEl = document.getElementById('awb-mismatch-report');
+                if (repEl) {
+                    repEl.readOnly = isReadonly;
+                    if(isReadonly) repEl.blur();
+                }
+
+                const svBtn = document.getElementById('inline-awb-save-btn');
+                const edBtn = document.getElementById('inline-awb-edit-btn');
+                
+                if (isReadonly) {
+                    if (svBtn) svBtn.style.display = 'none';
+                    if (edBtn) edBtn.style.display = 'block';
+                } else {
+                    if (svBtn) svBtn.style.display = 'block';
+                    if (edBtn) edBtn.style.display = 'none';
+                }
+            };
+
+            toggleReadonlyState(window.awbModalReadonly);
+
+            // Check status element (new)
+            let statusEl = document.getElementById('inline-awb-status-banner');
+            if (!statusEl) {
+                statusEl = document.createElement('div');
+                statusEl.id = 'inline-awb-status-banner';
+                const hdr = document.querySelector('.modal-hdr');
+                if (hdr) hdr.insertAdjacentElement('afterbegin', statusEl);
+            }
+            
+            // Load if exists
+            if (parsed) {
+                // Load agi array back into state
+                if(Array.isArray(parsed['Agi skid'])) {
+                    parsed['Agi skid'].forEach(qty => {
+                        currentLocalAwbItems.agi.push({qty: qty});
+                    });
+                }
+                if(parsed['Pre skid']) currentLocalAwbItems.pre = [{qty: parsed['Pre skid']}];
+                if(parsed['Crates']) currentLocalAwbItems.crate = [{qty: parsed['Crates']}];
+                if(parsed['Box']) currentLocalAwbItems.box = [{qty: parsed['Box']}];
+                if(parsed['Other']) currentLocalAwbItems.other = [{qty: parsed['Other']}];
+                
+                const repEl = document.getElementById('awb-mismatch-report');
+                const mismatchContainer = document.getElementById('awb-mismatch-container');
+                if (parsed['Mismatch Report']) {
+                    if (repEl) repEl.value = parsed['Mismatch Report'];
+                    if (mismatchContainer) mismatchContainer.style.display = 'block';
+                } else {
+                    if (repEl) repEl.value = '';
+                    if (mismatchContainer) mismatchContainer.style.display = 'none';
+                }
+                
+                // Location map back
+                if (parsed['Location required']) {
+                    const lq = parsed['Location required'].toLowerCase();
+                    let matchedPill = false;
+                    document.querySelectorAll('.loc-pill').forEach(pill => {
+                        const txt = pill.textContent.trim().toLowerCase();
+                        if (txt === lq) {
+                            pill.classList.add('selected');
+                            matchedPill = true;
+                        }
+                    });
+                    if (!matchedPill && parsed['Location required'].trim() !== '') {
+                        const optPill = Array.from(document.querySelectorAll('.loc-pill')).find(p => p.textContent.trim().toLowerCase() === 'other');
+                        if (optPill) {
+                            optPill.classList.add('selected');
+                            if (otherInput) {
+                                otherInput.style.display = 'block';
+                                otherInput.value = parsed['Location required'];
+                            }
+                        }
+                    }
+                }
+                
+                statusEl.innerHTML = `<div style="width: 100%; text-align: center; background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 700; padding: 6px; letter-spacing: 0.5px; border-bottom: 1px solid #c7d2fe; text-transform: uppercase;"><i class="fas fa-check-circle" style="margin-right:4px;"></i> Already Checked (Viewing/Editing Values)</div>`;
+            } else {
+                statusEl.innerHTML = ``;
+            }
+
+            window.renderLocalAwbItems();
+
+            document.getElementById('inline-awb-modal-title').textContent = `AWB: ${num}`;
+            document.getElementById('inline-awb-modal-pcs').textContent = pcs || '0';
+            document.getElementById('inline-awb-modal-wgt').textContent = wgt ? `${wgt} kg` : '0 kg';
+            document.getElementById('inline-awb-modal-hses').textContent = hse || '0';
+            
+            const remEl = document.getElementById('inline-awb-modal-rem-full');
+            if(remEl) remEl.textContent = rem || 'No notes provided.';
+
+            if(typeof window.switchAwbModalTab === 'function') {
+                window.switchAwbModalTab('data');
+            }
+            
+            document.getElementById('inline-awb-modal-overlay').classList.add('open');
+            document.getElementById('inline-awb-modal').classList.add('open');
+        };
+
+        window.enableAwbEditMode = function() {
+            window.awbModalReadonly = false;
+            
+            ['agi', 'pre', 'crate', 'box', 'other'].forEach(id => {
+                const el = document.getElementById('inline-awb-input-' + id);
+                if(el) el.readOnly = false;
+            });
+            const otherInput = document.getElementById('inline-awb-loc-other-input');
+            if (otherInput) otherInput.readOnly = false;
+
+            const svBtn = document.getElementById('inline-awb-save-btn');
+            const edBtn = document.getElementById('inline-awb-edit-btn');
+            if (svBtn) svBtn.style.display = 'block';
+            if (edBtn) edBtn.style.display = 'none';
+
+            const statusEl = document.getElementById('inline-awb-status-banner');
+            if (statusEl) {
+                statusEl.innerHTML = `<div style="width: 100%; text-align: center; background: #fef9c3; color: #854d0e; font-size: 11px; font-weight: 700; padding: 6px; letter-spacing: 0.5px; border-bottom: 1px solid #fde047; text-transform: uppercase;"><i class="fas fa-pencil-alt" style="margin-right:4px;"></i> Edit Mode Active</div>`;
+            }
+
+            window.renderLocalAwbItems();
+        };
+
+        window.saveCoordinatorData = async function(btn, overrideMismatch = false) {
+            if (!window.currentAwbEditing || !window.currentAwbEditing.id) return;
+            
+            const originalText = btn ? btn.innerHTML : 'Save';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                btn.disabled = true;
+            }
+
+            try {
+                // Determine location Selected
+                let locVal = '';
+                const selectedPill = document.querySelector('.loc-pill.selected');
+                if (selectedPill) {
+                    if (selectedPill.textContent.trim().toLowerCase() === 'other') {
+                        locVal = document.getElementById('inline-awb-loc-other-input').value.trim();
+                    } else {
+                        locVal = selectedPill.textContent.trim();
+                    }
+                }
+
+                const totalEl = document.getElementById('inline-awb-total-checked');
+                const totalChecked = totalEl ? parseInt(totalEl.innerText, 10) || 0 : 0;
+
+                const mismatchEl = document.getElementById('awb-mismatch-report');
+                let reportValue = mismatchEl ? mismatchEl.value.trim() : "";
+                const otherCount = currentLocalAwbItems.other[0] ? currentLocalAwbItems.other[0].qty : 0;
+                const hasMismatch = window.currentAwbEditing.pcs !== undefined && totalChecked !== window.currentAwbEditing.pcs;
+                const hasOther = otherCount > 0;
+
+                // Mismatch Overlay Check
+                if (!overrideMismatch && (hasMismatch || hasOther)) {
+                    const overlay = document.getElementById('mismatch-overlay-modal');
+                    if (overlay) {
+                        const titleEl = document.getElementById('mismatch-modal-title');
+                        const iconEl = document.getElementById('mismatch-modal-icon');
+                        const descEl = document.getElementById('mismatch-modal-desc');
+
+                        if (hasMismatch && hasOther) {
+                            titleEl.innerHTML = `<i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> <span>Discrepancy & "Other" Found</span>`;
+                            descEl.innerHTML = `The Total Checked pieces (<b>${totalChecked}</b>) do not match the expected AWB pieces (<b>${window.currentAwbEditing.pcs}</b>), AND you have recorded pieces as "Other".<br><br>Please provide a brief report explaining the situation before saving:`;
+                        } else if (hasMismatch) {
+                            titleEl.innerHTML = `<i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> <span>Pieces Discrepancy</span>`;
+                            descEl.innerHTML = `The Total Checked pieces (<b>${totalChecked}</b>) do not match the expected AWB pieces (<b>${window.currentAwbEditing.pcs}</b>).<br><br>Please provide a brief report explaining the difference before saving:`;
+                        } else if (hasOther) {
+                            titleEl.innerHTML = `<i class="fas fa-box-open" style="margin-right:8px; color: #d97706;"></i> <span style="color: #d97706;">"Other" Pieces Recorded</span>`;
+                            descEl.innerHTML = `You have recorded <b>${otherCount}</b> pieces as "Other" breakdown.<br><br>Please provide a brief report explaining what these "Other" pieces are before saving:`;
+                        }
+                        
+                        const overlayRep = document.getElementById('awb-mismatch-overlay-report');
+                        const errorMsg = document.getElementById('mismatch-error-msg');
+                        if (overlayRep) {
+                            overlayRep.value = reportValue;
+                            overlayRep.style.borderColor = '#cbd5e1'; // reset
+                        }
+                        if (errorMsg) {
+                            errorMsg.style.display = 'none'; // reset
+                        }
+                        
+                        overlay.style.display = 'flex';
+                        
+                        if(btn) {
+                            btn.innerHTML = 'Save';
+                            btn.disabled = false;
+                        }
+                        return; // Halt saving process until they confirm
+                    }
+                }
+
+                // If executing here, we either matched, or the user confirmed the overlay popup
+                if (overrideMismatch) {
+                    const overlayRep = document.getElementById('awb-mismatch-overlay-report');
+                    if (overlayRep) reportValue = overlayRep.value.trim();
+                } else {
+                    // if it matched, but they previously had a mismatch report, clear it
+                    reportValue = "";
+                }
+
+                const newEntry = {
+                    refCarrier: window.currentAwbEditing.refCarrier,
+                    refNumber: window.currentAwbEditing.refNumber,
+                    refDate: window.currentAwbEditing.refDate,
+                    refULD: window.currentAwbEditing.refULD,
+                    "Agi skid": currentLocalAwbItems.agi.map(a => a.qty),
+                    "Pre skid": currentLocalAwbItems.pre[0] ? currentLocalAwbItems.pre[0].qty : 0,
+                    "Crates": currentLocalAwbItems.crate[0] ? currentLocalAwbItems.crate[0].qty : 0,
+                    "Box": currentLocalAwbItems.box[0] ? currentLocalAwbItems.box[0].qty : 0,
+                    "Other": currentLocalAwbItems.other[0] ? currentLocalAwbItems.other[0].qty : 0,
+                    "Location required": locVal,
+                    "Total Checked": totalChecked,
+                    "Mismatch Report": reportValue
+                };
+
+                // Fetch current list
+                const { data, error } = await supabaseClient
+                    .from('AWB')
+                    .select('"data-coordinator"')
+                    .eq('id', window.currentAwbEditing.id)
+                    .single();
+                
+                if (error) throw error;
+                
+                let coordList = data['data-coordinator'];
+                if (!Array.isArray(coordList)) {
+                    try {
+                        coordList = JSON.parse(coordList);
+                        if (!Array.isArray(coordList)) coordList = [];
+                    } catch(e) {
+                        coordList = [];
+                    }
+                }
+
+                // Check if an entry for this ULD flight context already exists
+                const eqRef = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+
+                const existingIndex = coordList.findIndex(c => 
+                    eqRef(c.refCarrier, window.currentAwbEditing.refCarrier) &&
+                    eqRef(c.refNumber, window.currentAwbEditing.refNumber) &&
+                    eqRef(c.refDate, window.currentAwbEditing.refDate) &&
+                    eqRef(c.refULD, window.currentAwbEditing.refULD)
+                );
+
+                if (existingIndex > -1) {
+                    coordList[existingIndex] = newEntry; // Override
+                } else {
+                    coordList.push(newEntry); // Add new
+                }
+
+                // Update row
+                const { error: updateError } = await supabaseClient
+                    .from('AWB')
+                    .update({ 'data-coordinator': coordList })
+                    .eq('id', window.currentAwbEditing.id);
+
+                if (updateError) throw updateError;
+                
+                // Close modal on success
+                document.getElementById('inline-awb-modal').classList.remove('open');
+                document.getElementById('inline-awb-modal-overlay').classList.remove('open');
+                
+                // Auto-refresh the currently open ULD row to reflect the new checkmark
+                const openInlines = document.querySelectorAll('.inline-details-row');
+                if (openInlines.length > 0) {
+                    const parentTr = openInlines[0].previousElementSibling;
+                    if (parentTr) {
+                        parentTr.click(); // Close
+                        setTimeout(() => parentTr.click(), 50); // Re-open
+                    }
+                }
+
+            } catch (err) {
+                console.error("Error saving coordinator data:", err);
+                alert("Failed to save data. Try again.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        window.openAwbPanelReadOnly = async function(uldParam) {
+            currentUldIdForAwb = null; // Prevent modification globally
+            const footer = document.getElementById('awb-drawer-footer');
+            if (footer) footer.style.display = 'none';
+
+            let uld = null;
+            if (typeof uldParam === 'object' && uldParam !== null) {
+                uld = uldParam;
+            } else {
+                uld = localUlds.find(u => u.id == uldParam || u["ULD number"] == uldParam || u.uld_number == uldParam);
+            }
+            if(!uld) return;
+
+            const uNumber = uld["ULD number"] || uld.uld_number || uld.id;
+            drawerUldTitle.textContent = `ULD: ${uNumber}`;
+            
+            if(drawerUldPcs) drawerUldPcs.textContent = uld.pieces || '0';
+            if(drawerUldWgt) drawerUldWgt.textContent = (uld.weight || '0') + ' kg';
+            
+            const isPrio = uld.isPriority || uld.priority;
+            const isBrk = uld.isBreak || uld.break;
+            if(drawerUldPrio) drawerUldPrio.innerHTML = isPrio ? '<span style="color:#ef4444; font-weight:600;">Yes</span>' : 'No';
+            if(drawerUldBrk) drawerUldBrk.innerHTML = isBrk ? '<span style="color:#4f46e5; font-weight:600;">Yes</span>' : 'No';
+            if(drawerUldRem) drawerUldRem.textContent = uld.remarks || 'N/A';
+
+            // Loading state
+            if (drawerAwbTable) {
+                drawerAwbTable.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic;">Fetching AWBs from database...</td></tr>';
+            }
+            
+            // Abrir Drawer Animado (inmediatamente para percibir la carga)
+            awbDrawer.classList.add('open');
+            awbOverlay.classList.add('open');
+
+            // Fetch from Supabase
+            try {
+                const { data: awbs, error } = await supabaseClient.from('AWB').select('*');
+                let matchedAwbs = [];
+                if (!error && awbs) {
+                    awbs.forEach(awbDoc => {
+                        let nestedArr = [];
+                        if (Array.isArray(awbDoc['data-AWB'])) {
+                            nestedArr = awbDoc['data-AWB'];
+                        } else if (awbDoc['data-AWB']) {
+                            try { nestedArr = JSON.parse(awbDoc['data-AWB']); } catch(e){}
+                        }
+
+                        if (nestedArr.length > 0) {
+                            const nestedData = nestedArr.find(n => 
+                                n.refULD == uNumber && 
+                                (!uld.refCarrier || n.refCarrier == uld.refCarrier) &&
+                                (!uld.refNumber || n.refNumber == uld.refNumber) &&
+                                (!uld.refDate || n.refDate == uld.refDate)
+                            );
+                            if (nestedData) {
+                                matchedAwbs.push({
+                                    awb_number: awbDoc['AWB number'] || awbDoc.awb_number,
+                                    pieces: nestedData.pieces || 0,
+                                    weight: nestedData.weight || 0,
+                                    total: awbDoc.total,
+                                    house_number: nestedData.houses || nestedData.house_number || [],
+                                    remarks: nestedData.remarks || '-'
+                                });
+                            }
+                        }
+                    });
+                }
+
+                if (drawerAwbTable) {
+                    drawerAwbTable.innerHTML = '';
+                    if (matchedAwbs.length === 0) {
+                        drawerAwbTable.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic;">No AWBs associated with this ULD.</td></tr>';
+                    } else {
+                        matchedAwbs.forEach((awb, index) => {
+                            const tr = document.createElement('tr');
+                            const hList = awb.house_number || [];
+                            const hCount = hList.length;
+                            const hBadge = hCount > 0 
+                                           ? `<span style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:10px; font-size:9px; cursor:pointer;" onclick="alert('Houses:\\n${hList.join('\\n')}')" title="Click to view all">${hCount}</span>` 
+                                           : `<span style="color:#94a3b8; font-size:10px;">0</span>`;
+
+                            tr.innerHTML = `
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; font-weight: 500; text-align: center;">
+                                    ${index + 1}
+                                </td>
+                                <td style="padding: 12px; font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; font-weight: 500; white-space: nowrap;">
+                                    ${awb.awb_number}
+                                </td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${awb.pieces}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${awb.total || '0'}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${awb.weight}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${hBadge}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 100%; max-width: 0;">
+                                    <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;" title="${awb.remarks || ''}">${awb.remarks || '-'}</span>
+                                </td>
+                                <td style="padding: 12px; font-size: 11px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                                    <span style="color:#cbd5e1; font-size: 10px;">-</span>
+                                </td>
+                            `;
+                            drawerAwbTable.appendChild(tr);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching AWBs read-only:", err);
+                if (drawerAwbTable) {
+                    drawerAwbTable.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; color: #ef4444; font-size: 12px;">Failed to load AWBs.</td></tr>';
+                }
+            }
+        };
+
+        window.openCoordAwbDrawer = async function(uld, flight) {
+            currentUldIdForAwb = null; 
+            const footer = document.getElementById('awb-drawer-footer');
+            if (footer) footer.style.display = 'none';
+
+            const uNumber = uld["ULD number"] || uld.uld_number || uld.id || 'N/A';
+            drawerUldTitle.textContent = `ULD: ${uNumber}`;
+            
+            if(drawerUldPcs) drawerUldPcs.textContent = uld.pieces || '0';
+            if(drawerUldWgt) drawerUldWgt.textContent = (uld.weight || '0') + ' kg';
+            
+            const isPrio = uld.isPriority || uld.priority;
+            const isBrk = uld.isBreak || uld.break;
+            if(drawerUldPrio) drawerUldPrio.innerHTML = isPrio ? '<span style="color:#ef4444; font-weight:600;">Yes</span>' : 'No';
+            if(drawerUldBrk) drawerUldBrk.innerHTML = isBrk ? '<span style="color:#4f46e5; font-weight:600;">Yes</span>' : 'No';
+            if(drawerUldRem) drawerUldRem.textContent = uld.remarks || 'N/A';
+
+            if (drawerAwbTable) {
+                drawerAwbTable.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic;">Fetching AWBs from database...</td></tr>';
+            }
+            
+            awbDrawer.classList.add('open');
+            awbOverlay.classList.add('open');
+
+            try {
+                const fCarrier = flight.carrier || '';
+                const fNumber = flight.number || '';
+                const fDate = flight['date-arrived'];
+                const refDate = fDate ? new Date(fDate).toLocaleDateString() : '';
+                const strictFlightRefString = `${fCarrier} ${fNumber} ${refDate}`.trim();
+                const partialFlightRef = `${fCarrier} ${fNumber}`.trim();
+                
+                const officialDayStr = fDate ? parseInt(fDate.split('-')[2], 10).toString() : ''; 
+                const officialMonthStr = fDate ? parseInt(fDate.split('-')[1], 10).toString() : '';
+                const tzDay = fDate ? new Date(fDate).getDate().toString() : '';
+
+                const { data: awbs, error } = await supabaseClient.from('AWB').select('*');
+                let matchedAwbs = [];
+                if (!error && awbs) {
+                    awbs.forEach(awbDoc => {
+                        if (awbDoc['data-AWB'] && Array.isArray(awbDoc['data-AWB'])) {
+                            const nestedDatas = awbDoc['data-AWB'].filter(n => {
+                                if (n.refULD !== uNumber) return false;
+                                
+                                if (n.refCarrier) {
+                                    return n.refCarrier === fCarrier && n.refNumber === fNumber && n.refDate === refDate;
+                                } else if (n.refFlight) {
+                                    if (n.refFlight === strictFlightRefString) return true;
+                                    if (n.refFlight.startsWith(partialFlightRef)) return true;
+                                }
+                                
+                                return false;
+                            });
+
+                            nestedDatas.forEach(nestedData => {
+                                matchedAwbs.push({
+                                    awb_number: awbDoc['AWB number'] || awbDoc.awb_number,
+                                    pieces: nestedData.pieces || 0,
+                                    weight: nestedData.weight || 0,
+                                    total: awbDoc.total,
+                                    house_number: nestedData.houses || nestedData.house_number || [],
+                                    remarks: nestedData.remarks || '-',
+                                    matched_flight_ref: nestedData.refCarrier ? `${nestedData.refCarrier} ${nestedData.refNumber} ${nestedData.refDate}` : nestedData.refFlight
+                                });
+                            });
+                        }
+                    });
+                }
+
+                if (drawerAwbTable) {
+                    drawerAwbTable.innerHTML = '';
+                    if (matchedAwbs.length === 0) {
+                        drawerAwbTable.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic;">No AWBs associated with this ULD on this flight.</td></tr>';
+                    } else {
+                        matchedAwbs.forEach((awb, index) => {
+                            const tr = document.createElement('tr');
+                            const hList = awb.house_number || [];
+                            const hCount = hList.length;
+                            const hBadge = hCount > 0 
+                                           ? `<span style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:10px; font-size:9px; cursor:pointer;" onclick="alert('Houses:\\n${hList.join('\\n')}')" title="Click to view all">${hCount}</span>` 
+                                           : `<span style="color:#94a3b8; font-size:10px;">0</span>`;
+
+                            tr.style.cursor = 'pointer';
+                            tr.style.transition = 'all 0.2s';
+                            tr.onmouseover = () => { tr.style.background = '#f8fafc'; };
+                            tr.onmouseout = () => { tr.style.background = 'transparent'; };
+                            
+                            tr.addEventListener('click', () => {
+                                window.openReceiveModal(awb, awb.matched_flight_ref || strictFlightRefString, uNumber);
+                            });
+
+                            tr.innerHTML = `
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; font-weight: 500; text-align: center;">
+                                    ${index + 1}
+                                </td>
+                                <td style="padding: 12px; font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; font-weight: 500; white-space: nowrap;">
+                                    ${awb.awb_number}
+                                </td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${awb.pieces}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${awb.total || '0'}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${awb.weight} kg</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${hBadge}</td>
+                                <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 100%; max-width: 0;">
+                                    <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;" title="${awb.remarks || ''}">${awb.remarks || '-'}</span>
+                                </td>
+                                <td style="padding: 12px; font-size: 11px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                                    <span style="color:#cbd5e1; font-size: 10px;">-</span>
+                                </td>
+                            `;
+                            drawerAwbTable.appendChild(tr);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching AWBs coord:", err);
+                if (drawerAwbTable) {
+                    drawerAwbTable.innerHTML = '<tr><td colspan="8" style="padding: 16px; text-align: center; color: #ef4444; font-size: 12px;">Failed to load AWBs.</td></tr>';
+                }
+            }
+        };
+
+        // --- RECEIVE MODAL LOGIC ----
+        const recModalOverlay = document.getElementById('awb-receive-modal-overlay');
+        const closeRecModalBtn = document.getElementById('close-receive-modal-btn');
+        const cancelRecBtn = document.getElementById('cancel-receive-btn');
+        const saveRecBtn = document.getElementById('save-receive-btn');
+        
+        // Input y display fields
+        let currentReceivedAwbContext = null;
+
+        // Required Location Choice Logic
+        const reqLocOtherWrapper = document.getElementById('req-loc-other-wrapper');
+        const reqLocOtherInput = document.getElementById('req-loc-other-input');
+        
+        // Listen to all radio buttons in loc-chip directly:
+        document.addEventListener('change', (e) => {
+            if (e.target.name === 'rec-location') {
+                if (e.target.value === 'Other') {
+                    if (reqLocOtherWrapper) reqLocOtherWrapper.style.display = 'block';
+                    if (reqLocOtherInput) reqLocOtherInput.focus();
+                } else {
+                    if (reqLocOtherWrapper) reqLocOtherWrapper.style.display = 'none';
+                    if (reqLocOtherInput) reqLocOtherInput.value = '';
+                }
+            }
+        });
+
+        // Function to compute total pieces dynamically
+        function updateTotalPiecesChecked() {
+            let total = 0;
+            // Sum list items logic
+            ['AGI Skid', 'Pre Skid', 'Crate', 'Box', 'Other'].forEach(t => {
+                if (packageState[t]) {
+                    total += packageState[t].reduce((acc, curr) => acc + curr, 0);
+                }
+            });
+            
+            const totalPcsEl = document.getElementById('rec-inp-pcs');
+            if (totalPcsEl) {
+                 totalPcsEl.textContent = total;
+            }
+        }
+
+        // Package Lists Setup
+        const packageTypesConfig = [
+            { id: 'agi-skid', name: 'AGI Skid' },
+            { id: 'pre-skid', name: 'Pre Skid' },
+            { id: 'crate', name: 'Crate' },
+            { id: 'box', name: 'Box' },
+            { id: 'other', name: 'Other' }
+        ];
+
+        const packageState = {
+            'AGI Skid': [],
+            'Pre Skid': [],
+            'Crate': [],
+            'Box': [],
+            'Other': []
+        };
+
+        function renderPackageList(typeId, typeName) {
+            const listEl = document.getElementById(`${typeId}-list`);
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            
+            const isAgi = typeName === 'AGI Skid';
+
+            packageState[typeName].forEach((qty, idx) => {
+                const chip = document.createElement('div');
+                chip.style.cssText = 'display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 10px; background: transparent; border-radius: 6px; font-size: 14px; color: #64748b; box-sizing: border-box;';
+                
+                let numBadge = '';
+                if(isAgi) {
+                    numBadge = `<div style="width: 20px; height: 20px; border-radius: 50%; border: 1px solid #4f46e5; color: #4f46e5; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;">${idx + 1}</div>`;
+                }
+
+                chip.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        ${numBadge}
+                        <span style="font-weight: 600; color: #0f172a;">${qty}</span>
+                    </div>
+                    <button class="del-pkg-btn" data-type="${typeName}" data-idx="${idx}" style="background: transparent; border: none; color: #94a3b8; font-size: 15px; cursor: pointer; padding: 0; display: flex; align-items: center;">✕</button>
+                `;
+                listEl.appendChild(chip);
+            });
+
+            listEl.querySelectorAll('.del-pkg-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const tName = e.currentTarget.getAttribute('data-type');
+                    const idx = parseInt(e.currentTarget.getAttribute('data-idx'));
+                    packageState[tName].splice(idx, 1);
+                    renderPackageList(typeId, tName);
+                    updateTotalPiecesChecked();
+                });
+            });
+        }
+
+        packageTypesConfig.forEach(config => {
+            const inputEl = document.getElementById(`${config.id}-input`);
+            const btnEl = document.getElementById(`add-${config.id}-btn`);
+            
+            if (btnEl && inputEl) {
+                btnEl.addEventListener('click', () => {
+                    const val = parseInt(inputEl.value);
+                    if (!isNaN(val) && val > 0) {
+                        packageState[config.name].push(val);
+                        inputEl.value = '';
+                        renderPackageList(config.id, config.name);
+                        updateTotalPiecesChecked();
+                    }
+                });
+
+                inputEl.addEventListener('keyup', (e) => {
+                    if (e.key === 'Enter') btnEl.click();
+                });
+            }
+        });
+
+        window.openReceiveModal = function(awbData, flightRef, uldRef) {
+            currentReceivedAwbContext = { awbData, flightRef, uldRef };
+            
+            document.getElementById('receive-modal-title').textContent = awbData.awb_number || 'AWB number';
+            document.getElementById('rec-exp-pcs').textContent = awbData.pieces || '0';
+            document.getElementById('rec-exp-wgt').textContent = awbData.weight || '0';
+            document.getElementById('rec-exp-wgt').textContent = awbData.weight || '0';
+            
+            // Set Initial Display for textContent Div replacing value Input
+            document.getElementById('rec-inp-pcs').textContent = '0';
+            
+            // Reset Package Lists
+            packageTypesConfig.forEach(config => {
+                packageState[config.name] = [];
+                const inputEl = document.getElementById(`${config.id}-input`);
+                if(inputEl) inputEl.value = '';
+                renderPackageList(config.id, config.name);
+            });
+            
+            const reqIntact = document.querySelector('input[name="rec-condition"][value="Intact"]');
+            if(reqIntact) reqIntact.checked = true;
+
+            document.querySelectorAll('input[name="rec-location"]').forEach(input => input.checked = false);
+            if (reqLocOtherWrapper) reqLocOtherWrapper.style.display = 'none';
+            if (reqLocOtherInput) reqLocOtherInput.value = '';
+
+            document.getElementById('rec-inp-notes').value = '';
+            
+            if(saveRecBtn) {
+                saveRecBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save Record`;
+                saveRecBtn.disabled = false;
+                saveRecBtn.style.opacity = '1';
+                saveRecBtn.style.cursor = 'pointer';
+                saveRecBtn.style.background = '#4f46e5';
+            }
+
+            recModalOverlay.style.display = 'flex';
+        };
+
+        const closeRecModal = () => {
+            recModalOverlay.style.display = 'none';
+            currentReceivedAwbContext = null;
+        };
+
+        if (closeRecModalBtn) closeRecModalBtn.addEventListener('click', closeRecModal);
+        if (cancelRecBtn) cancelRecBtn.addEventListener('click', closeRecModal);
+
+        if (saveRecBtn) {
+            saveRecBtn.addEventListener('click', async () => {
+                if (!currentReceivedAwbContext) return;
+                
+                // Recolectar datos
+                const totalPcsEl = document.getElementById('rec-inp-pcs');
+                const totalPcs = totalPcsEl ? totalPcsEl.textContent : '0';
+
+                if (!totalPcs || parseInt(totalPcs) <= 0) {
+                    alert('Please enter a valid number of received pieces.');
+                    return;
+                }
+
+                const composition = {};
+                
+                // Set Array items
+                packageTypesConfig.forEach(config => {
+                    if (packageState[config.name] && packageState[config.name].length > 0) {
+                        composition[config.name] = [...packageState[config.name]];
+                    }
+                });
+
+                const conditionNode = document.querySelector('input[name="rec-condition"]:checked');
+                const condition = conditionNode ? conditionNode.value : 'Intact';
+                
+                const recLocNode = document.querySelector('input[name="rec-location"]:checked');
+                let requiredLocation = '';
+                if (recLocNode) {
+                    if (recLocNode.value === 'Other') {
+                        requiredLocation = document.getElementById('req-loc-other-input').value.trim();
+                    } else {
+                        requiredLocation = recLocNode.value;
+                    }
+                }
+
+                const notes = document.getElementById('rec-inp-notes').value.trim();
+
+                saveRecBtn.disabled = true;
+                saveRecBtn.textContent = 'Saving...';
+                saveRecBtn.style.opacity = '0.7';
+                saveRecBtn.style.cursor = 'not-allowed';
+
+                try {
+                    const awbNum = currentReceivedAwbContext.awbData.awb_number;
+                    const flightRef = currentReceivedAwbContext.flightRef;
+                    const uldRef = currentReceivedAwbContext.uldRef;
+
+                    // 1. Obtener el AWB original completo
+                    const { data: currentAwbs, error: fetchErr } = await supabaseClient
+                        .from('AWB')
+                        .select('*')
+                        .eq('AWB number', awbNum); 
+                        
+                    if (fetchErr || !currentAwbs || currentAwbs.length === 0) {
+                        throw fetchErr || new Error("AWB not found");
+                    }
+
+                    const awbDoc = currentAwbs[0];
+                    let nestedDataArray = awbDoc['data-AWB'];
+
+                    // 2. Localizar y mutar el fragmento específico correspondiente
+                    if (Array.isArray(nestedDataArray)) {
+                        const splitIndex = nestedDataArray.findIndex(n => n.refULD === uldRef && n.refFlight === flightRef);
+                        
+                        if(splitIndex !== -1) {
+                            nestedDataArray[splitIndex].received_data = {
+                                received_pieces: parseInt(totalPcs),
+                                composition: composition,
+                                condition: condition,
+                                required_location: requiredLocation,
+                                remarks: notes,
+                                receivedAt: new Date().toISOString()
+                            };
+                        }
+                    }
+
+                    // 3. Guardar el objeto entero de regreso a Supabase
+                    const { error: updateErr } = await supabaseClient
+                        .from('AWB')
+                        .update({ 'data-AWB': nestedDataArray })
+                        .eq('id', awbDoc.id);
+
+                    if (updateErr) {
+                        throw updateErr;
+                    }
+
+                    // Éxito:
+                    saveRecBtn.textContent = 'Saved!';
+                    saveRecBtn.style.background = '#10b981'; // Green
+                    
+                    setTimeout(() => {
+                        closeRecModal();
+                        saveRecBtn.style.background = '#4f46e5';
+                    }, 800);
+
+                } catch (err) {
+                    console.error("Failed to save received data:", err);
+                    alert("Error updating the database.");
+                    saveRecBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save Record`;
+                    saveRecBtn.disabled = false;
+                    saveRecBtn.style.opacity = '1';
+                    saveRecBtn.style.cursor = 'pointer';
+                }
+            });
+        }
+        // --- FIN RECEIVE MODAL ----
+
+        // Cerrar panel
+        function closeAwbPanel() {
+            awbDrawer.classList.remove('open');
+            awbOverlay.classList.remove('open');
+            currentUldIdForAwb = null;
+            renderLocalUlds(); // Quitar clase color de la fila si se cierra
+            
+            // Restaurar pie de página
+            const footer = document.getElementById('awb-drawer-footer');
+            if (footer) footer.style.display = 'block';
+        }
+
+        if(closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeAwbPanel);
+        if(awbOverlay) awbOverlay.addEventListener('click', closeAwbPanel);
+
+        // Auto-fill AWB total
+        const awbNumberInput = document.getElementById('awb-number');
+        if (awbNumberInput) {
+            awbNumberInput.addEventListener('input', async (e) => {
+                const val = e.target.value.trim().toUpperCase();
+                const totalInput = document.getElementById('awb-total');
+
+                // Si se borra o no está completo, permitimos edición libre siempre
+                if (val.length < 13) {
+                    totalInput.readOnly = false;
+                    totalInput.style.backgroundColor = '';
+                    return;
+                }
+
+                // Si ha alcanzado los 13 caracteres, buscamos si tiene "Total" ya guardado localmente en esta misma sesión
+                let foundTotal = null;
+
+                for (const u of localUlds) {
+                    if (u.awbs) {
+                        const foundLocal = u.awbs.find(a => a.awb_number === val);
+                        if (foundLocal && foundLocal.total !== null && foundLocal.total !== undefined && foundLocal.total !== '') {
+                            foundTotal = foundLocal.total;
+                            break;
+                        }
+                    }
+                }
+
+                // Buscar en Supabase si no se halló localmente
+                if (foundTotal === null) {
+                    try {
+                        totalInput.placeholder = 'Buscando...';
+                        const { data, error } = await supabaseClient
+                            .from('AWB')
+                            .select('total')
+                            .eq('AWB number', val)
+                            .single();
+                        
+                        if (!error && data && data.total !== null) {
+                            foundTotal = data.total;
+                        }
+                    } catch (err) {
+                        console.error('Error fetching awb total:', err);
+                    } finally {
+                        totalInput.placeholder = '0.0';
+                    }
+                }
+
+                if (foundTotal !== null) {
+                    totalInput.value = foundTotal;
+                    // Bloqueamos la edición del campo para no sobrescribir (según requerimiento)
+                    totalInput.readOnly = true;
+                    totalInput.style.backgroundColor = '#f1f5f9';
+                }
+            });
+        }
+
+        // Añadir AWB localmente
+        if(addAwbBtn) {
+            addAwbBtn.addEventListener('click', () => {
+                const aNum = document.getElementById('awb-number').value.trim().toUpperCase();
+                
+                // Parse house numbers into array
+                const aHouseRaw = document.getElementById('awb-house').value.trim().toUpperCase();
+                const aHouseList = aHouseRaw ? aHouseRaw.split(/[\n,]+/).map(h => h.trim()).filter(h => h) : [];
+                
+                const aPcs = parseInt(document.getElementById('awb-pieces').value, 10);
+                const aWgt = parseFloat(document.getElementById('awb-weight').value);
+                const aTot = parseFloat(document.getElementById('awb-total').value);
+                const aRem = document.getElementById('awb-remarks').value.trim();
+
+                if (!currentUldIdForAwb || !aNum) return;
+
+                // Buscamos el ULD padre
+                const uld = localUlds.find(u => u.id == currentUldIdForAwb || u["ULD number"] == currentUldIdForAwb || u.uld_number == currentUldIdForAwb);
+                if (!uld) return;
+
+                if (!uld.awbs) uld.awbs = []; // Inicializamos si no tiene arreglo
+                
+                const awbExists = uld.awbs.some(a => a.awb_number === aNum);
+                if (awbExists) {
+                    alert('This AWB number is already added to this ULD.');
+                    return;
+                }
+
+                uld.awbs.push({
+                    id: Date.now(),
+                    awb_number: aNum,
+                    house_number: aHouseList,
+                    pieces: isNaN(aPcs) ? 0 : aPcs,
+                    weight: isNaN(aWgt) ? 0 : aWgt,
+                    total: isNaN(aTot) ? 0 : aTot,
+                    remarks: aRem
+                });
+
+                // Limpiar form AWB
+                document.getElementById('awb-number').value = '';
+                const houseInput = document.getElementById('awb-house');
+                houseInput.value = '';
+                houseInput.style.height = '33px'; // Reset automatically expanded height
+                document.getElementById('awb-pieces').value = '';
+                document.getElementById('awb-weight').value = '';
+                
+                const totalInput = document.getElementById('awb-total');
+                totalInput.value = '';
+                totalInput.readOnly = false;
+                totalInput.style.backgroundColor = '';
+                
+                document.getElementById('awb-remarks').value = '';
+
+                renderLocalAwbs();
+                renderLocalUlds(); // Repintamos ULDs para actualizar el conteo en su fila
+            });
+        }
+
+        window.removeLocalAwb = function(uldId, awbId) {
+            const uld = localUlds.find(u => u.id == uldId || u["ULD number"] == uldId || u.uld_number == uldId);
+            if(uld && uld.awbs) {
+                uld.awbs = uld.awbs.filter(a => a.id !== awbId);
+                renderLocalAwbs();
+                renderLocalUlds(); // Por si cambió el badge de conteo
+            }
+        }
+
+        function renderLocalAwbs() {
+            if (!drawerAwbTable) return;
+            drawerAwbTable.innerHTML = '';
+            
+            const uld = localUlds.find(u => u.id == currentUldIdForAwb || u["ULD number"] == currentUldIdForAwb || u.uld_number == currentUldIdForAwb);
+            if (!uld || !uld.awbs || uld.awbs.length === 0) {
+                drawerAwbTable.innerHTML = '<tr><td colspan="4" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic;">No AWBs yet.</td></tr>';
+                return;
+            }
+
+            uld.awbs.forEach((awb, index) => {
+                const tr = document.createElement('tr');
+                const hList = awb.house_number || [];
+                const hCount = hList.length;
+                const hBadge = hCount > 0 
+                               ? `<span style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:10px; font-size:9px; cursor:pointer;" onclick="alert('Houses:\\n${hList.join('\\n')}')" title="Click to view all">${hCount}</span>` 
+                               : `<span style="color:#94a3b8; font-size:10px;">0</span>`;
+
+                tr.innerHTML = `
+                    <td style="padding: 8px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; font-weight: 500;">
+                        ${index + 1}
+                    </td>
+                    <td style="padding: 8px 12px; font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; font-weight: 500; white-space: nowrap;">
+                        ${awb.awb_number}
+                    </td>
+                    <td style="padding: 8px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9;">${awb.pieces}</td>
+                    <td style="padding: 8px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9;">${awb.total || '0'}</td>
+                    <td style="padding: 8px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9;">${awb.weight}</td>
+                    <td style="padding: 8px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9;">${hBadge}</td>
+                    <td style="padding: 8px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${awb.remarks || ''}">
+                        ${awb.remarks || '-'}
+                    </td>
+                    <td style="padding: 8px 12px; font-size: 11px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                        <button type="button" onclick="removeLocalAwb('${uld.id || uld["ULD number"] || uld.uld_number}', ${awb.id})" style="background: transparent; border: none; color: #ef4444; cursor: pointer;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </td>
+                `;
+                drawerAwbTable.appendChild(tr);
+            });
+        }
+        // ====== FIN LÓGICA DRAWER AWB ======
+
+        function renderLocalUlds() {
+            // Obsolete for local inside flight form
+        }
+
+        // ------ LÓGICA LOCAL ULD DENTRO DEL FORM DE FLIGHT ------
+        let flightLocalUlds = [];
+        
+        function renderFlightLocalUlds() {
+            const tableBody = document.getElementById('f-uld-table-body');
+            if (!tableBody) return;
+            
+            if (flightLocalUlds.length === 0) {
+                tableBody.innerHTML = '<tr style="display: table; width: 100%; table-layout: fixed;"><td colspan="7" style="padding: 12px; text-align: center; color: #94a3b8; font-size: 12px;">No ULDs added yet.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            flightLocalUlds.forEach((uld, index) => {
+                const tr = document.createElement('tr');
+                tr.style.display = 'table';
+                tr.style.width = '100%';
+                tr.style.tableLayout = 'fixed';
+                tr.style.cursor = 'pointer';
+                
+                // Clicking opens the drawer using the uldNumber as the identifier
+                tr.addEventListener('click', (e) => {
+                    // Evitar que el click en "Eliminar" abra el modal también
+                    if(e.target.closest('button')) return;
+                    openAwbPanel(uld.uldNumber);
+                });
+
+                tr.innerHTML = `
+                    <td style="padding: 10px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 30px;">
+                        ${index + 1}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; font-weight: 500; width: 120px;">
+                        ${uld.uldNumber}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 60px;">
+                        ${uld.pieces || '0'}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 70px;">
+                        ${uld.weight || '0'}
+                    </td>
+
+                    <td style="padding: 10px 12px; font-size: 11px; border-bottom: 1px solid #f1f5f9; width: 45px; text-align: center;">
+                        ${(uld.isPriority || uld.priority) ? '<span style="color:#ef4444; font-weight:bold;">Yes</span>' : '<span style="color:#94a3b8;">No</span>'}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px; border-bottom: 1px solid #f1f5f9; width: 45px; text-align: center;">
+                        ${(uld.isBreak || uld.break) ? '<span style="color:#4f46e5; font-weight:bold;">Yes</span>' : '<span style="color:#94a3b8;">No</span>'}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9;">
+                        ${uld.remarks || '-'}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; text-align: right; width: 50px;">
+                        <button type="button" onclick="removeFlightLocalUld(${index})" style="background: transparent; border: none; color: #ef4444; cursor: pointer;" title="Remove">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        window.removeFlightLocalUld = function(index) {
+            const removedUld = flightLocalUlds[index];
+            if(removedUld) {
+                localUlds = localUlds.filter(u => u["ULD number"] !== removedUld.uldNumber);
+            }
+            flightLocalUlds.splice(index, 1);
+            renderFlightLocalUlds();
+        };
+
+        const addFUldBtn = document.getElementById('add-f-uld-btn');
+        if (addFUldBtn) {
+            addFUldBtn.addEventListener('click', () => {
+                const uNum = document.getElementById('f-uld-number').value.trim().toUpperCase();
+                const uPcs = document.getElementById('f-uld-pieces').value;
+                const uWgt = document.getElementById('f-uld-weight').value;
+                const uRem = document.getElementById('f-uld-remarks').value;
+                
+                const prioEl = document.getElementById('f-uld-priority');
+                const uPrio = prioEl ? prioEl.checked : false;
+
+                const breakEl = document.getElementById('f-uld-break');
+                const uBreak = breakEl ? breakEl.checked : false;
+
+                if (!uNum) return;
+
+                const exists = flightLocalUlds.some(u => u.uldNumber === uNum);
+                if (exists) {
+                    alert('This ULD number is already in the list.');
+                    return;
+                }
+
+                const payload = {
+                    uldNumber: uNum,
+                    pieces: uPcs,
+                    weight: uWgt,
+                    remarks: uRem,
+                    priority: uPrio,
+                    break: uBreak,
+                    "ULD number": uNum, // Add for compatibility with drawer
+                    awbs: [] // Initialize awbs array when created locally
+                };
+
+                flightLocalUlds.push(payload);
+                localUlds.push(payload); // Ensure it's in localUlds so openAwbPanel detects it
+
+                // Limpiar inline form inputs
+                document.getElementById('f-uld-number').value = '';
+                document.getElementById('f-uld-pieces').value = '';
+                document.getElementById('f-uld-weight').value = '';
+                document.getElementById('f-uld-remarks').value = '';
+                if(prioEl) prioEl.checked = false;
+                if(breakEl) breakEl.checked = false;
+                
+                renderFlightLocalUlds();
+            });
+        }
+
+        if(addFlightForm) {
+            addFlightForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const fCarrier = document.getElementById('f-carrier').value;
+                const fNumber = document.getElementById('f-number').value;
+                const fBreak = document.getElementById('f-break').value;
+                const fNoBreak = document.getElementById('f-nobreak').value;
+                const fDate = document.getElementById('f-date').value;
+                const fTime = document.getElementById('f-time').value;
+                const fRemarks = document.getElementById('f-remarks').value;
+                const fStatus = document.getElementById('f-status').value;
+                
+                const submitBtn = addFlightForm.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Guardando...';
+
+                try {
+                    // Preparamos payload basado en las posibles columnas
+                    const payload = {
+                        carrier: fCarrier,
+                        number: fNumber,
+                        "cant-break": fBreak,
+                        "cant-noBreak": fNoBreak,
+                        "date-arrived": fDate,
+                        "time-arrived": fTime,
+                        remarks: fRemarks,
+                        status: fStatus
+                    };
+                    
+                    // Supabase Inserción Datos Principales del Vuelo (Flight)
+                    let response = await supabaseClient.from('Flight').insert([payload]).select();
+                    
+                    // Si falla porque no existe la tabla, intentamos en fonts (que es un error común de pluralización)
+                    if (response.error) {
+                        console.log("Error insertando en 'Flight', probando en 'flights'...");
+                        response = await supabaseClient.from('flights').insert([payload]).select();
+                        
+                        if (response.error) {
+                            console.error('%c[ERROR AL GUARDAR VUELO]', 'color:red; font-size:14px;', response.error);
+                            throw new Error('Flight save error: ' + response.error.message);
+                        }
+                    }
+                    console.log('%c[VUELO GUARDADO CON ÉXITO EN DB] ID:', 'color:green; font-weight:bold;', response.data[0]);
+
+                    // Save local ULDs mapped to this new flight reference
+                    if (flightLocalUlds.length > 0) {
+                        try {
+                            const flightRefString = `${fCarrier} ${fNumber} ${fDate}`.trim();
+                            
+                            const insertedFlightId = (response.data && response.data.length > 0) ? response.data[0].id : null;
+
+                            for (const uld of flightLocalUlds) {
+                                const uldPayload = {
+                                    "ULD number": uld.uldNumber,
+                                    refCarrier: fCarrier,
+                                    refNumber: fNumber,
+                                    refDate: fDate,
+                                    pieces: uld.pieces ? parseInt(uld.pieces, 10) : 0,
+                                    weight: uld.weight ? parseFloat(uld.weight) : 0,
+                                    remarks: uld.remarks || null,
+                                    isPriority: uld.priority || false,
+                                    isBreak: uld.break || false
+                                };
+                                const uldRes = await supabaseClient.from('ULD').insert([uldPayload]).select();
+                                if (uldRes.error) {
+                                    console.error("Error al insertar ULD del vuelo:", uldRes.error);
+                                } else {
+                                    // Save AWBs inside this ULD
+                                    if (uld.awbs && uld.awbs.length > 0) {
+                                        for (const awb of uld.awbs) {
+                                            try {
+                                                // 1. Check if AWB already exists in database
+                                                const { data: existingAwb, error: fetchErr } = await supabaseClient
+                                                    .from('AWB')
+                                                    .select('*')
+                                                    .eq('AWB number', awb.awb_number)
+                                                    .maybeSingle();
+
+                                                let currentDataAWB = [];
+                                                let isUpdate = false;
+
+                                                if (!fetchErr && existingAwb) {
+                                                    isUpdate = true;
+                                                    // Parse existing data if it's already an array, else create empty array
+                                                    if (Array.isArray(existingAwb['data-AWB'])) {
+                                                        currentDataAWB = existingAwb['data-AWB'];
+                                                    } else if (existingAwb['data-AWB']) {
+                                                        try {
+                                                            currentDataAWB = JSON.parse(existingAwb['data-AWB']);
+                                                        } catch(e) { /* ignore */ }
+                                                    }
+                                                }
+
+                                                // 2. Create the new item block for this specific entry
+                                                const newAwbItem = {
+                                                    refCarrier: fCarrier,
+                                                    refNumber: fNumber,
+                                                    refDate: fDate,
+                                                    refULD: uld.uldNumber,
+                                                    pieces: awb.pieces,
+                                                    weight: awb.weight,
+                                                    remarks: awb.remarks || null,
+                                                    house_number: awb.house_number // is already an array
+                                                };
+
+                                                currentDataAWB.push(newAwbItem);
+
+                                                // 3. Update or Insert
+                                                if (isUpdate) {
+                                                    const updateRes = await supabaseClient.from('AWB')
+                                                        .update({
+                                                            total: awb.total,
+                                                            "data-AWB": currentDataAWB
+                                                        })
+                                                        .eq('AWB number', awb.awb_number);
+                                                    
+                                                    if (updateRes.error) console.error("Error updating existing AWB:", updateRes.error);
+                                                } else {
+                                                    // Insert new document
+                                                    const insertPayload = {
+                                                        "AWB number": awb.awb_number,
+                                                        total: awb.total,
+                                                        "data-AWB": currentDataAWB
+                                                    };
+                                                    const insertRes = await supabaseClient.from('AWB').insert([insertPayload]);
+                                                    if (insertRes.error) console.error("Error inserting new AWB:", insertRes.error);
+                                                }
+                                            } catch (err) {
+                                                console.error("Unknown error processing AWB:", err);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Error guardando ULDs y AWBs:", e);
+                        }
+                    }
+
+                    alert('¡Vuelo (y ULDs si agregaste) guardado correctamente!');
+                    addFlightForm.reset();
+                    flightLocalUlds = [];
+                    renderFlightLocalUlds();
+                    hideFlightForm(); 
+                    
+                    // Al recargar, también actualizamos el dropdown de ULDs si existiera en la misma SPA
+                    window.location.reload();
+
+                } catch (err) {
+                    alert('Error al guardar: ' + err.message + '\n\nAsegúrate de que la tabla Flight exista en la base de datos pública y tengas permisos INSERT.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            });
+        }
+        // ---------- FIN LÓGICA AÑADIR VUELO ----------
+
+        // ---------- LÓGICA DE ULD (GLOBAL) ----------
+        const addUldGlobalForm = document.getElementById('add-uld-global-form');
+        const globalUldTableBody = document.getElementById('global-uld-table-body');
+        const gUldFlightSelect = document.getElementById('g-uld-flight');
+
+        // Búsqueda ULD Local
+        const searchUldInput = document.getElementById('uld-search-main');
+        if (searchUldInput) {
+            searchUldInput.addEventListener('keyup', function() {
+                const term = this.value.toLowerCase();
+                const rows = globalUldTableBody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    if (row.querySelector('.loading-td')) return;
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(term) ? '' : 'none';
+                });
+            });
+        }
+
+        async function fetchGlobalUlds() {
+            if (!globalUldTableBody) return;
+            try {
+                // Hacer el fetch directo y único a la tabla ULD
+                let uldRes = await supabaseClient.from('ULD').select('*');
+
+                if (uldRes.error) {
+                    console.error("Error al obtener ULDs:", uldRes.error);
+                    globalUldTableBody.innerHTML = '<tr><td colspan="8">Error al cargar listado de ULDs de la base de datos.</td></tr>';
+                    return;
+                }
+
+                const ulds = uldRes.data || [];
+                localUlds = ulds; // Cache them globally for the drawer
+                globalUldTableBody.innerHTML = '';
+
+                if (ulds.length === 0) {
+                    globalUldTableBody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px; color: #94a3b8;">No ULDs available.</td></tr>';
+                    return;
+                }
+
+                ulds.forEach((uld, index) => {
+                    const tr = document.createElement('tr');
+                    tr.style.cursor = 'pointer';
+                    
+                    const uNumber = uld["ULD number"] || uld.uld_number || uld.id || '-';
+                    tr.addEventListener('click', () => {
+                        const identifier = uld.id || uNumber;
+                        if(identifier !== '-') window.openAwbPanelReadOnly(identifier);
+                    });
+                    
+                    const fRef = (uld.refCarrier && uld.refNumber) ? `${uld.refCarrier} ${uld.refNumber}` : (uld.refFlight || uld.flight_id || '-');
+                    const pcs = uld.pieces || '0';
+                    const wgt = uld.weight || '0';
+                    const prio = (uld.isPriority || uld.priority) ? '<span style="color:#ef4444; font-weight:bold;">Yes</span>' : 'No';
+                    const brk = (uld.isBreak || uld.break) ? '<span style="color:#4f46e5; font-weight:bold;">Yes</span>' : 'No';
+                    const rem = uld.remarks || '-';
+
+                    tr.innerHTML = `
+                        <td style="text-align: center; color: #94a3b8; font-weight: 500;">${index + 1}</td>
+                        <td style="font-weight: 600; color: #334155; white-space: nowrap;">${uNumber}</td>
+                        <td style="color: #64748b; white-space: nowrap;">${fRef}</td>
+                        <td style="text-align: center;">${pcs}</td>
+                        <td style="text-align: center;">${wgt}</td>
+                        <td style="text-align: center;">${prio}</td>
+                        <td style="text-align: center;">${brk}</td>
+                        <td style="width: 100%; max-width: 0;"><span style="color:#64748b; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;" title="${rem}">${rem}</span></td>
+                    `;
+                    globalUldTableBody.appendChild(tr);
+                });
+
+            } catch (err) {
+                globalUldTableBody.innerHTML = '<tr><td colspan="7">Error cargando ULDs.</td></tr>';
+            }
+        }
+
+        // Llenar Dropdown de Vuelos
+        async function populateFlightDropdownForUld() {
+            if(!gUldFlightSelect) return;
+            try {
+                let fRes = await supabaseClient.from('Flight').select('id, number, carrier, "date-arrived"');
+                if (fRes.error) fRes = await supabaseClient.from('flights').select('id, number, carrier, "date-arrived"');
+                
+                if(!fRes.error && fRes.data) {
+                    gUldFlightSelect.innerHTML = '<option value="" disabled selected>Select Flight</option>';
+                    fRes.data.forEach(f => {
+                        const opt = document.createElement('option');
+                        
+                        const carrier = f.carrier || '';
+                        const number = f.number || 'Unnamed';
+                        let date = f['date-arrived'] || '';
+                        
+                        // Si hay fecha, mostramos de forma legible
+                        if (date) {
+                            date = new Date(date).toLocaleDateString();
+                        }
+                        
+                        // El value guardará los datos estructurados en JSON
+                        const combinedText = `${carrier} ${number} ${date}`.trim();
+                        opt.value = JSON.stringify({carrier, number, date}); 
+                        opt.textContent = combinedText;
+                        gUldFlightSelect.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.log('No pudimos rellenar el select de vuelos', e);
+            }
+        }
+
+        // ------ NUEVA LÓGICA LOCAL ULDs ------
+        let localUldsToAdd = [];
+        
+        function renderLocalAddingUlds() {
+            const tableBody = document.getElementById('local-adding-uld-table-body');
+            const saveBtn = document.getElementById('save-all-ulds-btn');
+            
+            if (!tableBody) return;
+            
+            if (localUldsToAdd.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="2" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 13px;">No ULDs added yet.</td></tr>';
+                if(saveBtn) saveBtn.style.display = 'none';
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            localUldsToAdd.forEach((uld, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding: 12px 16px; font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; font-weight: 500;">
+                        ${uld.uldNumber}
+                    </td>
+                    <td style="padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f1f5f9; text-align: right;">
+                        <button type="button" onclick="removeLocalAddingUld(${index})" style="background: transparent; border: none; color: #ef4444; cursor: pointer;" title="Remove">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+            
+            if(saveBtn) saveBtn.style.display = 'block';
+        }
+
+        window.removeLocalAddingUld = function(index) {
+            localUldsToAdd.splice(index, 1);
+            renderLocalAddingUlds();
+        };
+
+        if (addUldGlobalForm) {
+            addUldGlobalForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const uNum = document.getElementById('g-uld-number').value.trim().toUpperCase();
+                const uFlightCombo = document.getElementById('g-uld-flight').value;
+                let fCarrier = null, fNumber = null, fDate = null;
+                try {
+                    const parsed = JSON.parse(uFlightCombo);
+                    fCarrier = parsed.carrier; fNumber = parsed.number; fDate = parsed.date;
+                } catch(e) {}
+
+                const uPcs = document.getElementById('g-uld-pieces').value;
+                const uWgt = document.getElementById('g-uld-weight').value;
+                const uRem = document.getElementById('g-uld-remarks').value;
+                const uPrio = document.getElementById('g-uld-priority').checked;
+                const uBrk = document.getElementById('g-uld-break').checked;
+
+                if (!uNum) return;
+
+                // Añadir al array local
+                localUldsToAdd.push({
+                    uldNumber: uNum,
+                    flightCarrier: fCarrier,
+                    flightNumber: fNumber,
+                    flightDate: fDate,
+                    flightRefStr: uFlightCombo, // Raw UI text if needed
+                    pieces: uPcs,
+                    weight: uWgt,
+                    remarks: uRem,
+                    priority: uPrio,
+                    break: uBrk
+                });
+
+                // Limpiar form
+                addUldGlobalForm.reset();
+                renderLocalAddingUlds();
+            });
+        }
+
+        const saveAllUldsBtn = document.getElementById('save-all-ulds-btn');
+        if (saveAllUldsBtn) {
+            saveAllUldsBtn.addEventListener('click', async () => {
+                if (localUldsToAdd.length === 0) return;
+
+                const prevText = saveAllUldsBtn.textContent;
+                saveAllUldsBtn.disabled = true;
+                saveAllUldsBtn.textContent = 'Guardando...';
+
+                try {
+                    // Loop local items
+                    for (const uld of localUldsToAdd) {
+                        const payload = {
+                            "ULD number": uld.uldNumber,
+                            refCarrier: uld.flightCarrier,
+                            refNumber: uld.flightNumber,
+                            refDate: uld.flightDate,
+                            pieces: uld.pieces ? parseInt(uld.pieces, 10) : 0,
+                            weight: uld.weight ? parseFloat(uld.weight) : 0,
+                            remarks: uld.remarks || null,
+                            isPriority: uld.priority || false,
+                            isBreak: uld.break || false
+                        };
+                        const uldRes = await supabaseClient.from('ULD').insert([payload]);
+
+                        if (uldRes.error) {
+                            console.error("Error al insertar ULD:", uldRes.error);
+                            throw new Error(`Error en ${uld.uldNumber}: ${uldRes.error.message || uldRes.error.hint}`);
+                        }
+                    }
+
+                    alert('¡Todos los ULDs guardados exitosamente!');
+                    
+                    // Reset
+                    localUldsToAdd = [];
+                    renderLocalAddingUlds();
+                    if(addUldGlobalForm) addUldGlobalForm.reset();
+                    hideUldForm(); // Vuelve a la lista global
+                    fetchGlobalUlds(); // Actualiza la lista principal
+
+                } catch (err) {
+                    console.error(err);
+                    alert('Hubo un error al guardar los ULDs: ' + err.message);
+                } finally {
+                    saveAllUldsBtn.disabled = false;
+                    saveAllUldsBtn.textContent = prevText;
+                }
+            });
+        }
+
+        // Llamar a la carga de Vuelos al Select y a los ULDs Globales iniciales
+        populateFlightDropdownForUld();
+        fetchGlobalUlds();
+        
+        // ---------- FIN LÓGICA DE ULD (GLOBAL) ----------
+
+        // ---------- LÓGICA DE AWB (GLOBAL) ----------
+        const globalAwbTableBody = document.getElementById('global-awb-table-body');
+        const awbSearchMain = document.getElementById('awb-search-main');
+
+        let allLoadedAwbs = []; 
+
+        if (awbSearchMain && globalAwbTableBody) {
+            awbSearchMain.addEventListener('keyup', function() {
+                const term = this.value.toLowerCase();
+                const rows = globalAwbTableBody.querySelectorAll('tr');
+                rows.forEach(row => {
+                    if (row.querySelector('.loading-td')) return;
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(term) ? '' : 'none';
+                });
+            });
+        }
+
+        async function fetchGlobalAwbs() {
+            if (!globalAwbTableBody) return;
+            try {
+                let awbRes = await supabaseClient.from('AWB').select('*');
+
+                if (awbRes.error) {
+                    console.error("Error al obtener AWBs:", awbRes.error);
+                    globalAwbTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 16px;">Error al cargar listado de AWBs.</td></tr>';
+                    return;
+                }
+
+                allLoadedAwbs = awbRes.data || [];
+                globalAwbTableBody.innerHTML = '';
+
+                if (allLoadedAwbs.length === 0) {
+                    globalAwbTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px; color: #94a3b8;">No AWBs available.</td></tr>';
+                    return;
+                }
+
+                allLoadedAwbs.forEach((awb, index) => {
+                    const tr = document.createElement('tr');
+                    tr.style.cursor = 'pointer';
+                    
+                    const aNumber = awb['AWB number'] || awb.awb_number || '-';
+                    const expectedTotal = awb.total || 0;
+
+                    let receivedPcs = 0;
+                    if (awb['data-AWB'] && Array.isArray(awb['data-AWB'])) {
+                        receivedPcs = awb['data-AWB'].reduce((acc, curr) => acc + (parseInt(curr.pieces) || 0), 0);
+                    } else if (awb['data-AWB']) {
+                        try {
+                            const parsed = JSON.parse(awb['data-AWB']);
+                            receivedPcs = parsed.reduce((acc, curr) => acc + (parseInt(curr.pieces) || 0), 0);
+                        } catch(e) {}
+                    }
+
+                    tr.addEventListener('click', () => {
+                        window.openAwbInfoDrawer(aNumber, expectedTotal, awb['data-AWB']);
+                    });
+
+                    tr.innerHTML = `
+                        <td style="text-align: center; color: #94a3b8; font-weight: 500;">${index + 1}</td>
+                        <td style="font-weight: 600; color: #334155; white-space: nowrap;">${aNumber}</td>
+                        <td style="color: #64748b; text-align: center;">${expectedTotal}</td>
+                        <td style="color: #0d9488; font-weight: 500; text-align: center;">${receivedPcs} <span style="font-size: 11px; color:#cbd5e1;">pcs</span></td>
+                    `;
+                    globalAwbTableBody.appendChild(tr);
+                });
+
+            } catch (err) {
+                globalAwbTableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 16px; color:#ef4444;">Error cargando AWBs.</td></tr>';
+            }
+        }
+
+        const awbInfoDrawer = document.getElementById('awb-info-drawer');
+        const awbInfoOverlay = document.getElementById('awb-info-drawer-overlay');
+        const closeAwbInfoBtn = document.getElementById('close-awb-info-drawer-btn');
+        
+        window.openAwbInfoDrawer = function(awbNum, total, dataAwb) {
+            document.getElementById('info-drawer-awb-title').textContent = `AWB: ${awbNum}`;
+            document.getElementById('info-drawer-awb-total').textContent = total || '0';
+            
+            const tbody = document.getElementById('info-drawer-awb-table-body');
+            tbody.innerHTML = '';
+
+            let splits = [];
+            if (Array.isArray(dataAwb)) splits = dataAwb;
+            else if (dataAwb) {
+                try { splits = JSON.parse(dataAwb); } catch(e){}
+            }
+
+            if (!splits || splits.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 12px; font-style: italic;">No shipment data logged yet.</td></tr>';
+            } else {
+                splits.forEach(split => {
+                    const tr = document.createElement('tr');
+                    const hList = split.house_number || [];
+                    const hCount = hList.length;
+                    const hBadge = hCount > 0 
+                                   ? `<span style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:10px; font-size:9px; cursor:pointer;" onclick="alert('Houses:\\n${hList.join('\\n')}')" title="Click to view all">${hCount}</span>` 
+                                   : `<span style="color:#94a3b8; font-size:10px;">0</span>`;
+
+                    const fRef = (split.refCarrier && split.refNumber) ? `${split.refCarrier} ${split.refNumber}<br><span style="font-size:9px; color:#94a3b8;">${split.refDate || ''}</span>` : (split.refFlight || '-');
+                    
+                    tr.innerHTML = `
+                        <td style="padding: 12px; font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; white-space: nowrap;">${fRef}</td>
+                        <td style="padding: 12px; font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; font-weight: 500; white-space: nowrap;">${split.refULD || '-'}</td>
+                        <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${split.pieces || 0}</td>
+                        <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${split.weight || 0}</td>
+                        <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; text-align: center;">${hBadge}</td>
+                        <td style="padding: 12px; font-size: 11px; color: #64748b; border-bottom: 1px solid #f1f5f9; width: 100%; max-width: 0;">
+                            <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;" title="${split.remarks || ''}">${split.remarks || '-'}</span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            if (awbInfoDrawer) awbInfoDrawer.style.right = '0';
+            if (awbInfoOverlay) awbInfoOverlay.classList.add('open');
+        };
+
+        function closeAwbInfoDrawer() {
+            if (awbInfoDrawer) awbInfoDrawer.style.right = '-800px';
+            if (awbInfoOverlay) awbInfoOverlay.classList.remove('open');
+        }
+
+        if (closeAwbInfoBtn) closeAwbInfoBtn.addEventListener('click', closeAwbInfoDrawer);
+        if (awbInfoOverlay) awbInfoOverlay.addEventListener('click', closeAwbInfoDrawer);
+        
+        fetchGlobalAwbs();
+        // ---------- FIN LÓGICA DE AWB (GLOBAL) ----------
+
+        fetchUsers();
+    }
+
+    // ==========================================
+    // ------- SYSTEM WORKFLOW LOGIC (DUAL) -----
+    // ==========================================
+    
+    // Panel Left
+    const sysDateLeft = document.getElementById('sys-date-left');
+    const sysFlightsLeft = document.getElementById('sys-flights-left');
+    const sysUldsLeft = document.getElementById('sys-ulds-left');
+    const sysReceiveBtnLeft = document.getElementById('sys-receive-btn-left');
+    
+    // Panel Right
+    const sysDateRight = document.getElementById('sys-date-right');
+    const sysFlightsRight = document.getElementById('sys-flights-right');
+    const sysUldsRight = document.getElementById('sys-ulds-right');
+    const sysReceiveBtnRight = document.getElementById('sys-receive-btn-right');
+
+    // Función que carga los vuelos dada una fecha y pinta los ChoiceChips en un contenedor
+    async function loadFlightsForSystem(dateString, chipsContainer, tableBody, receiveBtn) {
+        if (receiveBtn) {
+            receiveBtn.disabled = true;
+            receiveBtn.style.opacity = '0.5';
+            receiveBtn.style.cursor = 'not-allowed';
+            receiveBtn.textContent = 'Mark Flight as Received';
+            receiveBtn.style.background = '#10b981';
+            receiveBtn.onclick = null;
+        }
+
+        const colSpan = (tableBody.id === 'coord-ulds') ? 5 : 6;
+
+        if (!dateString) {
+            chipsContainer.innerHTML = '<span style="font-size: 13px; color: #94a3b8; font-style: italic;">Pick a date to load flights...</span>';
+            tableBody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; padding: 24px 20px; color: #94a3b8; font-size: 13px; border:none; background: transparent;">Select a flight to view ULDs</td></tr>`;
+            return;
+        }
+
+        chipsContainer.innerHTML = '<span style="font-size: 13px; color: #64748b;">Loading flights...</span>';
+        tableBody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; padding: 24px 20px; color: #94a3b8; font-size: 13px; border:none; background: transparent;">Select a flight to view ULDs</td></tr>`;
+
+        // Convertir la fecha local del picker (YYYY-MM-DD)
+        let { data: flights, error } = await supabaseClient
+            .from('Flight')
+            .select('*')
+            .eq('date-arrived', dateString);
+            
+        // Fallback en caso de que la tabla sea 'flights' en minuscula o el nombre de columna sea distinto
+        if (error) {
+            console.log("Error consultando 'Flight' con 'date-arrived', intentando variaciones...");
+            const fallback = await supabaseClient
+                .from('flights')
+                .select('*')
+                .eq('date-arrived', dateString);
+            
+            error = fallback.error;
+            flights = fallback.data;
+        }
+
+        if (error || !flights || flights.length === 0) {
+            chipsContainer.innerHTML = '<span style="font-size: 13px; color: #e11d48; background: #ffe4e6; padding: 4px 8px; border-radius: 6px;">No flights found for this date.</span>';
+            return;
+        }
+
+        chipsContainer.innerHTML = ''; // Limpiar 
+        
+        flights.forEach(flight => {
+            const chip = document.createElement('div');
+            chip.className = 'choice-chip';
+            chip.dataset.flightId = flight.id; // added for syncing
+            chip.textContent = `${flight.carrier}${flight.number}`;
+            
+            // Evento Click en el Chip para cargar ULDs
+            chip.addEventListener('click', () => {
+                if(chip.classList.contains('selected-other')) return; // Bloquear si está seleccionado del otro lado
+
+                // Quitar clase active a todos
+                const allChips = chipsContainer.querySelectorAll('.choice-chip');
+                allChips.forEach(c => c.classList.remove('active'));
+                
+                // Activar este
+                chip.classList.add('active');
+                
+                // Cargar ULDs para este vuelo en su respectiva tabla usando la estructura real de asociación refFlight
+                loadUldsForSystem(flight, tableBody, receiveBtn);
+
+                // Sincronizar bloqueo cruzado
+                syncSystemChips();
+            });
+            
+            chipsContainer.appendChild(chip);
+        });
+
+        // Sync at initialization for active elements cross panel
+        syncSystemChips();
+    }
+
+    // Function to cross-check choice chips in dual system panel
+    function syncSystemChips() {
+        const leftChips = document.querySelectorAll('#sys-flights-left .choice-chip');
+        const rightChips = document.querySelectorAll('#sys-flights-right .choice-chip');
+        
+        // Reset styles initially
+        leftChips.forEach(c => { c.classList.remove('selected-other'); c.title = ''; });
+        rightChips.forEach(c => { c.classList.remove('selected-other'); c.title = ''; });
+        
+        // Find active in left, disable in right
+        const activeLeft = document.querySelector('#sys-flights-left .choice-chip.active');
+        if (activeLeft) {
+            const matchRight = document.querySelector(`#sys-flights-right .choice-chip[data-flight-id="${activeLeft.dataset.flightId}"]`);
+            if (matchRight) {
+                matchRight.classList.add('selected-other');
+                matchRight.title = 'Current active selection in the left panel.';
+            }
+        }
+        
+        // Find active in right, disable in left
+        const activeRight = document.querySelector('#sys-flights-right .choice-chip.active');
+        if (activeRight) {
+            const matchLeft = document.querySelector(`#sys-flights-left .choice-chip[data-flight-id="${activeRight.dataset.flightId}"]`);
+            if (matchLeft) {
+                matchLeft.classList.add('selected-other');
+                matchLeft.title = 'Current active selection in the right panel.';
+            }
+        }
+    }
+
+    // Función que carga los ULDs dado un flightId y los pinta en su respectiva tabla
+    async function loadUldsForSystem(flight, tableBody, receiveBtn) {
+        const isReceived = flight.status === 'Received';
+        const isCoordinator = !receiveBtn && tableBody.id === 'coord-ulds';
+        const colSpan = isCoordinator ? 5 : 6;
+        
+        if (receiveBtn) {
+            receiveBtn.disabled = true;
+            receiveBtn.style.opacity = isReceived ? '1' : '0.5';
+            receiveBtn.style.cursor = isReceived ? 'default' : 'not-allowed';
+            receiveBtn.textContent = isReceived ? 'Received!' : 'Mark Flight as Received';
+            receiveBtn.style.background = isReceived ? '#0ea5e9' : '#10b981';
+            receiveBtn.onclick = null;
+        }
+
+        tableBody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; padding: 24px 20px; color: #64748b; font-size: 13px; border:none; background: transparent;">Loading ULDs...</td></tr>`;
+        
+        const fCarrier = flight.carrier || '';
+        const fNumber = flight.number || '';
+        const fDate = flight['date-arrived'];
+        
+        // Forma estricta original
+        const refDate = fDate || '';
+        const strictFlightRefString = `${fCarrier} ${fNumber} ${refDate}`.trim();
+        
+        // Forma parcial para búsqueda en BD (ignora conflictos de zona horaria)
+        const partialFlightRef = `${fCarrier} ${fNumber}`.trim();
+
+        const { data: ulds, error } = await supabaseClient
+            .from('ULD')
+            .select('*')
+            .eq('refCarrier', fCarrier)
+            .eq('refNumber', fNumber)
+            .eq('refDate', refDate);
+
+        if (error) {
+            console.error('Error fetching ULDs sys:', error);
+            tableBody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; padding: 24px 20px; color: #e11d48; font-size: 13px; border:none; background: transparent;">Error loading ULDs</td></tr>`;
+            return;
+        }
+
+        tableBody.innerHTML = '';
+
+        if (!ulds || ulds.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; padding: 24px 20px; color: #94a3b8; font-size: 13px; border:none; background: transparent;">No ULDs registered for this flight.</td></tr>`;
+            return;
+        }
+        ulds.forEach((uld, index) => {
+            const uldNumber = uld['ULD number'] || 'N/A';
+            const pieces = uld.pieces || 0;
+            const weight = uld.weight || 0;
+            const remarks = uld.remarks || '-';
+
+            const tr = document.createElement('tr');
+            
+            // Ambas vistas usarán la expansión interactiva inline
+            tr.style.cursor = 'pointer';
+            tr.style.transition = 'background 0.2s';
+            
+            tr.addEventListener('mouseover', () => { if (!tr.nextElementSibling?.classList.contains('inline-details-row')) tr.style.background = '#f8fafc'; });
+            tr.addEventListener('mouseout', () => { if (!tr.nextElementSibling?.classList.contains('inline-details-row')) tr.style.background = 'transparent'; });
+
+                tr.addEventListener('click', (e) => {
+                    // Si le dio click directo al checkbox, ignorar expansión
+                    if (e.target.classList.contains('sys-uld-checkbox')) return;
+
+                    // Cerrar si ya está abierto
+                    const nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('inline-details-row')) {
+                        nextRow.remove();
+                        tr.style.background = 'transparent';
+                        return;
+                    }
+
+                    // Forzar cierre de otras filas inline si se desea "acordeón único"
+                    const existingInlines = tableBody.querySelectorAll('.inline-details-row');
+                    existingInlines.forEach(row => { 
+                        if (row.previousElementSibling) row.previousElementSibling.style.background = 'transparent';
+                        row.remove(); 
+                    });
+
+                    // Marcar este como activo resaltando el fondo
+                    tr.style.background = '#e2e8f0';
+
+                    // Crear fila base para inyección (100% width)
+                    const inlineTr = document.createElement('tr');
+                    inlineTr.className = 'inline-details-row';
+                    inlineTr.innerHTML = `
+                        <td colspan="${colSpan}" style="padding: 12px 20px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; animation: fadeIn 0.3s ease;">
+                            <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; min-height: 80px; display: flex; center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                                <span style="margin: auto; color: #64748b; font-size: 13px; font-weight: 500;">Loading Details & AWBs...</span>
+                            </div>
+                        </td>
+                    `;
+                    tr.insertAdjacentElement('afterend', inlineTr);
+
+                    // Fetch the AWBs for this ULD async
+                    async function fetchInlineData() {
+                        const cellBox = inlineTr.querySelector('td > div');
+                        try {
+                            const { data: awbs, error } = await supabaseClient.from('AWB').select('*');
+                            if (error) throw error;
+                            
+                            let matchedAwbs = [];
+                            if (awbs) {
+                                awbs.forEach(awbDoc => {
+                                    let nestedArr = [];
+                                    if (Array.isArray(awbDoc['data-AWB'])) {
+                                        nestedArr = awbDoc['data-AWB'];
+                                    } else if (awbDoc['data-AWB']) {
+                                        try { nestedArr = JSON.parse(awbDoc['data-AWB']); } catch(e){}
+                                    }
+
+                                    if (nestedArr.length > 0) {
+                                        const nestedData = nestedArr.find(n => 
+                                            n.refULD == uldNumber && 
+                                            n.refCarrier == fCarrier &&
+                                            n.refNumber == fNumber &&
+                                            n.refDate == refDate
+                                        );
+                                        if (nestedData) {
+                                            // Check if it has 'data-coordinator' matching this context
+                                            let existingCoordObj = null;
+                                            if (awbDoc['data-coordinator']) {
+                                                let cArr = [];
+                                                if (Array.isArray(awbDoc['data-coordinator'])) cArr = awbDoc['data-coordinator'];
+                                                else {
+                                                    try { cArr = JSON.parse(awbDoc['data-coordinator']); } catch(e){}
+                                                }
+                                                if (Array.isArray(cArr)) {
+                                                    const eqRef = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+                                                    existingCoordObj = cArr.find(c => 
+                                                        eqRef(c.refCarrier, fCarrier) &&
+                                                        eqRef(c.refNumber, fNumber) &&
+                                                        eqRef(c.refDate, refDate) &&
+                                                        eqRef(c.refULD, uldNumber)
+                                                    );
+                                                }
+                                            }
+
+                                            matchedAwbs.push({
+                                                id: awbDoc.id,
+                                                number: awbDoc['AWB number'] || awbDoc.awb_number,
+                                                pieces: nestedData.pieces || 0,
+                                                weight: nestedData.weight || 0,
+                                                remarks: nestedData.remarks || '-',
+                                                houses: nestedData.house_number || [],
+                                                refCarrier: fCarrier,
+                                                refNumber: fNumber,
+                                                refDate: refDate,
+                                                refULD: uldNumber,
+                                                coordData: existingCoordObj
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+
+                            const uldPrio = (uld.isPriority || uld.priority) ? '<span style="color:#ef4444; font-weight:700;">Yes</span>' : '<span style="color:#64748b;">No</span>';
+                            const uldBrk = (uld.isBreak || uld.break) ? '<span style="color:#4f46e5; font-weight:700;">Yes</span>' : '<span style="color:#64748b;">No</span>';
+                            const remSafe = uld.remarks || 'No notes provided.';
+
+                            let html = `
+                                <div style="width:100%; display:flex; flex-direction:column; align-items: stretch;">
+                                    
+                                    <!-- TOP: ULD Info Metadata -->
+                                    <div style="display: flex; gap: 32px; padding-bottom: 16px; border-bottom: 1px dashed #e2e8f0; margin-bottom: 16px;">
+                                        <div>
+                                            <div style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">ULD</div>
+                                            <div style="font-size: 14px; color: #0f172a; font-weight: 700;">${uldNumber}</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Priority</div>
+                                            <div style="font-size: 13px;">${uldPrio}</div>
+                                        </div>
+                                        <div>
+                                            <div style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">Break</div>
+                                            <div style="font-size: 13px;">${uldBrk}</div>
+                                        </div>
+                                        <div style="flex:1;">
+                                            <div style="font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase;">ULD Remarks</div>
+                                            <div style="font-size: 13px; color: #475569; font-style: italic;">${remSafe}</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- BOTTOM: AWB Breakdown Table -->
+                                    <div style="font-size: 11px; color: #4f46e5; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">AWB Shipments Received in this PMC</div>
+                            `;
+
+                            if (matchedAwbs.length === 0) {
+                                html += '<div style="font-size: 13px; color: #64748b; font-style: italic; background:#f8fafc; padding:12px; border-radius:6px;">No AWBs associated or logged under this PMC format.</div>';
+                            } else {
+                                html += `
+                                    <table style="width: 100%; border-collapse: collapse; text-align: left; background:#fafafa; border-radius: 6px; overflow: hidden; border:1px solid #f1f5f9;">
+                                        <thead style="background: #f1f5f9;">
+                                            <tr>
+                                                <th style="font-size: 11px; color:#475569; padding: 6px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0; width: 140px; white-space: nowrap;">AWB Number</th>
+                                                <th style="font-size: 11px; color:#475569; padding: 6px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0; text-align: center; width: 60px;">Pcs</th>
+                                                <th style="font-size: 11px; color:#475569; padding: 6px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0; text-align: center; width: 80px;">Weight</th>
+                                                <th style="font-size: 11px; color:#475569; padding: 6px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0; text-align: center; width: 60px;">Houses</th>
+                                                <th style="font-size: 11px; color:#475569; padding: 6px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0; text-align: center; width: 90px;">Status</th>
+                                                <th style="font-size: 11px; color:#475569; padding: 6px 12px; font-weight: 600; border-bottom: 1px solid #e2e8f0; width: 100%;">Remarks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                `;
+                                
+                                matchedAwbs.forEach(awb => {
+                                    const hCount = awb.houses.length;
+                                    const hBadge = hCount > 0 ? `<span style="background:#e0e7ff; color:#4f46e5; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600;">${hCount}</span>` : '<span style="color:#94a3b8; font-size:10px;">0</span>';
+                                    
+                                    const remEscaped = (awb.remarks || '-').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                                    
+                                    // Serialize existing data
+                                    let encodedData = '';
+                                    if (awb.coordData) {
+                                        encodedData = encodeURIComponent(JSON.stringify(awb.coordData));
+                                    }
+                                    
+                                    const checkedBg = awb.coordData ? '#ecfdf5' : '#f1f5f9';
+                                    const statusBadge = awb.coordData ? `<span style="background:#10b981; color:white; padding:4px 10px; border-radius:12px; font-size:10px; font-weight:700; box-shadow: 0 2px 4px rgba(16,185,129,0.2);"><i class="fas fa-check" style="margin-right:3px;"></i> CHECKED</span>` : `<span style="background:#e2e8f0; color:#64748b; padding:4px 10px; border-radius:12px; font-size:10px; font-weight:600;">PENDING</span>`;
+
+                                    html += `
+                                        <tr style="cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='${awb.coordData ? '#d1fae5' : '#e2e8f0'}'" onmouseout="this.style.background='transparent'" onclick="window.openInlineAwbModalText('${awb.id}', '${awb.number}', '${awb.pieces}', '${awb.weight}', '${hCount}', '${remEscaped}', '${awb.refCarrier}', '${awb.refNumber}', '${awb.refDate}', '${awb.refULD}', '${encodedData}')">
+                                            <td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; border-bottom: 1px solid ${checkedBg}; white-space: nowrap;">
+                                                ${awb.number}
+                                            </td>
+                                            <td style="padding: 10px 12px; font-size: 12px; color: #475569; border-bottom: 1px solid ${checkedBg}; text-align: center;">${awb.pieces}</td>
+                                            <td style="padding: 10px 12px; font-size: 12px; color: #475569; border-bottom: 1px solid ${checkedBg}; text-align: center;">${awb.weight}</td>
+                                            <td style="padding: 10px 12px; font-size: 12px; color: #475569; border-bottom: 1px solid ${checkedBg}; text-align: center;">${hBadge}</td>
+                                            <td style="padding: 10px 12px; font-size: 12px; color: #475569; border-bottom: 1px solid ${checkedBg}; text-align: center;">${statusBadge}</td>
+                                            <td style="padding: 10px 12px; font-size: 12px; color: #64748b; border-bottom: 1px solid ${checkedBg}; max-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${awb.remarks}">${awb.remarks}</td>
+                                        </tr>
+                                    `;
+                                });
+                                html += '</tbody></table>';
+                            }
+                            
+                            html += '</div>';
+                            cellBox.style.display = 'block';
+                            cellBox.innerHTML = html;
+                        } catch(err) {
+                            cellBox.innerHTML = '<span style="color:#ef4444; font-size: 13px; font-weight:500;">Failed to load data for this PMC.</span>';
+                        }
+                    }
+                    
+                    fetchInlineData();
+                });
+
+                tr.innerHTML = `
+                    <td style="text-align: center; color: #94a3b8; font-weight: 500;">
+                        ${index + 1}
+                    </td>
+                    <td>
+                        <div style="font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${uldNumber}</div>
+                    </td>
+                    <td style="text-align: center; white-space: nowrap;">${pieces}</td>
+                    <td style="text-align: center; white-space: nowrap;">${weight} kg</td>
+                    <td style="color: #64748b; font-size: 13px; max-width: 0;">
+                        <div style="width: 100%; overflow-x: auto; white-space: nowrap; padding-bottom: 2px; scrollbar-width: thin;">
+                            ${remarks}
+                        </div>
+                    </td>
+                    ${!isCoordinator ? `<td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
+                            <input type="checkbox" class="sys-uld-checkbox" ${isReceived ? 'checked disabled' : ''} style="width: 18px; height: 18px; cursor: ${isReceived ? 'default' : 'pointer'}; accent-color: #4f46e5; border-radius: 4px; border: 1px solid #cbd5e1; outline: none; box-shadow: none;">
+                        </div>
+                    </td>` : ''}
+                `;
+            
+            tableBody.appendChild(tr);
+        });
+
+        // Event listener for activating the receiveBtn
+        const checkboxes = tableBody.querySelectorAll('.sys-uld-checkbox');
+        const checkAll = () => {
+            if (checkboxes.length === 0) return;
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            if (receiveBtn) {
+                if (allChecked) {
+                    receiveBtn.disabled = false;
+                    receiveBtn.style.opacity = '1';
+                    receiveBtn.style.cursor = 'pointer';
+                } else {
+                    receiveBtn.disabled = true;
+                    receiveBtn.style.opacity = '0.5';
+                    receiveBtn.style.cursor = 'not-allowed';
+                }
+            }
+        };
+
+        checkboxes.forEach(cb => cb.addEventListener('change', checkAll));
+
+        // Submit listener for Receive btn
+        if (receiveBtn) {
+            receiveBtn.onclick = async () => {
+                receiveBtn.disabled = true;
+                const originalText = receiveBtn.textContent;
+                receiveBtn.textContent = 'Updating...';
+                
+                let { error: errUpdate } = await supabaseClient
+                    .from('Flight')
+                    .update({ status: 'Received' })
+                    .eq('id', flight.id);
+                    
+                if (errUpdate) {
+                    const fallback = await supabaseClient
+                        .from('flights')
+                        .update({ status: 'Received' })
+                        .eq('id', flight.id);
+                    errUpdate = fallback.error;
+                }
+                
+                if (errUpdate) {
+                    console.error('Error updating flight status:', errUpdate);
+                    alert('Error: Could not mark as received.');
+                    receiveBtn.disabled = false;
+                    receiveBtn.textContent = originalText;
+                } else {
+                    receiveBtn.textContent = 'Received!';
+                    receiveBtn.style.background = '#0ea5e9';
+                    receiveBtn.style.cursor = 'default';
+                    
+                    checkboxes.forEach(cb => {
+                        cb.checked = true;
+                        cb.disabled = true;
+                        cb.style.cursor = 'default';
+                    });
+                    
+                    flight.status = 'Received'; // Refresh local ui state
+                }
+            };
+        }
+    }
+
+    // Suscribir inputs de fecha
+    if (sysDateLeft) {
+        sysDateLeft.addEventListener('change', (e) => {
+            loadFlightsForSystem(e.target.value, sysFlightsLeft, sysUldsLeft, sysReceiveBtnLeft);
+        });
+    }
+    
+    if (sysDateRight) {
+        sysDateRight.addEventListener('change', (e) => {
+            loadFlightsForSystem(e.target.value, sysFlightsRight, sysUldsRight, sysReceiveBtnRight);
+        });
+    }
+
+    // ------- COORDINATOR WORKFLOW LOGIC -------
+    const coordDate = document.getElementById('coord-date');
+    const coordFlights = document.getElementById('coord-flights');
+    const coordUlds = document.getElementById('coord-ulds');
+
+    if (coordDate) {
+        coordDate.addEventListener('change', (e) => {
+            // Reusing the system functionality without a receiveBtn
+            loadFlightsForSystem(e.target.value, coordFlights, coordUlds);
+        });
+    }
+
+
+    // ------- MANEJAR REGISTRO (register.html) -------
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const name = document.getElementById('name').value; 
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const btn = registerForm.querySelector('button[type="submit"]');
+
+            if (password !== confirmPassword) {
+                alert('Las contraseñas no coinciden.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Registrando...';
+
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password,
+                options: { data: { name: name } }
+            });
+
+            if (error) {
+                alert('Error al registrar: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Registrarse';
+            } else {
+                alert('¡Registro exitoso! Iniciando sesión automáticamente...');
+                window.location.href = 'index.html';
+            }
+        });
+    }
+    window.confirmCoordinatorSave = function() {
+        const reportEl = document.getElementById('awb-mismatch-overlay-report');
+        const errorMsg = document.getElementById('mismatch-error-msg');
+        
+        if (reportEl && reportEl.value.trim() === '') {
+            reportEl.style.borderColor = '#ef4444';
+            reportEl.focus();
+            if (errorMsg) errorMsg.style.display = 'block';
+            return; // Block save
+        }
+        
+        if (errorMsg) errorMsg.style.display = 'none';
+        document.getElementById('mismatch-overlay-modal').style.display = 'none';
+        const svBtn = document.getElementById('inline-awb-save-btn');
+        window.saveCoordinatorData(svBtn, true);
+    };
+});
