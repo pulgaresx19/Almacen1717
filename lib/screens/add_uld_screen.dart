@@ -104,7 +104,7 @@ class _AddUldScreenState extends State<AddUldScreen> {
         }
 
         payloads.add({
-          'ULD number': uld['uldNumber'],
+          'ULD-number': uld['uldNumber'],
           'pieces': uld['pieces'],
           'weight': uld['weight'],
           'isPriority': uld['priority'],

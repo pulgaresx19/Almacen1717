@@ -120,27 +120,56 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
   }
 
   void _addLocalUld() {
-    if (_uldNumberCtrl.text.isEmpty) {
+    final String newUld = _uldNumberCtrl.text.trim().toUpperCase();
+    if (newUld.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ULD Number required to add to local list.')));
       return;
     }
+
+    if (_flightLocalUlds.any((uld) => uld['uldNumber'] == newUld)) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b)),
+              SizedBox(width: 8),
+              Text('Duplicate ULD', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: Text('The ULD "$newUld" is already in this flight list. Please enter a different ULD number.', style: const TextStyle(color: Color(0xFFcbd5e1))),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))),
+            )
+          ],
+        )
+      );
+      return;
+    }
+
     setState(() {
       _flightLocalUlds.add({
-        'uldNumber': _uldNumberCtrl.text.toUpperCase(),
+        'uldNumber': newUld,
         'pieces': _uldPiecesCtrl.text.isNotEmpty ? int.tryParse(_uldPiecesCtrl.text) : 0,
         'weight': _uldWeightCtrl.text.isNotEmpty ? double.tryParse(_uldWeightCtrl.text) : 0.0,
         'remarks': _uldRemarksCtrl.text,
         'priority': _uldPriority,
         'break': _uldBreak,
+        'isAutoPieces': _isUldPiecesAuto,
+        'isAutoWeight': _isUldWeightAuto,
         'awbs': [], 
       });
       // Update auto breaks
       if (_uldBreak) {
         _cBreak++;
-        if (_isBreakAuto) _breakCtrl.text = 'Auto';
+        if (_isBreakAuto) _breakCtrl.text = '$_cBreak';
       } else {
         _cNoBreak++;
-        if (_isNoBreakAuto) _noBreakCtrl.text = 'Auto';
+        if (_isNoBreakAuto) _noBreakCtrl.text = '$_cNoBreak';
       }
       
       _uldNumberCtrl.clear();
@@ -159,15 +188,61 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     final totalCtrl = TextEditingController();
     final houseCtrl = TextEditingController();
     final remCtrl = TextEditingController();
+    final totalLocked = ValueNotifier<bool>(false);
+
+    awbNumCtrl.addListener(() {
+      final text = awbNumCtrl.text.toUpperCase();
+      if (text.length == 13) {
+        bool foundLocally = false;
+        String foundTotal = '';
+        for (var u in _flightLocalUlds) {
+          for (var a in (u['awbs'] as List)) {
+            if (a['awb_number'] == text) {
+              foundLocally = true;
+              foundTotal = a['total'].toString();
+              break;
+            }
+          }
+          if (foundLocally) break;
+        }
+
+        if (foundLocally) {
+          totalLocked.value = true;
+          if (totalCtrl.text != foundTotal) {
+            totalCtrl.text = foundTotal;
+          }
+        } else {
+          () async {
+            try {
+              final res = await Supabase.instance.client.from('AWB').select('total').eq('AWB-number', text).maybeSingle();
+              if (res != null && res['total'] != null && awbNumCtrl.text.toUpperCase() == text) {
+                totalLocked.value = true;
+                totalCtrl.text = res['total'].toString();
+              }
+            } catch (_) {}
+          }();
+        }
+      } else {
+        if (totalLocked.value) {
+          totalLocked.value = false;
+          totalCtrl.text = '0';
+        }
+      }
+    });
 
     await showDialog(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1e293b),
-          title: Text('Add AWB to ${_flightLocalUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
-          content: SingleChildScrollView(
-            child: Column(
+        double houseHeight = 120.0;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1e293b),
+              title: Text('Add AWB to ${_flightLocalUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: 380,
+            child: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
@@ -175,35 +250,102 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                   children: [
                     Expanded(flex: 5, child: _buildTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true)),
                     const SizedBox(width: 8),
-                    Expanded(flex: 3, child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true)),
+                    Expanded(flex: 3, child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true)),
                     const SizedBox(width: 8),
-                    Expanded(flex: 3, child: _buildTextField('Total', totalCtrl, '0', isNum: true)),
+                    Expanded(
+                      flex: 3, 
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: totalLocked,
+                        builder: (ctx, locked, _) => _buildTextField('Total', totalCtrl, '0', isNum: true, digitsOnly: true, disabled: locked),
+                      )
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(flex: 3, child: _buildTextField('Weight', weightCtrl, '0.0', isNum: true)),
+                    Expanded(flex: 3, child: _buildTextField('Weight', weightCtrl, '0.0', isNum: true, allowDecimal: true)),
                   ]
                 ),
                 const SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildTextField('Remarks', remCtrl, 'Notas...'),
                 const SizedBox(height: 12),
-                _buildTextField('House Number', houseCtrl, 'HAWB1, HAWB2...', maxLines: null, minLines: 3),
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    SizedBox(
+                      height: houseHeight,
+                      child: _buildTextField('House Number', houseCtrl, 'HAWB1, HAWB2...', expands: true, isUpperCase: true),
+                    ),
+                    GestureDetector(
+                      onPanUpdate: (details) {
+                        setDialogState(() {
+                          houseHeight = (houseHeight + details.delta.dy).clamp(80.0, 500.0);
+                        });
+                      },
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.resizeUpDown,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: SizedBox(
+                            width: 10,
+                            height: 10,
+                            child: CustomPaint(painter: ResizeHandlePainter()),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
+          ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF94a3b8)))),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1)),
               onPressed: () {
-                if (awbNumCtrl.text.isNotEmpty && totalCtrl.text.isNotEmpty) {
+                final newAwb = awbNumCtrl.text.trim().toUpperCase();
+                if (newAwb.isNotEmpty && totalCtrl.text.isNotEmpty) {
+                  final existingAwbs = _flightLocalUlds[uldIndex]['awbs'] as List;
+                  if (existingAwbs.any((a) => a['awb_number'] == newAwb)) {
+                    showDialog(
+                      context: ctx,
+                      builder: (c) => AlertDialog(
+                        backgroundColor: const Color(0xFF1e293b),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        title: const Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b)),
+                            SizedBox(width: 8),
+                            Text('Duplicate AWB', style: TextStyle(color: Colors.white)),
+                          ],
+                        ),
+                        content: Text('The AWB "$newAwb" is already registered under this ULD. Please verify or modify the existing entry.', style: const TextStyle(color: Color(0xFFcbd5e1))),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(c),
+                            child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))),
+                          )
+                        ],
+                      )
+                    );
+                    return;
+                  }
+
                   setState(() {
                     _flightLocalUlds[uldIndex]['awbs'].add({
-                      'awb_number': awbNumCtrl.text.toUpperCase(),
+                      'awb_number': newAwb,
                       'pieces': int.tryParse(piecesCtrl.text) ?? 0,
                       'weight': double.tryParse(weightCtrl.text) ?? 0.0,
                       'total': int.tryParse(totalCtrl.text) ?? 1,
-                      'house_number': houseCtrl.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                      'house_number': houseCtrl.text.split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                       'remarks': remCtrl.text,
                     });
+                    if (_flightLocalUlds[uldIndex]['isAutoPieces'] == true) {
+                      _flightLocalUlds[uldIndex]['pieces'] = (_flightLocalUlds[uldIndex]['awbs'] as List).fold<int>(0, (s, a) => s + ((a['pieces'] as num).toInt()));
+                    }
+                    if (_flightLocalUlds[uldIndex]['isAutoWeight'] == true) {
+                      _flightLocalUlds[uldIndex]['weight'] = (_flightLocalUlds[uldIndex]['awbs'] as List).fold<double>(0.0, (s, a) => s + ((a['weight'] as num).toDouble()));
+                    }
                   });
                   Navigator.pop(ctx);
                 }
@@ -211,6 +353,8 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
               child: const Text('Add AWB', style: TextStyle(color: Colors.white)),
             ),
           ],
+        );
+        }
         );
       }
     );
@@ -254,9 +398,12 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
       await supabase.from('Flight').insert([flightPayload]);
       
       if (_flightLocalUlds.isNotEmpty) {
+        List<Map<String, dynamic>> uldPayloads = [];
+        Map<String, Map<String, dynamic>> mergedAwbs = {};
+
         for (var uld in _flightLocalUlds) {
-          final uldPayload = {
-            'ULD number': uld['uldNumber'],
+          uldPayloads.add({
+            'ULD-number': uld['uldNumber'],
             'refCarrier': fCarrier,
             'refNumber': fNumber,
             'refDate': fDate,
@@ -265,23 +412,19 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
             'isPriority': uld['priority'],
             'isBreak': uld['break'],
             'created_at': DateTime.now().toIso8601String(),
-          };
-          await supabase.from('ULD').insert([uldPayload]);
+          });
 
           List awbs = uld['awbs'];
-          if (awbs.isNotEmpty) {
-            for (var awb in awbs) {
-              final awbNum = awb['awb_number'];
-              final existingAwbList = await supabase.from('AWB').select('*').eq('AWB number', awbNum).limit(1);
-              
-              List currentDataAwb = [];
-              bool isUpdate = existingAwbList.isNotEmpty;
-              if (isUpdate) {
-                 var dbDataAwb = existingAwbList[0]['data-AWB'];
-                 if (dbDataAwb != null && dbDataAwb is List) currentDataAwb = List.from(dbDataAwb);
-              }
-
-              final newAwbItem = {
+          for (var awb in awbs) {
+            final num = awb['awb_number'];
+            if (!mergedAwbs.containsKey(num)) {
+               mergedAwbs[num] = {
+                 'AWB-number': num,
+                 'total': awb['total'],
+                 'data-AWB': [],
+               };
+            }
+            (mergedAwbs[num]!['data-AWB'] as List).add({
                 'refCarrier': fCarrier,
                 'refNumber': fNumber,
                 'refDate': fDate,
@@ -291,16 +434,41 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                 'remarks': awb['remarks'],
                 'isBreak': uld['break'],
                 'house_number': awb['house_number']
-              };
-              currentDataAwb.add(newAwbItem);
-
-              if (isUpdate) {
-                await supabase.from('AWB').update({'total': awb['total'], 'data-AWB': currentDataAwb}).eq('AWB number', awbNum);
-              } else {
-                await supabase.from('AWB').insert([{'AWB number': awbNum, 'total': awb['total'], 'data-AWB': currentDataAwb, 'created_at': DateTime.now().toIso8601String()}]);
-              }
-            }
+            });
           }
+        }
+
+        await supabase.from('ULD').insert(uldPayloads);
+
+        if (mergedAwbs.isNotEmpty) {
+           final awbNumbers = mergedAwbs.keys.toList();
+           final existingDbAwbs = await supabase.from('AWB').select('AWB-number, data-AWB').inFilter('AWB-number', awbNumbers);
+           
+           final existingAwbMap = { for (var e in existingDbAwbs) e['AWB-number'] : e['data-AWB'] };
+           
+           for (var awbNum in mergedAwbs.keys) {
+              if (existingAwbMap.containsKey(awbNum)) {
+                 var dbData = existingAwbMap[awbNum];
+                 if (dbData is List) {
+                    (mergedAwbs[awbNum]!['data-AWB'] as List).insertAll(0, dbData);
+                 }
+              }
+           }
+           
+           final finalAwbPayloads = mergedAwbs.values.map((v) {
+             final n = v['AWB-number'];
+             Map<String, dynamic> out = {
+               'AWB-number': n,
+               'total': v['total'],
+               'data-AWB': v['data-AWB'],
+             };
+             if (!existingAwbMap.containsKey(n)) {
+                out['created_at'] = DateTime.now().toIso8601String();
+             }
+             return out;
+           }).toList();
+           
+           await supabase.from('AWB').upsert(finalAwbPayloads, onConflict: 'AWB-number');
         }
       }
       
@@ -372,7 +540,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                     onChanged: (v) {
                       setState(() {
                         _isBreakAuto = v ?? true;
-                        _breakCtrl.text = _isBreakAuto ? 'Auto' : '';
+                        _breakCtrl.text = _isBreakAuto ? '$_cBreak' : '';
                       });
                     }
                   )
@@ -387,7 +555,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                     onChanged: (v) {
                       setState(() {
                         _isNoBreakAuto = v ?? true;
-                        _noBreakCtrl.text = _isNoBreakAuto ? 'Auto' : '';
+                        _noBreakCtrl.text = _isNoBreakAuto ? '$_cNoBreak' : '';
                       });
                     }
                   )
@@ -584,8 +752,10 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                                   setState(() {
                                     if (_flightLocalUlds[i]['break'] == true) {
                                       _cBreak = (_cBreak > 0) ? _cBreak - 1 : 0;
+                                      if (_isBreakAuto) _breakCtrl.text = '$_cBreak';
                                     } else {
                                       _cNoBreak = (_cNoBreak > 0) ? _cNoBreak - 1 : 0;
+                                      if (_isNoBreakAuto) _noBreakCtrl.text = '$_cNoBreak';
                                     }
                                     _flightLocalUlds.removeAt(i);
                                   });
@@ -598,21 +768,103 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                     ),
                     if (awbs.isNotEmpty)
                       Table(
-                        border: TableBorder(horizontalInside: BorderSide(color: Colors.white.withAlpha(25))),
                         columnWidths: const {
                            0: IntrinsicColumnWidth(),
-                           1: FlexColumnWidth(),
+                           1: IntrinsicColumnWidth(),
                            2: IntrinsicColumnWidth(),
                            3: IntrinsicColumnWidth(),
+                           4: IntrinsicColumnWidth(),
+                           5: FlexColumnWidth(),
+                           6: IntrinsicColumnWidth(),
+                           7: IntrinsicColumnWidth(),
                         },
-                        children: awbs.map((a) => TableRow(
-                          children: [
-                            Padding(padding: const EdgeInsets.all(8), child: Icon(Icons.subdirectory_arrow_right, color: Colors.white.withAlpha(128), size: 16)),
-                            Padding(padding: const EdgeInsets.all(8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                            Padding(padding: const EdgeInsets.all(8), child: Text('${a['pieces']} pcs', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                            Padding(padding: const EdgeInsets.all(8), child: Text('${a['weight']} kg', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                          ]
-                        )).toList(),
+                        children: awbs.asMap().entries.map((entry) {
+                          final aInt = entry.key;
+                          final a = entry.value;
+                          return TableRow(
+                            children: [
+                              Padding(padding: const EdgeInsets.all(8), child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(4)), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))))),
+                              Padding(padding: const EdgeInsets.all(8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
+                              Padding(padding: const EdgeInsets.all(8), child: Text('${a['pieces']} pcs', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
+                              Padding(padding: const EdgeInsets.all(8), child: Text('${a['total'] ?? 0} ttl', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
+                              Padding(padding: const EdgeInsets.all(8), child: Text('${a['weight']} kg', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
+                              Padding(padding: const EdgeInsets.all(8), child: Text(a['remarks']?.isNotEmpty == true ? a['remarks'] : '-', style: const TextStyle(color: Color(0xFF94a3b8), fontStyle: FontStyle.italic, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                              Padding(padding: const EdgeInsets.all(8), child: Builder(
+                                builder: (ctx) {
+                                  final rawH = a['house_number'];
+                                  final List<String> items = (rawH is List) ? rawH.map((e) => e.toString()).toList() : [];
+                                  if (items.isEmpty) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                      decoration: BoxDecoration(color: Colors.white.withAlpha(10), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.white.withAlpha(30))),
+                                      child: const Center(child: Text('0 HAWBs', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.w600))),
+                                    );
+                                  }
+                                  return InkWell(
+                                    onTap: () {
+                                      showDialog(
+                                        context: ctx,
+                                        builder: (c) => AlertDialog(
+                                          backgroundColor: const Color(0xFF1e293b),
+                                          title: Text('House Numbers (${items.length})', style: const TextStyle(color: Colors.white)),
+                                          content: SingleChildScrollView(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: items.asMap().entries.map((ent) => Padding(
+                                                padding: const EdgeInsets.only(bottom: 8),
+                                                child: Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 24, height: 24,
+                                                      alignment: Alignment.center,
+                                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), borderRadius: BorderRadius.circular(6)),
+                                                      child: Text('${ent.key + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(child: Text(ent.value, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14))),
+                                                  ]
+                                                ),
+                                              )).toList(),
+                                            )
+                                          ),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))))
+                                          ],
+                                        )
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(100))),
+                                      child: Center(child: Text('${items.length} HAWB${items.length > 1 ? 's' : ''}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.w600))),
+                                    ),
+                                  );
+                                }
+                              )),
+                              Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(4),
+                                  onTap: () {
+                                    setState(() {
+                                      _flightLocalUlds[i]['awbs'].removeAt(aInt);
+                                      if (_flightLocalUlds[i]['isAutoPieces'] == true) {
+                                        _flightLocalUlds[i]['pieces'] = (_flightLocalUlds[i]['awbs'] as List).fold<int>(0, (s, a) => s + ((a['pieces'] as num).toInt()));
+                                      }
+                                      if (_flightLocalUlds[i]['isAutoWeight'] == true) {
+                                        _flightLocalUlds[i]['weight'] = (_flightLocalUlds[i]['awbs'] as List).fold<double>(0.0, (s, a) => s + ((a['weight'] as num).toDouble()));
+                                      }
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4.0),
+                                    child: Icon(Icons.close, color: Colors.redAccent.withAlpha(200), size: 16),
+                                  ),
+                                ),
+                              ),
+                            ]
+                          );
+                        }).toList(),
                       ),
                     const Divider(height: 1, color: Colors.transparent),
                   ],
@@ -675,7 +927,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines, bool expands = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -687,13 +939,23 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
            ],
         ),
         const SizedBox(height: 6),
-        TextField(
-          controller: ctrl,
-          enabled: !disabled,
-          readOnly: readOnly,
-          onTap: onTap,
-          keyboardType: isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text,
-          textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
+        expands 
+        ? Expanded(
+            child: _buildInnerTextField(ctrl, disabled, readOnly, onTap, isNum, allowDecimal, isUpperCase, isAwb, digitsOnly, maxLen, null, null, true, hint, suffixIcon)
+          )
+        : _buildInnerTextField(ctrl, disabled, readOnly, onTap, isNum, allowDecimal, isUpperCase, isAwb, digitsOnly, maxLen, maxLines, minLines, false, hint, suffixIcon),
+      ],
+    );
+  }
+
+  Widget _buildInnerTextField(TextEditingController ctrl, bool disabled, bool readOnly, VoidCallback? onTap, bool isNum, bool allowDecimal, bool isUpperCase, bool isAwb, bool digitsOnly, int? maxLen, int? maxLines, int? minLines, bool expands, String hint, Widget? suffixIcon) {
+    return TextField(
+      controller: ctrl,
+      enabled: !disabled,
+      readOnly: readOnly,
+      onTap: onTap,
+      keyboardType: isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text,
+      textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
           inputFormatters: [
             if (isAwb) AwbTextInputFormatter(),
             if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
@@ -703,6 +965,8 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
           maxLength: maxLen,
           maxLines: maxLines,
           minLines: minLines,
+          expands: expands,
+          textAlignVertical: expands ? TextAlignVertical.top : null,
           style: TextStyle(color: disabled ? Colors.white.withAlpha(120) : Colors.white, fontSize: 12),
           decoration: InputDecoration(
             hintText: hint,
@@ -716,9 +980,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
             disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withAlpha(10))),
             suffixIcon: suffixIcon,
           ),
-        ),
-      ],
-    );
+        );
   }
 
   Widget _buildDropdown(String label) {
@@ -767,4 +1029,21 @@ class AwbTextInputFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
+}
+
+class ResizeHandlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF94a3b8)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+      
+    canvas.drawLine(Offset(0, size.height), Offset(size.width, 0), paint);
+    canvas.drawLine(Offset(size.width * 0.45, size.height), Offset(size.width, size.height * 0.45), paint);
+    canvas.drawLine(Offset(size.width * 0.9, size.height), Offset(size.width, size.height * 0.9), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

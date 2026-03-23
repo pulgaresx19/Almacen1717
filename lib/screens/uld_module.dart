@@ -138,7 +138,7 @@ class _UldModuleState extends State<UldModule> {
                   
                   if (_searchController.text.isNotEmpty) {
                     final term = _searchController.text.toLowerCase();
-                    ulds = ulds.where((u) => u['ULD number']?.toString().toLowerCase().contains(term) ?? false).toList();
+                    ulds = ulds.where((u) => u['ULD-number']?.toString().toLowerCase().contains(term) ?? false).toList();
                   }
 
                   if (ulds.isEmpty) return const Center(child: Text('No ULDs found.', style: TextStyle(color: Color(0xFF94a3b8))));
@@ -170,7 +170,7 @@ class _UldModuleState extends State<UldModule> {
                           return DataRow(
                             cells: [
                               DataCell(Text('${index + 1}')),
-                              DataCell(Text(u['ULD number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
+                              DataCell(Text(u['ULD-number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                               DataCell(Text(u['pieces']?.toString() ?? '0')),
                               DataCell(Text('${u['weight']?.toString() ?? '0'} kg')),
                               DataCell(Text(u['isPriority'] == true ? 'Yes' : 'No', style: TextStyle(color: u['isPriority'] == true ? Colors.redAccent : const Color(0xFFcbd5e1)))),

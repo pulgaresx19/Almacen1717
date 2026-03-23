@@ -129,7 +129,7 @@ class _AwbModuleState extends State<AwbModule> {
                   
                   if (_searchController.text.isNotEmpty) {
                     final term = _searchController.text.toLowerCase();
-                    awbs = awbs.where((u) => u['AWB number']?.toString().toLowerCase().contains(term) ?? false).toList();
+                    awbs = awbs.where((u) => u['AWB-number']?.toString().toLowerCase().contains(term) ?? false).toList();
                   }
 
                   if (awbs.isEmpty) return const Center(child: Text('No AWBs found.', style: TextStyle(color: Color(0xFF94a3b8))));
@@ -172,7 +172,7 @@ class _AwbModuleState extends State<AwbModule> {
                           return DataRow(
                             cells: [
                               DataCell(Text('${index + 1}')),
-                              DataCell(Text(u['AWB number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
+                              DataCell(Text(u['AWB-number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                               DataCell(Text('$pieces pcs / $weight kg')),
                               DataCell(_buildStatusBadge(status)),
                             ],

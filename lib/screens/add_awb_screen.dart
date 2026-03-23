@@ -72,7 +72,7 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
       };
 
       final payload = {
-        'AWB number': _awbNumberCtrl.text.toUpperCase(),
+        'AWB-number': _awbNumberCtrl.text.toUpperCase(),
         'total': int.tryParse(_totalCtrl.text) ?? 1,
         'data-AWB': dataAwb,
         'data-coordinator': {},
