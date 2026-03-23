@@ -1,5 +1,5 @@
-const supabaseUrl = 'https://cleqppfzfuljynhxjlst.supabase.co';
-const supabaseKey = 'sb_publishable_GxFV2KWcAm9HggC1u-byFg_53EJfJrH';
+const supabaseUrl = 'https://rbefksdbdosxoxicfqww.supabase.co';
+const supabaseKey = 'sb_publishable_ZH5JD9AlFYTVYcOx-DckPg_9WqzrRkf';
 const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
 document.addEventListener('DOMContentLoaded', async () => {
