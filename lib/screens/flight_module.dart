@@ -293,12 +293,18 @@ class _FlightModuleState extends State<FlightModule> {
           child: child,
         );
       },
-    );
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   String _formatTime(String? timeStr) {
     if (timeStr == null || timeStr.trim().isEmpty || timeStr == '-') return '-';
     try {
+      if (timeStr.contains('T') || timeStr.contains('-')) {
+        final dt = DateTime.parse(timeStr);
+        return DateFormat('hh:mm a').format(dt).toUpperCase();
+      }
       final parts = timeStr.trim().split(':');
       if (parts.length >= 2) {
         int hr = int.parse(parts[0]);
@@ -344,6 +350,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
   String? _selectedUldId;
   List<Map<String, dynamic>> _selectedAwbs = [];
   
+  Set<String> _editingKeys = {};
   bool _isEditing = false;
   late Map<String, dynamic> _editedFlight;
 
@@ -427,21 +434,50 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
   }
 
   Widget _buildEditableRow(String label, String key, Color colorL, Color colorP, {bool isTime = false, bool isStatus = false}) {
-    if (!_isEditing) {
+    final isEditingThisField = _editingKeys.contains(key);
+
+    if (!isEditingThisField) {
+      String displayValue = '${_editedFlight[key] ?? '-'}';
       if (isTime) {
         String ts = _editedFlight[key]?.toString() ?? '-';
         if (ts != '-') {
             try {
-              final parts = ts.trim().split(':');
-              if (parts.length >= 2) {
-                 final dt = DateTime(2000, 1, 1, int.parse(parts[0]), int.parse(parts[1]));
-                 ts = DateFormat('hh:mm a').format(dt).toUpperCase();
+              if (ts.contains('T') || ts.contains('-')) {
+                final dt = DateTime.parse(ts);
+                ts = DateFormat('hh:mm a').format(dt).toUpperCase();
+              } else {
+                final parts = ts.trim().split(':');
+                if (parts.length >= 2) {
+                   final dt = DateTime(2000, 1, 1, int.parse(parts[0]), int.parse(parts[1]));
+                   ts = DateFormat('hh:mm a').format(dt).toUpperCase();
+                }
               }
             } catch (_) {}
         }
-        return _buildInfoRow(label, ts, colorL, colorP);
+        displayValue = ts;
       }
-      return _buildInfoRow(label, '${_editedFlight[key] ?? '-'}', colorL, colorP);
+      
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(width: 130, child: Text(label, style: TextStyle(color: colorL, fontSize: 13))),
+            Expanded(child: Text(displayValue, style: TextStyle(color: colorP, fontSize: 14, fontWeight: FontWeight.w500))),
+            const SizedBox(width: 8),
+            if (_isEditing)
+              IconButton(
+                icon: Icon(Icons.edit_rounded, color: colorL, size: 16),
+                onPressed: () {
+                  setState(() => _editingKeys.add(key));
+                },
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
+                tooltip: appLanguage.value == 'es' ? 'Editar' : 'Edit',
+              ),
+          ],
+        ),
+      );
     }
     
     Widget editor;
@@ -466,7 +502,6 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
              final dt = DateTime(2000, 1, 1, picked.hour, picked.minute);
              final formatted = DateFormat('hh:mm a').format(dt).toUpperCase();
              setState(() => _editedFlight[key] = formatted);
-             _saveField(key, formatted);
           }
         },
         child: Container(
@@ -498,7 +533,6 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
             onChanged: (v) {
               if (v != null) {
                 setState(() => _editedFlight[key] = v);
-                _saveField(key, v);
               }
             },
           ),
@@ -520,7 +554,6 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
           onChanged: (v) {
             _editedFlight[key] = v;
           },
-          onSubmitted: (v) => _saveField(key, v),
         ),
       );
     }
@@ -532,6 +565,46 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
         children: [
           SizedBox(width: 130, child: Text(label, style: TextStyle(color: colorL, fontSize: 13))),
           Expanded(child: editor),
+          if (isEditingThisField) ...[
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.save_rounded, color: Color(0xFF6366f1), size: 18),
+                onPressed: () {
+                  _saveField(key, _editedFlight[key]);
+                  setState(() => _editingKeys.remove(key));
+                },
+                tooltip: appLanguage.value == 'es' ? 'Guardar' : 'Save',
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Container(
+              decoration: BoxDecoration(
+                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
+                onPressed: () {
+                  setState(() {
+                    _editedFlight[key] = widget.flight[key];
+                    _editingKeys.remove(key);
+                  });
+                },
+                tooltip: appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ]
         ],
       ),
     );
@@ -539,9 +612,10 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
 
   Future<void> _saveField(String key, dynamic value) async {
     try {
-      if (key == 'time-arrived') {
+      if (['time-arrived', 'start-break', 'end-break', 'first-truck', 'last-truck'].contains(key)) {
          try {
-           value = DateFormat('HH:mm').format(DateFormat('hh:mm a').parse(value.toString()));
+           final parsedTime = DateFormat('hh:mm a').parse(value.toString());
+           value = DateFormat('HH:mm:ss').format(parsedTime);
          } catch (_) {}
       }
       
@@ -551,8 +625,29 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
         .eq('carrier', widget.flight['carrier'])
         .eq('number', widget.flight['number'])
         .eq('date-arrived', widget.flight['date-arrived']);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(appLanguage.value == 'es' ? 'Se ha guardado correctamente.' : 'Saved successfully.'),
+            backgroundColor: const Color(0xFF166534),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('Error updating \$key: \$e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(appLanguage.value == 'es' ? 'Error al guardar.' : 'Error saving.'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -581,7 +676,15 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                   Switch(
                     value: _isEditing, 
                     activeColor: const Color(0xFF6366f1),
-                    onChanged: (v) => setState(() => _isEditing = v)
+                    onChanged: (v) {
+                      setState(() {
+                        _isEditing = v;
+                        if (!v) {
+                          _editingKeys.clear();
+                          _editedFlight = Map<String, dynamic>.from(widget.flight);
+                        }
+                      });
+                    }
                   ),
                   IconButton(icon: Icon(Icons.close, color: textS), onPressed: () => Navigator.pop(context)),
                 ],
@@ -607,6 +710,10 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                 }),
                 _buildInfoRow('Break / No Break', '${f['cant-break'] ?? 0} / ${f['cant-noBreak'] ?? 0}', textS, textP),
                 _buildEditableRow(appLanguage.value == 'es' ? 'Hora Llegada' : 'Arrive Time', 'time-arrived', textS, textP, isTime: true),
+                _buildEditableRow(appLanguage.value == 'es' ? 'Inicio Desarme' : 'Start Break', 'start-break', textS, textP, isTime: true),
+                _buildEditableRow(appLanguage.value == 'es' ? 'Fin Desarme' : 'End Break', 'end-break', textS, textP, isTime: true),
+                _buildEditableRow(appLanguage.value == 'es' ? 'Primer Camión' : 'First Truck', 'first-truck', textS, textP, isTime: true),
+                _buildEditableRow(appLanguage.value == 'es' ? 'Último Camión' : 'Last Truck', 'last-truck', textS, textP, isTime: true),
                 _buildEditableRow(appLanguage.value == 'es' ? 'Estado' : 'Status', 'status', textS, textP, isStatus: true),
                 _buildEditableRow(appLanguage.value == 'es' ? 'Observaciones' : 'Remarks', 'remarks', textS, textP),
                 
