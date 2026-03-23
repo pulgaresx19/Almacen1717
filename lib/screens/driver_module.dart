@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage;
+import '../main.dart' show appLanguage, isDarkMode;
 
 class DriverModule extends StatefulWidget {
   const DriverModule({super.key});
@@ -20,20 +20,29 @@ class _DriverModuleState extends State<DriverModule> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Main Header Row (Title, Search, Buttons)
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (context, dark, child) {
+        final Color textP = dark ? Colors.white : const Color(0xFF111827);
+        final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+        final Color bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff);
+        final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+        final Color iconColor = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // Main Header Row (Title, Search, Buttons)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(appLanguage.value == 'es' ? 'Choferes y Entregas' : 'Driver / Deliveries', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(appLanguage.value == 'es' ? 'Administración de choferes, camiones y despachos.' : 'Management of drivers, trucks, and deliveries.', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 13)),
-              ],
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(appLanguage.value == 'es' ? 'Choferes y Entregas' : 'Driver / Deliveries', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(appLanguage.value == 'es' ? 'Administración de choferes, camiones y despachos.' : 'Management of drivers, trucks, and deliveries.', style: TextStyle(color: textS, fontSize: 13)),
+                  ],
             ),
             const Spacer(),
             
@@ -42,18 +51,18 @@ class _DriverModuleState extends State<DriverModule> {
               width: 300,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(10),
+                color: bgCard,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withAlpha(25)),
+                border: Border.all(color: borderCard),
               ),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style: TextStyle(color: textP, fontSize: 13),
                 onChanged: (v) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search Delivery...',
-                  hintStyle: TextStyle(color: Colors.white.withAlpha(76), fontSize: 13),
-                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94a3b8), size: 16),
+                  hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                  prefixIcon: Icon(Icons.search_rounded, color: iconColor, size: 16),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
@@ -78,10 +87,10 @@ class _DriverModuleState extends State<DriverModule> {
             // Refresh Button
             IconButton(
               onPressed: () => setState(() {}),
-              icon: const Icon(Icons.refresh_rounded, color: Color(0xFFcbd5e1), size: 18),
+              icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
               tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
               style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withAlpha(25),
+                backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
                 padding: const EdgeInsets.all(12),
               ),
             ),
@@ -92,9 +101,9 @@ class _DriverModuleState extends State<DriverModule> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withAlpha(10),
+              color: bgCard,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withAlpha(25)),
+              border: Border.all(color: borderCard),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
@@ -129,10 +138,10 @@ class _DriverModuleState extends State<DriverModule> {
                           constraints: BoxConstraints(minWidth: constraints.maxWidth),
                           child: SingleChildScrollView(
                             child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(Colors.white.withAlpha(13)),
-                        dataRowColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.hovered) ? Colors.white.withAlpha(8) : Colors.transparent),
-                        dataTextStyle: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13),
-                        headingTextStyle: const TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.w600, fontSize: 12),
+                              headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
+                        dataRowColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.hovered) ? (dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6)) : Colors.transparent),
+                        dataTextStyle: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13),
+                        headingTextStyle: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 12),
                         columns: const [
                           DataColumn(label: Text('Order')),
                           DataColumn(label: Text('Door')),
@@ -154,12 +163,12 @@ class _DriverModuleState extends State<DriverModule> {
                           return DataRow(
                             cells: [
                               DataCell(Text(u['sort_order']?.toString() ?? '${index + 1}')),
-                              DataCell(Text(u['door']?.toString() ?? '-', style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold))),
+                              DataCell(Text(u['door']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.amberAccent : const Color(0xFFD97706), fontWeight: FontWeight.bold))),
                               DataCell(Text(u['truck-company']?.toString() ?? '-')),
-                              DataCell(Text(u['driver']?.toString() ?? '-', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500))),
+                              DataCell(Text(u['driver']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.w500))),
                               DataCell(Text(u['type']?.toString() ?? '-')),
                               DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
-                              DataCell(Text('$awbCount AWBs', style: const TextStyle(color: Color(0xFF818cf8)))),
+                              DataCell(Text('$awbCount AWBs', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF4f46e5)))),
                             ],
                           );
                         }),
@@ -175,6 +184,8 @@ class _DriverModuleState extends State<DriverModule> {
           ),
         ),
       ],
+    );
+     }
     );
   }
 

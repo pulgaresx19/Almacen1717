@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
-import '../main.dart' show appLanguage;
+import '../main.dart' show appLanguage, isDarkMode;
 
 class DashboardViewModule extends StatelessWidget {
   const DashboardViewModule({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (context, dark, child) {
+        final Color textP = dark ? Colors.white : const Color(0xFF111827);
+        final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+        
+        return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -17,9 +23,9 @@ class DashboardViewModule extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(appLanguage.value == 'es' ? 'Panel Principal' : 'Dashboard Overview', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
+                  Text(appLanguage.value == 'es' ? 'Panel Principal' : 'Dashboard Overview', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
-                  Text(appLanguage.value == 'es' ? 'Resumen completo de la actividad.' : 'Complete overview of warehouse activity.', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 13)),
+                  Text(appLanguage.value == 'es' ? 'Resumen completo de la actividad.' : 'Complete overview of warehouse activity.', style: TextStyle(color: textS, fontSize: 13)),
                 ],
               ),
             ],
@@ -34,17 +40,17 @@ class DashboardViewModule extends StatelessWidget {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(flex: 2, child: _buildCourseSummaryCard()),
+                    Expanded(flex: 2, child: _buildCourseSummaryCard(dark)),
                     const SizedBox(width: 24),
-                    Expanded(flex: 1, child: _buildStatsColumn()),
+                    Expanded(flex: 1, child: _buildStatsColumn(dark)),
                   ],
                 );
               } else {
                 return Column(
                   children: [
-                    _buildCourseSummaryCard(),
+                    _buildCourseSummaryCard(dark),
                     const SizedBox(height: 24),
-                    _buildStatsColumn(),
+                    _buildStatsColumn(dark),
                   ],
                 );
               }
@@ -53,18 +59,25 @@ class DashboardViewModule extends StatelessWidget {
         ],
       ),
     );
-  }
+  });
+}
 
-  Widget _buildCourseSummaryCard() {
+  Widget _buildCourseSummaryCard(bool dark) {
+    final Color bg = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
+    final Color border = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
+    final Color shadow = dark ? Colors.black.withAlpha(25) : const Color(0xFF000000).withAlpha(12); // Sheer elegant black
+    final Color textP = dark ? Colors.white : const Color(0xFF111827);
+    final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+    
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1e293b),
+        color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withAlpha(15)),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(25),
+            color: shadow,
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
@@ -73,21 +86,21 @@ class DashboardViewModule extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'System Operations Summary',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
+            style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'An overview of your warehouse status.',
-            style: TextStyle(color: Color(0xFF94a3b8), fontSize: 13),
+            style: TextStyle(color: textS, fontSize: 13),
           ),
           const SizedBox(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildCircularChart(23, const Color(0xFFf97316)), // Orange
-              _buildCircularChart(93, const Color(0xFF3b82f6)), // Blue
+              _buildCircularChart(23, const Color(0xFFf97316), textP), // Orange
+              _buildCircularChart(93, const Color(0xFF3b82f6), textP), // Blue
             ],
           ),
           const SizedBox(height: 10),
@@ -96,7 +109,7 @@ class DashboardViewModule extends StatelessWidget {
     );
   }
 
-  Widget _buildCircularChart(int percentage, Color color) {
+  Widget _buildCircularChart(int percentage, Color color, Color textP) {
     return SizedBox(
       width: 120,
       height: 120,
@@ -114,21 +127,26 @@ class DashboardViewModule extends StatelessWidget {
               strokeCap: StrokeCap.round,
             ),
           ),
-          Text(
-            '$percentage%',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
+            Text(
+              '$percentage%',
+              style: TextStyle(
+                color: textP,
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsColumn() {
-    return Column(
+          ],
+        ),
+      );
+    }
+  
+    Widget _buildStatsColumn(bool dark) {
+      final Color bgCard2 = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
+      final Color borderCard2 = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
+      final Color textP = dark ? Colors.white : const Color(0xFF111827);
+      final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+      
+      return Column(
       children: [
         // Active Users Card
         Container(
@@ -177,21 +195,21 @@ class DashboardViewModule extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xFF1e293b),
+            color: bgCard2,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withAlpha(15)),
+            border: Border.all(color: borderCard2),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Total User Count',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'An overview of all your users on your platform.',
-                style: TextStyle(color: Color(0xFF94a3b8), fontSize: 13),
+                style: TextStyle(color: textS, fontSize: 13),
               ),
               const SizedBox(height: 24),
               Row(
@@ -205,10 +223,10 @@ class DashboardViewModule extends StatelessWidget {
                     ),
                     child: const Icon(Icons.group_rounded, color: Color(0xFF818cf8), size: 28),
                   ),
-                  const Text(
-                    '56.4k', // Static from their image originally
+                  Text(
+                    '56.4k',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: textP,
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
                     ),

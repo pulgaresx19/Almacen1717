@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
@@ -24,17 +25,21 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
   int _cNoBreak = 0;
   bool _isBreakAuto = true;
   bool _isNoBreakAuto = true;
+  final _breakCtrl = TextEditingController(text: 'Auto');
+  final _noBreakCtrl = TextEditingController(text: 'Auto');
 
   String _status = 'Waiting';
   bool _isSaving = false;
 
   // ULD Controllers
   final _uldNumberCtrl = TextEditingController();
-  final _uldPiecesCtrl = TextEditingController();
-  final _uldWeightCtrl = TextEditingController();
+  final _uldPiecesCtrl = TextEditingController(text: 'Auto');
+  final _uldWeightCtrl = TextEditingController(text: 'Auto');
   final _uldRemarksCtrl = TextEditingController();
   bool _uldPriority = false;
   bool _uldBreak = false;
+  bool _isUldPiecesAuto = true;
+  bool _isUldWeightAuto = true;
 
   // Nested Data
   final List<Map<String, dynamic>> _flightLocalUlds = [];
@@ -42,14 +47,17 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
   @override
   void initState() {
     super.initState();
-    _dateCtrl.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _timeCtrl.text = DateFormat('HH:mm').format(DateTime.now());
   }
 
   Future<void> _selectDate() async {
+    DateTime initD = DateTime.now();
+    if (_dateCtrl.text.isNotEmpty) {
+      try { initD = DateFormat('MM/dd/yyyy').parse(_dateCtrl.text); } catch (_) {}
+    }
+    
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.tryParse(_dateCtrl.text) ?? DateTime.now(),
+      initialDate: initD,
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
       builder: (context, child) {
@@ -67,7 +75,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
       },
     );
     if (picked != null) {
-      setState(() => _dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked));
+      setState(() => _dateCtrl.text = DateFormat('MM/dd/yyyy').format(picked));
     }
   }
 
@@ -89,9 +97,8 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     );
     if (picked != null) {
       setState(() {
-        final hh = picked.hour.toString().padLeft(2, '0');
-        final mm = picked.minute.toString().padLeft(2, '0');
-        _timeCtrl.text = '$hh:$mm';
+        final dt = DateTime(2000, 1, 1, picked.hour, picked.minute);
+        _timeCtrl.text = DateFormat('hh:mm a').format(dt).toUpperCase();
       });
     }
   }
@@ -103,6 +110,8 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     _dateCtrl.dispose();
     _timeCtrl.dispose();
     _remarksCtrl.dispose();
+    _breakCtrl.dispose();
+    _noBreakCtrl.dispose();
     _uldNumberCtrl.dispose();
     _uldPiecesCtrl.dispose();
     _uldWeightCtrl.dispose();
@@ -126,12 +135,17 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
         'awbs': [], 
       });
       // Update auto breaks
-      if (_uldBreak) _cBreak++;
-      else _cNoBreak++;
+      if (_uldBreak) {
+        _cBreak++;
+        if (_isBreakAuto) _breakCtrl.text = 'Auto';
+      } else {
+        _cNoBreak++;
+        if (_isNoBreakAuto) _noBreakCtrl.text = 'Auto';
+      }
       
       _uldNumberCtrl.clear();
-      _uldPiecesCtrl.clear();
-      _uldWeightCtrl.clear();
+      _uldPiecesCtrl.text = _isUldPiecesAuto ? 'Auto' : '';
+      _uldWeightCtrl.text = _isUldWeightAuto ? 'Auto' : '';
       _uldRemarksCtrl.clear();
       _uldPriority = false;
       _uldBreak = false;
@@ -157,24 +171,21 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _buildTextField('AWB Number (123-1234 5678)', awbNumCtrl, '')),
+                    Expanded(flex: 5, child: _buildTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true)),
                     const SizedBox(width: 8),
-                    Expanded(child: _buildTextField('House Number', houseCtrl, 'HAWB1, HAWB2...')),
+                    Expanded(flex: 3, child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true)),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 3, child: _buildTextField('Total', totalCtrl, '0', isNum: true)),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 3, child: _buildTextField('Weight', weightCtrl, '0.0', isNum: true)),
                   ]
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildTextField('Total', totalCtrl, '0', isNum: true)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildTextField('Weight', weightCtrl, '0.0', isNum: true)),
-                  ],
-                ),
-                const SizedBox(height: 12),
                 _buildTextField('Remarks', remCtrl, 'Notas...'),
+                const SizedBox(height: 12),
+                _buildTextField('House Number', houseCtrl, 'HAWB1, HAWB2...', maxLines: null, minLines: 3),
               ],
             ),
           ),
@@ -217,15 +228,24 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     try {
       final fCarrier = _carrierCtrl.text.toUpperCase();
       final fNumber = _numberCtrl.text;
-      final fDate = _dateCtrl.text;
+      
+      String fDate = _dateCtrl.text;
+      if (fDate.isNotEmpty) {
+        try { fDate = DateFormat('yyyy-MM-dd').format(DateFormat('MM/dd/yyyy').parse(_dateCtrl.text)); } catch (_) {}
+      }
+      
+      String fTime = _timeCtrl.text;
+      if (fTime.isNotEmpty) {
+        try { fTime = DateFormat('HH:mm').format(DateFormat('hh:mm a').parse(_timeCtrl.text)); } catch (_) {}
+      }
       
       final flightPayload = {
         'carrier': fCarrier,
         'number': fNumber,
-        'cant-break': _isBreakAuto ? _cBreak : 0,
-        'cant-noBreak': _isNoBreakAuto ? _cNoBreak : 0,
+        'cant-break': _isBreakAuto ? _cBreak : (int.tryParse(_breakCtrl.text) ?? 0),
+        'cant-noBreak': _isNoBreakAuto ? _cNoBreak : (int.tryParse(_noBreakCtrl.text) ?? 0),
         'date-arrived': fDate,
-        'time-arrived': _timeCtrl.text,
+        'time-arrived': fTime.isEmpty ? null : fTime,
         'remarks': _remarksCtrl.text,
         'status': _status,
         'created_at': DateTime.now().toIso8601String(),
@@ -327,26 +347,53 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              // 1. FLIGHT HEADER
-              const Text('1. Flight Details', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('Flight Details', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
         
         // Linear Wrap replicating flex-wrap: wrap
         LayoutBuilder(
           builder: (context, constraints) {
-            double rWidth = constraints.maxWidth - 744;
-            if (rWidth < 250) rWidth = 250;
+            double rWidth = constraints.maxWidth - 775;
+            if (rWidth < 180) rWidth = 180;
             return Wrap(
               spacing: 12,
               runSpacing: 12,
               crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                SizedBox(width: 90, child: _buildTextField('Carrier', _carrierCtrl, 'AMERICAN', maxLen: 10)),
+                SizedBox(width: 90, child: _buildTextField('Carrier', _carrierCtrl, 'AMERICAN', maxLen: 10, isUpperCase: true)),
                 SizedBox(width: 80, child: _buildTextField('Number', _numberCtrl, '204', isNum: true, maxLen: 10)),
-                SizedBox(width: 80, child: _buildTextField('Break', TextEditingController(text: _isBreakAuto ? 'Auto' : ''), '', disabled: _isBreakAuto)),
-                SizedBox(width: 80, child: _buildTextField('No Break', TextEditingController(text: _isNoBreakAuto ? 'Auto' : ''), '', disabled: _isNoBreakAuto)),
-                SizedBox(width: 130, child: _buildTextField('Date Arrived', _dateCtrl, '', readOnly: true, onTap: _selectDate, suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70))),
-                SizedBox(width: 100, child: _buildTextField('Time Arrived', _timeCtrl, '', readOnly: true, onTap: _selectTime, suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
+                SizedBox(width: 85, child: _buildTextField('Break', _breakCtrl, '', disabled: _isBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
+                  width: 20, height: 20,
+                  child: Checkbox(
+                    value: _isBreakAuto,
+                    activeColor: const Color(0xFF6366f1),
+                    side: const BorderSide(color: Color(0xFF94a3b8)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (v) {
+                      setState(() {
+                        _isBreakAuto = v ?? true;
+                        _breakCtrl.text = _isBreakAuto ? 'Auto' : '';
+                      });
+                    }
+                  )
+                ))),
+                SizedBox(width: 85, child: _buildTextField('No Break', _noBreakCtrl, '', disabled: _isNoBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
+                  width: 20, height: 20,
+                  child: Checkbox(
+                    value: _isNoBreakAuto,
+                    activeColor: const Color(0xFF6366f1),
+                    side: const BorderSide(color: Color(0xFF94a3b8)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (v) {
+                      setState(() {
+                        _isNoBreakAuto = v ?? true;
+                        _noBreakCtrl.text = _isNoBreakAuto ? 'Auto' : '';
+                      });
+                    }
+                  )
+                ))),
+                SizedBox(width: 130, child: _buildTextField('Date Arrived', _dateCtrl, '__/__/____', readOnly: true, onTap: _selectDate, suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70))),
+                SizedBox(width: 120, child: _buildTextField('Time Arrived', _timeCtrl, '__:__ --', readOnly: true, onTap: _selectTime, suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
                 SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Notas adicionales...')),
                 SizedBox(width: 100, child: _buildDropdown('Status')),
               ]
@@ -363,16 +410,44 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
         
         LayoutBuilder(
           builder: (context, constraints) {
-            double uldRWidth = constraints.maxWidth - 572;
+            double uldRWidth = constraints.maxWidth - 644;
             if (uldRWidth < 200) uldRWidth = 200;
             return Wrap(
               spacing: 12,
               runSpacing: 12,
               crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                SizedBox(width: 110, child: _buildTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10)),
-                SizedBox(width: 70, child: _buildTextField('Pieces', _uldPiecesCtrl, '0', isNum: true)),
-                SizedBox(width: 70, child: _buildTextField('Weight', _uldWeightCtrl, '0.0', isNum: true)),
+                SizedBox(width: 130, child: _buildTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true)),
+                SizedBox(width: 95, child: _buildTextField('Pieces', _uldPiecesCtrl, '0', isNum: true, digitsOnly: true, disabled: _isUldPiecesAuto, titleTrailing: SizedBox(
+                  width: 20, height: 20,
+                  child: Checkbox(
+                    value: _isUldPiecesAuto,
+                    activeColor: const Color(0xFF6366f1),
+                    side: const BorderSide(color: Color(0xFF94a3b8)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (v) {
+                      setState(() {
+                        _isUldPiecesAuto = v ?? true;
+                        _uldPiecesCtrl.text = _isUldPiecesAuto ? 'Auto' : '';
+                      });
+                    }
+                  )
+                ))),
+                SizedBox(width: 95, child: _buildTextField('Weight', _uldWeightCtrl, '0.0', isNum: true, allowDecimal: true, disabled: _isUldWeightAuto, titleTrailing: SizedBox(
+                  width: 20, height: 20,
+                  child: Checkbox(
+                    value: _isUldWeightAuto,
+                    activeColor: const Color(0xFF6366f1),
+                    side: const BorderSide(color: Color(0xFF94a3b8)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (v) {
+                      setState(() {
+                        _isUldWeightAuto = v ?? true;
+                        _uldWeightCtrl.text = _isUldWeightAuto ? 'Auto' : '';
+                      });
+                    }
+                  )
+                ))),
                 SizedBox(width: uldRWidth, child: _buildTextField('Remarks', _uldRemarksCtrl, 'Notas del ULD...')),
                 SizedBox(
                   width: 65,
@@ -438,21 +513,85 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            u['remarks'] != null && u['remarks'].toString().isNotEmpty
-                              ? '${i + 1}. ULD Number: ${u['uldNumber']} | Pcs: ${u['pieces']} | Wgt: ${u['weight']} | Rem: ${u['remarks']}'
-                              : '${i + 1}. ULD Number: ${u['uldNumber']} | Pcs: ${u['pieces']} | Wgt: ${u['weight']}', 
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () => _showAddAwbDialog(i),
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text('Add AWB', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF10b981), // Emerald
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32, height: 32,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(50), borderRadius: BorderRadius.circular(8)),
+                                  child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 13)),
+                                ),
+                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: 115,
+                                  child: Text(u['uldNumber'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5))
+                                ),
+                                const SizedBox(width: 16),
+                                Container(
+                                  width: 95,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha(15), borderRadius: BorderRadius.circular(6)), 
+                                  child: Text('Pieces: ${u['pieces'] ?? 'Auto'}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12))
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  width: 95,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+                                  decoration: BoxDecoration(color: Colors.white.withAlpha(15), borderRadius: BorderRadius.circular(6)), 
+                                  child: Text('Weight: ${u['weight'] ?? 'Auto'}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12))
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  width: 90,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+                                  decoration: BoxDecoration(color: (u['priority'] == true) ? const Color(0xFFf59e0b).withAlpha(50) : Colors.white.withAlpha(15), borderRadius: BorderRadius.circular(6)), 
+                                  child: Text('Priority: ${(u['priority'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['priority'] == true) ? const Color(0xFFfde68a) : const Color(0xFFcbd5e1), fontSize: 12, fontWeight: (u['priority'] == true) ? FontWeight.bold : FontWeight.normal))
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  width: 80,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
+                                  decoration: BoxDecoration(color: (u['break'] == true) ? const Color(0xFF10b981).withAlpha(50) : const Color(0xFFef4444).withAlpha(50), borderRadius: BorderRadius.circular(6)), 
+                                  child: Text('Break: ${(u['break'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['break'] == true) ? const Color(0xFF6ee7b7) : const Color(0xFFfca5a5), fontSize: 12, fontWeight: FontWeight.bold))
+                                ),
+                                const SizedBox(width: 16),
+                                if (u['remarks'] != null && u['remarks'].toString().isNotEmpty)
+                                  Expanded(
+                                    child: Text('Rem: ${u['remarks']}', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 12, fontStyle: FontStyle.italic), overflow: TextOverflow.ellipsis),
+                                  ),
+                              ],
                             ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _showAddAwbDialog(i),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Add AWB', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10b981), // Emerald
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Color(0xFFef4444), size: 20),
+                                tooltip: 'Eliminar ULD',
+                                onPressed: () {
+                                  setState(() {
+                                    if (_flightLocalUlds[i]['break'] == true) {
+                                      _cBreak = (_cBreak > 0) ? _cBreak - 1 : 0;
+                                    } else {
+                                      _cNoBreak = (_cNoBreak > 0) ? _cNoBreak - 1 : 0;
+                                    }
+                                    _flightLocalUlds.removeAt(i);
+                                  });
+                                },
+                              ),
+                            ],
                           )
                         ],
                       ),
@@ -536,19 +675,34 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
+        Row(
+           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+           children: [
+             Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
+             if (titleTrailing != null) titleTrailing,
+           ],
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
           enabled: !disabled,
           readOnly: readOnly,
           onTap: onTap,
-          keyboardType: isNum ? TextInputType.number : TextInputType.text,
+          keyboardType: isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text,
+          textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
+          inputFormatters: [
+            if (isAwb) AwbTextInputFormatter(),
+            if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
+            if (allowDecimal) FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            if (isUpperCase) TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection)),
+          ],
           maxLength: maxLen,
+          maxLines: maxLines,
+          minLines: minLines,
           style: TextStyle(color: disabled ? Colors.white.withAlpha(120) : Colors.white, fontSize: 12),
           decoration: InputDecoration(
             hintText: hint,
@@ -590,6 +744,27 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class AwbTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String raw = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (raw.length > 11) raw = raw.substring(0, 11);
+    
+    String formatted = '';
+    for (int i = 0; i < raw.length; i++) {
+        if (i == 3) formatted += '-';
+        if (i == 7) formatted += ' ';
+        formatted += raw[i];
+    }
+    
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

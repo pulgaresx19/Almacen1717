@@ -22,7 +22,9 @@ Future<void> main() async {
 }
 
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+// Global settings
 final ValueNotifier<String> appLanguage = ValueNotifier<String>('en');
+final ValueNotifier<bool> isDarkMode = ValueNotifier<bool>(true);
 
 class AlmacenApp extends StatelessWidget {
   const AlmacenApp({super.key});
@@ -380,26 +382,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     final userEmail = user?.email ?? 'Usuario';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
-      body: ValueListenableBuilder<String>(
-        valueListenable: appLanguage,
-        builder: (context, lang, child) {
-          return Row(
-            children: [
-              // Sidebar
-              Container(
-            width: 260,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1e293b),
-              border: Border(
-                right: BorderSide(
-                  color: Colors.white.withAlpha(15),
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Column(
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (context, dark, _) {
+        final bgMain = dark ? const Color(0xFF0f172a) : const Color(0xFFF4F7F9);
+        final bgSidebar = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
+        final borderWhite = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
+        final textP = dark ? Colors.white : const Color(0xFF111827);
+        
+        return Scaffold(
+          backgroundColor: bgMain,
+          body: ValueListenableBuilder<String>(
+            valueListenable: appLanguage,
+            builder: (context, lang, child) {
+              return Row(
+                children: [
+                  // Sidebar
+                  Container(
+                    width: 260,
+                    decoration: BoxDecoration(
+                      color: bgSidebar,
+                      border: Border(
+                        right: BorderSide(
+                          color: borderWhite,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Column(
               children: [
                 const SizedBox(height: 40),
                 // Logo Area
@@ -416,10 +426,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         child: const Icon(Icons.warehouse_rounded, color: Colors.white, size: 24),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
+                      Text(
                         'Almacén 1717',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textP,
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),
@@ -439,15 +449,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       _buildNavItem(Icons.inventory_2_rounded, 'ULD', 2),
                       _buildNavItem(Icons.description_rounded, 'AWB', 3),
                       _buildNavItem(Icons.people_alt_rounded, 'Users', 4),
-                      const SizedBox(height: 20),
-                      const Padding(
-                        padding: EdgeInsets.only(left: 16.0, bottom: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 16.0, bottom: 8),
                         child: Text(
                           'OPERACIONES',
                           style: TextStyle(
-                            color: Color(0xFF64748b),
+                            color: dark ? const Color(0xFF64748b) : const Color(0xFF6B7280),
                             fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.w800,
                             letterSpacing: 1.2,
                           ),
                         ),
@@ -460,20 +469,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                 ),
 
-                // Language Selector
+                // Theme & Language
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.language_rounded, color: Color(0xFF64748b), size: 18),
+                      IconButton(
+                        icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: const Color(0xFF64748b), size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => isDarkMode.value = !dark,
+                        tooltip: dark ? 'Modo Claro' : 'Modo Oscuro',
+                      ),
                       const SizedBox(width: 12),
-                      const Text('Idioma', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 13, fontWeight: FontWeight.w600)),
+                      const Icon(Icons.language_rounded, color: Color(0xFF64748b), size: 18),
+                      const SizedBox(width: 8),
+                      Text('Idioma', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w600)),
                       const Spacer(),
                       DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: appLanguage.value,
-                          dropdownColor: const Color(0xFF1e293b),
-                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                          dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                          style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
                           icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748b)),
                           items: const [
                             DropdownMenuItem(value: 'en', child: Text('EN')),
@@ -492,7 +509,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: Colors.white.withAlpha(15))),
+                    border: Border(top: BorderSide(color: borderWhite)),
                   ),
                   child: Row(
                     children: [
@@ -510,10 +527,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(
                               userEmail.split('@')[0],
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+                              style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const Text('Admin', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11)),
+                            Text('Admin', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11)),
                           ],
                         ),
                       ),
@@ -532,7 +549,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Main Content Area
           Expanded(
             child: Container(
-              color: const Color(0xFF0f172a), // Ensures background consistency
+              color: bgMain, // Dynamically changes to light or dark background
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -550,9 +567,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       );
-    }
-   ),
-  );
+     }
+    ),
+   );
+  });
 }
 
   Widget _buildBodyContent() {
@@ -577,10 +595,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 24),
         Text(
           'Módulo de ${_titles[_selectedIndex]}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: isDarkMode.value ? Colors.white : const Color(0xFF0f172a),
           ),
         ),
       ],
@@ -609,6 +627,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildNavItem(IconData icon, String title, int index) {
     final isSelected = _selectedIndex == index;
+    final bool dark = isDarkMode.value;
+    final Color textP = dark ? Colors.white : const Color(0xFF111827);
+    final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+    final Color activeColor = dark ? const Color(0xFF818cf8) : const Color(0xFF4f46e5);
+    final Color activeBg = dark ? const Color(0xFF6366f1).withAlpha(25) : const Color(0xFF6366f1).withAlpha(20);
+    final Color activeBorder = dark ? const Color(0xFF6366f1).withAlpha(76) : const Color(0xFF6366f1).withAlpha(30);
     
     return InkWell(
       onTap: () => _onDestinationSelected(index),
@@ -619,24 +643,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
         margin: const EdgeInsets.only(bottom: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: isSelected ? const Color(0xFF6366f1).withAlpha(25) : Colors.transparent, // ~0.1 opacity
+          color: isSelected ? activeBg : Colors.transparent,
           border: Border.all(
-            color: isSelected ? const Color(0xFF6366f1).withAlpha(76) : Colors.transparent, // ~0.3
+            color: isSelected ? activeBorder : Colors.transparent,
           ),
         ),
         child: Row(
           children: [
             Icon(
               icon,
-              color: isSelected ? const Color(0xFF818cf8) : const Color(0xFF94a3b8),
+              color: isSelected ? activeColor : textS,
               size: 22,
             ),
             const SizedBox(width: 14),
             Text(
               title,
               style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFFcbd5e1),
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? activeColor : textP,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                 fontSize: 14,
               ),
             ),
