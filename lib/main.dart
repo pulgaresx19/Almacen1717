@@ -119,8 +119,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               transitionDuration: const Duration(milliseconds: 600),
-              pageBuilder: (_, __, ___) => const DashboardScreen(),
-              transitionsBuilder: (_, animation, __, child) {
+              pageBuilder: (_, _, _) => const DashboardScreen(),
+              transitionsBuilder: (_, animation, _, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),
@@ -368,8 +368,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 600),
-          pageBuilder: (_, __, ___) => const LoginScreen(),
-          transitionsBuilder: (_, animation, __, child) {
+          pageBuilder: (_, _, _) => const LoginScreen(),
+          transitionsBuilder: (_, animation, _, child) {
             return FadeTransition(opacity: animation, child: child);
           },
         ),
@@ -605,10 +605,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  String _getLocalizedTitle(int index) {
-    const esTitles = ['Panel Principal', 'Vuelos', 'Contenedores', 'Guías Aéreas', 'Usuarios', 'Sistema', 'Coordinador', 'Ubicación', 'Choferes'];
-    return esTitles[index];
-  }
+
 
   IconData _getIconForIndex(int index) {
     switch (index) {

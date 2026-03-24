@@ -159,7 +159,7 @@ class _AddUldScreenState extends State<AddUldScreen> {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
-            child: Container(
+            child: SizedBox(
               width: double.infinity,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,7 +188,7 @@ class _AddUldScreenState extends State<AddUldScreen> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                   const Text('Priority?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                                  Switch(value: _isPriority, activeColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isPriority = v)),
+                                  Switch(value: _isPriority, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isPriority = v)),
                               ],
                             ),
                           ),
@@ -198,7 +198,7 @@ class _AddUldScreenState extends State<AddUldScreen> {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                   const Text('Break?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                                  Switch(value: _isBreak, activeColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isBreak = v)),
+                                  Switch(value: _isBreak, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isBreak = v)),
                               ],
                             ),
                           ),

@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
 import 'add_flight_screen.dart';
-import 'add_flight_screen.dart';
 
 class FlightModule extends StatefulWidget {
   const FlightModule({super.key});
@@ -360,7 +359,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
   String? _selectedUldId;
   List<Map<String, dynamic>> _selectedAwbs = [];
   
-  Set<String> _editingKeys = {};
+  final Set<String> _editingKeys = {};
   bool _isEditing = false;
   late Map<String, dynamic> _editedFlight;
 
@@ -689,7 +688,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                   Text('Edit', style: TextStyle(color: textS, fontSize: 12)),
                   Switch(
                     value: _isEditing, 
-                    activeColor: const Color(0xFF6366f1),
+                    activeThumbColor: const Color(0xFF6366f1),
                     onChanged: (v) {
                       setState(() {
                         _isEditing = v;
@@ -795,7 +794,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                        child: Text('Air Waybills:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
                                      ),
                                      ..._selectedAwbs.map((a) {
-                                       var matchAwbData;
+                                       Map<String, dynamic>? matchAwbData;
                                        try {
                                           matchAwbData = (a['data-AWB'] as List).firstWhere((e) => e['refULD'] == u['ULD-number'].toString() && e['refCarrier'] == widget.flight['carrier'] && e['refNumber'] == widget.flight['number']);
                                        } catch (_) {}

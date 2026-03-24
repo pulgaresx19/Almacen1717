@@ -539,7 +539,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
-            child: Container(
+            child: SizedBox(
               width: double.infinity,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,7 +652,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                         const Text('Priority?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                        Switch(value: _uldPriority, activeColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _uldPriority = v)),
+                        Switch(value: _uldPriority, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _uldPriority = v)),
                     ],
                   ),
                 ),
@@ -662,7 +662,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                         const Text('Break?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                        Switch(value: _uldBreak, activeColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _uldBreak = v)),
+                        Switch(value: _uldBreak, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _uldBreak = v)),
                     ],
                   ),
                 ),
@@ -991,7 +991,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
            mainAxisAlignment: MainAxisAlignment.spaceBetween,
            children: [
              Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
-             if (titleTrailing != null) titleTrailing,
+             ?titleTrailing,
            ],
         ),
         const SizedBox(height: 6),

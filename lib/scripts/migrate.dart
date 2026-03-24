@@ -9,7 +9,7 @@ void main() {
   int locIndex = lines.indexWhere((l) => l.startsWith('class LocationModule '));
 
   if (startIndex == -1 || endIndex == -1) {
-    print('Indices not found');
+    stdout.writeln('Indices not found');
     exit(1);
   }
 
@@ -37,5 +37,5 @@ void main() {
   ];
 
   file.writeAsStringSync(newLines.join('\n'));
-  print('Successfully duplicated SystemModule into CoordinatorModule and securely decoupled both modules');
+  stdout.writeln('Successfully duplicated SystemModule into CoordinatorModule and securely decoupled both modules');
 }

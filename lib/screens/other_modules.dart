@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
-import 'add_awb_screen.dart';
 
 class SystemModule extends StatefulWidget {
   final bool singlePanelMode;
@@ -93,8 +92,11 @@ class _SystemModuleState extends State<SystemModule> {
       debugPrint('Error: $e');
       if (mounted) {
         setState(() {
-          if (isLeft) _isLoadingUldsLeft = false;
-          else _isLoadingUldsRight = false;
+          if (isLeft) {
+            _isLoadingUldsLeft = false;
+          } else {
+            _isLoadingUldsRight = false;
+          }
         });
       }
     }
@@ -136,8 +138,11 @@ class _SystemModuleState extends State<SystemModule> {
       debugPrint('Error: $e');
       if (mounted) {
         setState(() {
-          if (isLeft) _isLoadingLeft = false;
-          else _isLoadingRight = false;
+          if (isLeft) {
+            _isLoadingLeft = false;
+          } else {
+            _isLoadingRight = false;
+          }
         });
       }
     }
@@ -162,8 +167,11 @@ class _SystemModuleState extends State<SystemModule> {
       }
     );
     if (dt != null) {
-      if (isLeft) _dateLeft = dt;
-      else _dateRight = dt;
+      if (isLeft) {
+        _dateLeft = dt;
+      } else {
+        _dateRight = dt;
+      }
       _fetchFlights(isLeft, dt);
     }
   }
@@ -197,7 +205,7 @@ class _SystemModuleState extends State<SystemModule> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                false 
+                widget.singlePanelMode 
                   ? (widget.titleOverride ?? (appLanguage.value == 'es' ? 'Panel Único' : 'Single Panel'))
                   : (isLeft ? (appLanguage.value == 'es' ? 'Panel Izquierdo' : 'Left Panel') : (appLanguage.value == 'es' ? 'Panel Derecho' : 'Right Panel')), 
                 style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)
@@ -232,7 +240,7 @@ class _SystemModuleState extends State<SystemModule> {
               children: flights.map((f) {
                 final chipId = '${f['carrier']}-${f['number']}';
                 final isSel = selectedId == chipId;
-                final isOppositeSel = false ? false : (isLeft ? (_selectedFlightIdRight == chipId) : (_selectedFlightIdLeft == chipId));
+                final isOppositeSel = widget.singlePanelMode ? false : (isLeft ? (_selectedFlightIdRight == chipId) : (_selectedFlightIdLeft == chipId));
                 final isReceived = f['status']?.toString() == 'Received';
 
                 Color textColor = isOppositeSel ? (dark ? Colors.white30 : Colors.black26) : (isSel ? Colors.white : (isReceived ? const Color(0xFF10b981) : textP));
@@ -251,12 +259,18 @@ class _SystemModuleState extends State<SystemModule> {
                     setState(() {
                       if (isLeft) {
                         _selectedFlightIdLeft = v ? chipId : null;
-                        if (v) _fetchUldsForFlight(true, f);
-                        else _uldsLeft.clear();
+                        if (v) {
+                          _fetchUldsForFlight(true, f);
+                        } else {
+                          _uldsLeft.clear();
+                        }
                       } else {
                         _selectedFlightIdRight = v ? chipId : null;
-                        if (v) _fetchUldsForFlight(false, f);
-                        else _uldsRight.clear();
+                        if (v) {
+                          _fetchUldsForFlight(false, f);
+                        } else {
+                          _uldsRight.clear();
+                        }
                       }
                     });
                   },
@@ -298,8 +312,11 @@ class _SystemModuleState extends State<SystemModule> {
                                     onTap: () async {
                                       if (uld['awbList'] == null && uld['ULD-number'] != null && match.isNotEmpty) {
                                         setState(() {
-                                          if (isLeft) _activeAwbOverlayLeft = uld;
-                                          else _activeAwbOverlayRight = uld;
+                                          if (isLeft) {
+                                            _activeAwbOverlayLeft = uld;
+                                          } else {
+                                            _activeAwbOverlayRight = uld;
+                                          }
                                           uld['isLoadingAwbs'] = true;
                                         });
 
@@ -338,8 +355,11 @@ class _SystemModuleState extends State<SystemModule> {
                                       } else {
                                         if (mounted) {
                                           setState(() {
-                                            if (isLeft) _activeAwbOverlayLeft = uld;
-                                            else _activeAwbOverlayRight = uld;
+                                            if (isLeft) {
+                                              _activeAwbOverlayLeft = uld;
+                                            } else {
+                                              _activeAwbOverlayRight = uld;
+                                            }
                                           });
                                         }
                                       }
@@ -417,7 +437,6 @@ class _SystemModuleState extends State<SystemModule> {
                                         if (uld['id'] != null) {
                                           _savedUldCheckboxState[uld['id']] = v ?? false;
                                         }
-                                        if (selectedId != null) {
                                           final currentFlightList = isLeft ? _flightsLeft : _flightsRight;
                                           final idx = currentFlightList.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedId);
                                           if (idx != -1) {
@@ -435,7 +454,6 @@ class _SystemModuleState extends State<SystemModule> {
                                               }
                                             }
                                           }
-                                        }
                                       });
                                     },
                                   ),
@@ -577,7 +595,7 @@ class _SystemModuleState extends State<SystemModule> {
                                   }
                                   
                                   // Update the parent Flight
-                                  if (selectedId != null && dt != null) {
+                                  if (dt != null) {
                                     final parts = selectedId.split('-');
                                     if (parts.length >= 2) {
                                       final dateStr = DateFormat('yyyy-MM-dd').format(dt);
@@ -625,11 +643,11 @@ class _SystemModuleState extends State<SystemModule> {
                                       if (u['id'] != null) _savedUldCheckboxState.remove(u['id']);
                                     }
                                   });
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appLanguage.value == 'es' ? 'Vuelo procesado y ULDs actualizados a Received' : 'Flight processed. ULDs marked as Received'), backgroundColor: const Color(0xFF10b981)));
-                                  }
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appLanguage.value == 'es' ? 'Vuelo procesado y ULDs actualizados a Received' : 'Flight processed. ULDs marked as Received'), backgroundColor: const Color(0xFF10b981)));
                                 } catch(e) {
-                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                                 }
                               } : null,
                               icon: Icon(isFlightReceived ? Icons.verified : Icons.check_circle_outline, size: 20),
@@ -739,7 +757,7 @@ class _SystemModuleState extends State<SystemModule> {
                           child: ListView.separated(
                             shrinkWrap: true,
                             itemCount: list.length,
-                            separatorBuilder: (_, __) => Divider(color: borderC),
+                            separatorBuilder: (_, _) => Divider(color: borderC),
                             itemBuilder: (c, i) {
                               final awb = list[i];
                               return Padding(
@@ -764,8 +782,11 @@ class _SystemModuleState extends State<SystemModule> {
                         child: TextButton(
                           onPressed: () {
                             setState(() {
-                              if (isLeft) _activeAwbOverlayLeft = null;
-                              else _activeAwbOverlayRight = null;
+                              if (isLeft) {
+                                _activeAwbOverlayLeft = null;
+                              } else {
+                                _activeAwbOverlayRight = null;
+                              }
                             });
                           },
                           child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
@@ -814,7 +835,7 @@ class _SystemModuleState extends State<SystemModule> {
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: false 
+            children: widget.singlePanelMode 
               ? [
                   Expanded(child: _buildPanel(true, dark)),
                 ]
@@ -919,8 +940,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
       debugPrint('Error: $e');
       if (mounted) {
         setState(() {
-          if (isLeft) _isLoadingUldsLeft = false;
-          else _isLoadingUldsRight = false;
+          if (isLeft) {
+            _isLoadingUldsLeft = false;
+          } else {
+            _isLoadingUldsRight = false;
+          }
         });
       }
     }
@@ -962,8 +986,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
       debugPrint('Error: $e');
       if (mounted) {
         setState(() {
-          if (isLeft) _isLoadingLeft = false;
-          else _isLoadingRight = false;
+          if (isLeft) {
+            _isLoadingLeft = false;
+          } else {
+            _isLoadingRight = false;
+          }
         });
       }
     }
@@ -988,8 +1015,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
       }
     );
     if (dt != null) {
-      if (isLeft) _dateLeft = dt;
-      else _dateRight = dt;
+      if (isLeft) {
+        _dateLeft = dt;
+      } else {
+        _dateRight = dt;
+      }
       _fetchFlights(isLeft, dt);
     }
   }
@@ -1023,7 +1053,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                true 
+                widget.singlePanelMode 
                   ? ((appLanguage.value == 'es' ? 'Coordinador' : 'Coordinator'))
                   : (isLeft ? (appLanguage.value == 'es' ? 'Panel Izquierdo' : 'Left Panel') : (appLanguage.value == 'es' ? 'Panel Derecho' : 'Right Panel')), 
                 style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)
@@ -1075,12 +1105,18 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                     setState(() {
                       if (isLeft) {
                         _selectedFlightIdLeft = v ? chipId : null;
-                        if (v) _fetchUldsForFlight(true, f);
-                        else _uldsLeft.clear();
+                        if (v) {
+                          _fetchUldsForFlight(true, f);
+                        } else {
+                          _uldsLeft.clear();
+                        }
                       } else {
                         _selectedFlightIdRight = v ? chipId : null;
-                        if (v) _fetchUldsForFlight(false, f);
-                        else _uldsRight.clear();
+                        if (v) {
+                          _fetchUldsForFlight(false, f);
+                        } else {
+                          _uldsRight.clear();
+                        }
                       }
                     });
                   },
@@ -1347,7 +1383,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                                         child: ListView.separated(
                                                                           shrinkWrap: true,
                                                                           itemCount: hList.length,
-                                                                          separatorBuilder: (_, __) => Divider(color: borderC, height: 1),
+                                                                          separatorBuilder: (_, _) => Divider(color: borderC, height: 1),
                                                                           itemBuilder: (ctx, i) => Padding(
                                                                             padding: const EdgeInsets.symmetric(vertical: 6),
                                                                             child: Row(
@@ -1516,7 +1552,6 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                             
                             final flightList = isLeft ? _flightsLeft : _flightsRight;
                             final currentFlightIdx = flightList.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedId);
-                            final currentFlight = currentFlightIdx != -1 ? flightList[currentFlightIdx] : null;
 
                             Widget actionButton = ElevatedButton.icon(
                               onPressed: isFlightReceived ? null : allSelected ? () async {
@@ -1529,7 +1564,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                   }
                                   
                                   // Update the parent Flight
-                                  if (selectedId != null && dt != null) {
+                                  if (dt != null) {
                                     final parts = selectedId.split('-');
                                     if (parts.length >= 2) {
                                       final dateStr = DateFormat('yyyy-MM-dd').format(dt);
@@ -1577,11 +1612,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                       if (u['id'] != null) _savedUldCheckboxState.remove(u['id']);
                                     }
                                   });
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appLanguage.value == 'es' ? 'Vuelo procesado y ULDs actualizados a Received' : 'Flight processed. ULDs marked as Received'), backgroundColor: const Color(0xFF10b981)));
-                                  }
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appLanguage.value == 'es' ? 'Vuelo procesado y ULDs actualizados a Received' : 'Flight processed. ULDs marked as Received'), backgroundColor: const Color(0xFF10b981)));
                                 } catch(e) {
-                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                                 }
                               } : null,
                               icon: Icon(isFlightReceived ? Icons.verified : Icons.check_circle_outline, size: 20),
@@ -1645,7 +1680,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                           child: ListView.separated(
                             shrinkWrap: true,
                             itemCount: list.length,
-                            separatorBuilder: (_, __) => Divider(color: borderC),
+                            separatorBuilder: (_, _) => Divider(color: borderC),
                             itemBuilder: (c, i) {
                               final awb = list[i];
                               return Padding(
@@ -1670,8 +1705,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                         child: TextButton(
                           onPressed: () {
                             setState(() {
-                              if (isLeft) _activeAwbOverlayLeft = null;
-                              else _activeAwbOverlayRight = null;
+                              if (isLeft) {
+                                _activeAwbOverlayLeft = null;
+                              } else {
+                                _activeAwbOverlayRight = null;
+                              }
                             });
                           },
                           child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
@@ -1948,9 +1986,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       };
 
                       await Supabase.instance.client.from('AWB').insert(payload);
-                      if (mounted) Navigator.pop(ctx, true);
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx, true);
                     } catch (e) {
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                       setDialogState(() => isSaving = false);
                     }
                   },
@@ -1979,7 +2019,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: true 
+            children: widget.singlePanelMode 
               ? [
                   Expanded(child: _buildPanel(true, dark)),
                 ]
