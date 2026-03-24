@@ -1787,18 +1787,19 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     Map<String, List<int>> breakdown = {
       'AGI Skid': [],
       'Pre Skid': [],
-      'Crate(s)': [],
-      'Box(es)': [],
+      'Crate': [],
+      'Box': [],
       'Other': [],
     };
     List<String> selectedLocations = [];
+    final otherLocationCtrl = TextEditingController();
     bool isLoading = true;
 
     final ctrls = {
       'AGI Skid': TextEditingController(),
       'Pre Skid': TextEditingController(),
-      'Crate(s)': TextEditingController(),
-      'Box(es)': TextEditingController(),
+      'Crate': TextEditingController(),
+      'Box': TextEditingController(),
       'Other': TextEditingController(),
     };
 
@@ -1823,8 +1824,16 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       if (data['breakdown'] is Map) {
                         final bd = data['breakdown'] as Map;
                         for (var k in breakdown.keys) {
+                          String legacyKey = k;
+                          if (k == 'Crate') legacyKey = 'Crate(s)';
+                          if (k == 'Box') legacyKey = 'Box(es)';
+
                           if (bd[k] is List) {
                             breakdown[k] = (bd[k] as List)
+                                .map((e) => int.tryParse(e.toString()) ?? 0)
+                                .toList();
+                          } else if (bd[legacyKey] is List) {
+                            breakdown[k] = (bd[legacyKey] as List)
                                 .map((e) => int.tryParse(e.toString()) ?? 0)
                                 .toList();
                           }
@@ -1834,6 +1843,13 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                         selectedLocations = List<String>.from(
                           data['selectedLocations'],
                         );
+                        if (selectedLocations.isNotEmpty) {
+                          String loc = selectedLocations.first;
+                          if (!['15-25°C', '2-8°C', 'PSV', 'DG', 'Oversize', 'Small rack', 'Animal Live', 'Other'].contains(loc)) {
+                            selectedLocations = ['Other'];
+                            otherLocationCtrl.text = loc;
+                          }
+                        }
                       }
                     }
                     if (dialogCtx.mounted) setDialogState(() {});
@@ -1861,38 +1877,40 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: SizedBox(
-                        height: 38,
-                        child: TextField(
-                          controller: ctrls[label],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                    SizedBox(
+                      width: 80,
+                      height: 38,
+                      child: TextField(
+                        controller: ctrls[label],
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(5),
+                        ],
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withAlpha(50),
                           ),
-                          decoration: InputDecoration(
-                            hintText: '0',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withAlpha(50),
+                          filled: true,
+                          fillColor: Colors.white.withAlpha(10),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: Colors.white.withAlpha(20),
                             ),
-                            filled: true,
-                            fillColor: Colors.white.withAlpha(10),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withAlpha(20),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF8b5cf6),
-                              ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF8b5cf6),
                             ),
                           ),
                         ),
@@ -1904,7 +1922,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                         final val = int.tryParse(ctrls[label]!.text);
                         if (val != null && val > 0) {
                           setDialogState(() {
-                            breakdown[label]!.add(val);
+                            if (label == 'AGI Skid') {
+                              breakdown[label]!.add(val);
+                            } else {
+                              breakdown[label] = [val];
+                            }
                             ctrls[label]!.clear();
                           });
                         }
@@ -1936,9 +1958,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                 onTap: () {
                   setDialogState(() {
                     if (isSel) {
-                      selectedLocations.remove(label);
+                      selectedLocations.clear();
+                      if (label == 'Other') otherLocationCtrl.clear();
                     } else {
-                      selectedLocations.add(label);
+                      selectedLocations = [label];
+                      if (label != 'Other') otherLocationCtrl.clear();
                     }
                   });
                 },
@@ -2088,8 +2112,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               children: [
                                 buildControlRow('AGI Skid'),
                                 buildControlRow('Pre Skid'),
-                                buildControlRow('Crate(s)'),
-                                buildControlRow('Box(es)'),
+                                buildControlRow('Crate'),
+                                buildControlRow('Box'),
                                 buildControlRow('Other'),
                               ],
                             ),
@@ -2111,121 +2135,203 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                 children: breakdown.entries.where((e) => e.value.isNotEmpty).map((
                                   entry,
                                 ) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(5),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Colors.white.withAlpha(10),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              entry.key.toUpperCase(),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                            Text(
-                                              '${entry.value.fold<int>(0, (a, b) => a + b)} pcs',
-                                              style: const TextStyle(
-                                                color: Color(0xFF94a3b8),
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
+                                  int itemCount = entry.value.length;
+                                  int totalPcs = entry.value.fold<int>(0, (a, b) => a + b);
+
+                                  String getDisplayName(String key, int count) {
+                                    if (count <= 1) return key.toUpperCase();
+                                    if (key == 'Box') return 'BOXES';
+                                    return '${key.toUpperCase()}S';
+                                  }
+
+                                  if (entry.key == 'AGI Skid') {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withAlpha(5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white.withAlpha(10),
                                         ),
-                                        const SizedBox(height: 8),
-                                        ...entry.value.asMap().entries.map((
-                                          item,
-                                        ) {
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 6,
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Text(
-                                                  '#${item.key + 1}',
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 24,
+                                                height: 24,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withAlpha(25),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Text(
+                                                  '$itemCount',
                                                   style: const TextStyle(
-                                                    color: Color(0xFF64748b),
+                                                    color: Color(0xFFcbd5e1),
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 8,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                getDisplayName(entry.key, itemCount),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              Text(
+                                                '$totalPcs pcs',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF94a3b8),
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          ...entry.value.asMap().entries.map((
+                                            item,
+                                          ) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 6,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Text(
+                                                    '#${item.key + 1}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF64748b),
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 8,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white
+                                                            .withAlpha(5),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              4,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        '${item.value}',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                         ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white
-                                                          .withAlpha(5),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      '${item.value}',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.bold,
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                InkWell(
-                                                  onTap: () {
-                                                    setDialogState(() {
-                                                      breakdown[entry.key]!
-                                                          .removeAt(item.key);
-                                                    });
-                                                  },
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.all(4),
-                                                    decoration: BoxDecoration(
-                                                      border: Border.all(
-                                                        color: Colors.red
-                                                            .withAlpha(50),
+                                                  const SizedBox(width: 8),
+                                                  InkWell(
+                                                    onTap: () {
+                                                      setDialogState(() {
+                                                        breakdown[entry.key]!
+                                                            .removeAt(item.key);
+                                                      });
+                                                    },
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.all(4),
+                                                      decoration: BoxDecoration(
+                                                        border: Border.all(
+                                                          color: Colors.red
+                                                              .withAlpha(50),
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              4,
+                                                            ),
                                                       ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
-                                                          ),
-                                                    ),
-                                                    child: const Icon(
-                                                      Icons.close,
-                                                      color: Color(0xFFef4444),
-                                                      size: 14,
+                                                      child: const Icon(
+                                                        Icons.close,
+                                                        color: Color(0xFFef4444),
+                                                        size: 14,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withAlpha(5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white.withAlpha(10),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            '$totalPcs',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                          );
-                                        }),
-                                      ],
-                                    ),
-                                  );
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            getDisplayName(entry.key, totalPcs),
+                                            style: const TextStyle(
+                                              color: Color(0xFF94a3b8),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          InkWell(
+                                            onTap: () {
+                                              setDialogState(() {
+                                                breakdown[entry.key]!.clear();
+                                              });
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(
+                                                  color: Colors.red.withAlpha(50),
+                                                ),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                color: Color(0xFFef4444),
+                                                size: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
                                 }).toList(),
                               ),
                             ),
@@ -2245,6 +2351,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           buildLocationChip('15-25°C'),
                           buildLocationChip('2-8°C'),
@@ -2254,6 +2361,40 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                           buildLocationChip('Small rack'),
                           buildLocationChip('Animal Live'),
                           buildLocationChip('Other'),
+                          if (selectedLocations.contains('Other'))
+                            SizedBox(
+                              width: 200,
+                              height: 38,
+                              child: TextField(
+                                controller: otherLocationCtrl,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter custom location...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withAlpha(50),
+                                    fontSize: 13,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white.withAlpha(5),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 0,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: BorderSide(
+                                      color: Colors.white.withAlpha(20),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF8b5cf6),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],
@@ -2290,8 +2431,12 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                 );
                               }
                               coordData['breakdown'] = breakdown;
-                              coordData['selectedLocations'] =
-                                  selectedLocations;
+                              coordData['selectedLocations'] = selectedLocations.map((loc) {
+                                if (loc == 'Other' && otherLocationCtrl.text.trim().isNotEmpty) {
+                                  return otherLocationCtrl.text.trim();
+                                }
+                                return loc;
+                              }).toList();
 
                               await Supabase.instance.client
                                   .from('AWB')
