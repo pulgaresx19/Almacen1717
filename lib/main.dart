@@ -21,7 +21,8 @@ Future<void> main() async {
   runApp(const AlmacenApp());
 }
 
-final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 // Global settings
 final ValueNotifier<String> appLanguage = ValueNotifier<String>('en');
 final ValueNotifier<bool> isDarkMode = ValueNotifier<bool>(true);
@@ -55,13 +56,14 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
-  
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _isLoading = false;
 
   @override
@@ -72,9 +74,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
 
-    _animation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -110,10 +113,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         scaffoldMessengerKey.currentState?.showSnackBar(
           SnackBar(
             backgroundColor: Colors.green.shade600,
-            content: Text('✅ ¡Sesión iniciada! Bienvenido ${response.user!.email}'),
+            content: Text(
+              '✅ ¡Sesión iniciada! Bienvenido ${response.user!.email}',
+            ),
           ),
         );
-        
+
         // Navigation to Dashboard!
         if (mounted) {
           Navigator.of(context).pushReplacement(
@@ -128,10 +133,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         }
       }
     } catch (e) {
+      debugPrint('LOGIN ERROR: $e');
       scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade600,
-          content: const Text('Error: Usuario o contraseña incorrectos.'),
+          content: Text('Error: ${e.toString()}'),
         ),
       );
     } finally {
@@ -164,15 +170,21 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: childShape(300, const Color(0xFFec4899)),
                   ),
                   Positioned(
-                    top: MediaQuery.of(context).size.height / 2 - 125 + (_animation.value * 30),
-                    left: MediaQuery.of(context).size.width / 2 - 125 - (_animation.value * 30),
+                    top:
+                        MediaQuery.of(context).size.height / 2 -
+                        125 +
+                        (_animation.value * 30),
+                    left:
+                        MediaQuery.of(context).size.width / 2 -
+                        125 -
+                        (_animation.value * 30),
                     child: childShape(250, const Color(0xFF06b6d4)),
                   ),
                 ],
               );
             },
           ),
-          
+
           Center(
             child: SingleChildScrollView(
               child: Padding(
@@ -184,13 +196,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 16.0, sigmaY: 16.0),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 30,
+                          vertical: 40,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withAlpha(13),
                           borderRadius: BorderRadius.circular(24.0),
-                          border: Border.all(
-                            color: Colors.white.withAlpha(25),
-                          ),
+                          border: Border.all(color: Colors.white.withAlpha(25)),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -215,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               ),
                             ),
                             const SizedBox(height: 30),
-                            
+
                             const Text(
                               'Correo Electrónico',
                               style: TextStyle(
@@ -225,10 +238,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildTextField('ejemplo@correo.com', false, _emailController),
-                            
+                            _buildTextField(
+                              'ejemplo@correo.com',
+                              false,
+                              _emailController,
+                            ),
+
                             const SizedBox(height: 20),
-                            
+
                             const Text(
                               'Contraseña',
                               style: TextStyle(
@@ -238,23 +255,33 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _buildTextField('••••••••', true, _passwordController),
+                            _buildTextField(
+                              '••••••••',
+                              true,
+                              _passwordController,
+                            ),
                             const SizedBox(height: 30),
-                            
+
                             Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFF6366f1), Color(0xFFa855f7), Color(0xFFec4899)],
+                                  colors: [
+                                    Color(0xFF6366f1),
+                                    Color(0xFFa855f7),
+                                    Color(0xFFec4899),
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFa855f7).withAlpha(102),
+                                    color: const Color(
+                                      0xFFa855f7,
+                                    ).withAlpha(102),
                                     blurRadius: 15,
                                     offset: const Offset(0, 4),
-                                  )
+                                  ),
                                 ],
                               ),
                               child: ElevatedButton(
@@ -262,16 +289,21 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.transparent,
                                   shadowColor: Colors.transparent,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: _isLoading 
+                                child: _isLoading
                                     ? const SizedBox(
-                                        height: 24, 
-                                        width: 24, 
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                                        height: 24,
+                                        width: 24,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
                                       )
                                     : const Text(
                                         'Iniciar Sesión',
@@ -301,10 +333,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 80.0, sigmaY: 80.0),
         child: Container(color: Colors.transparent),
@@ -312,7 +341,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildTextField(String hintText, bool obscureText, TextEditingController controller) {
+  Widget _buildTextField(
+    String hintText,
+    bool obscureText,
+    TextEditingController controller,
+  ) {
     return TextField(
       controller: controller,
       obscureText: obscureText,
@@ -322,7 +355,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         hintStyle: TextStyle(color: Colors.white.withAlpha(76)),
         filled: true,
         fillColor: Colors.white.withAlpha(13),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.white.withAlpha(25)),
@@ -349,11 +385,18 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
-  
+
   // Dashboard content placeholder based on selection
   final List<String> _titles = [
-    'Dashboard', 'Flight', 'ULD', 'AWB', 'Users', 
-    'System', 'Coordinator', 'Location', 'Driver'
+    'Dashboard',
+    'Flight',
+    'ULD',
+    'AWB',
+    'Users',
+    'System',
+    'Coordinator',
+    'Location',
+    'Driver',
   ];
 
   void _onDestinationSelected(int index) {
@@ -386,10 +429,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       valueListenable: isDarkMode,
       builder: (context, dark, _) {
         final bgMain = dark ? const Color(0xFF0f172a) : const Color(0xFFF4F7F9);
-        final bgSidebar = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
-        final borderWhite = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
+        final bgSidebar = dark
+            ? const Color(0xFF1e293b)
+            : const Color(0xFFffffff);
+        final borderWhite = dark
+            ? Colors.white.withAlpha(15)
+            : const Color(0xFFE5E7EB);
         final textP = dark ? Colors.white : const Color(0xFF111827);
-        
+
         return Scaffold(
           backgroundColor: bgMain,
           body: ValueListenableBuilder<String>(
@@ -403,175 +450,277 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     decoration: BoxDecoration(
                       color: bgSidebar,
                       border: Border(
-                        right: BorderSide(
-                          color: borderWhite,
-                          width: 1,
-                        ),
+                        right: BorderSide(color: borderWhite, width: 1),
                       ),
                     ),
                     child: Column(
-              children: [
-                const SizedBox(height: 40),
-                // Logo Area
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6366f1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.warehouse_rounded, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Almacén 1717',
-                        style: TextStyle(
-                          color: textP,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                
-                // Navigation Items
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    children: [
-                      _buildNavItem(Icons.dashboard_rounded, 'Dashboard', 0),
-                      _buildNavItem(Icons.flight_land_rounded, 'Flight', 1),
-                      _buildNavItem(Icons.inventory_2_rounded, 'ULD', 2),
-                      _buildNavItem(Icons.description_rounded, 'AWB', 3),
-                      _buildNavItem(Icons.people_alt_rounded, 'Users', 4),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16.0, bottom: 8),
-                        child: Text(
-                          'OPERACIONES',
-                          style: TextStyle(
-                            color: dark ? const Color(0xFF64748b) : const Color(0xFF6B7280),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
+                      children: [
+                        const SizedBox(height: 40),
+                        // Logo Area
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366f1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.warehouse_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Almacén 1717',
+                                style: TextStyle(
+                                  color: textP,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      _buildNavItem(Icons.settings_system_daydream_rounded, 'System', 5),
-                      _buildNavItem(Icons.support_agent_rounded, 'Coordinator', 6),
-                      _buildNavItem(Icons.location_on_rounded, 'Location', 7),
-                      _buildNavItem(Icons.local_shipping_rounded, 'Driver', 8),
-                    ],
-                  ),
-                ),
+                        const SizedBox(height: 40),
 
-                // Theme & Language
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(dark ? Icons.light_mode_rounded : Icons.dark_mode_rounded, color: const Color(0xFF64748b), size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () => isDarkMode.value = !dark,
-                        tooltip: dark ? 'Modo Claro' : 'Modo Oscuro',
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(Icons.language_rounded, color: Color(0xFF64748b), size: 18),
-                      const SizedBox(width: 8),
-                      Text('Idioma', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w600)),
-                      const Spacer(),
-                      DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: appLanguage.value,
-                          dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                          style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
-                          icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF64748b)),
-                          items: const [
-                            DropdownMenuItem(value: 'en', child: Text('EN')),
-                            DropdownMenuItem(value: 'es', child: Text('ES')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) appLanguage.value = v;
-                          },
+                        // Navigation Items
+                        Expanded(
+                          child: ListView(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            children: [
+                              _buildNavItem(
+                                Icons.dashboard_rounded,
+                                'Dashboard',
+                                0,
+                              ),
+                              _buildNavItem(
+                                Icons.flight_land_rounded,
+                                'Flight',
+                                1,
+                              ),
+                              _buildNavItem(
+                                Icons.inventory_2_rounded,
+                                'ULD',
+                                2,
+                              ),
+                              _buildNavItem(
+                                Icons.description_rounded,
+                                'AWB',
+                                3,
+                              ),
+                              _buildNavItem(
+                                Icons.people_alt_rounded,
+                                'Users',
+                                4,
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 16.0,
+                                  bottom: 8,
+                                ),
+                                child: Text(
+                                  'OPERACIONES',
+                                  style: TextStyle(
+                                    color: dark
+                                        ? const Color(0xFF64748b)
+                                        : const Color(0xFF6B7280),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                              _buildNavItem(
+                                Icons.settings_system_daydream_rounded,
+                                'System',
+                                5,
+                              ),
+                              _buildNavItem(
+                                Icons.support_agent_rounded,
+                                'Coordinator',
+                                6,
+                              ),
+                              _buildNavItem(
+                                Icons.location_on_rounded,
+                                'Location',
+                                7,
+                              ),
+                              _buildNavItem(
+                                Icons.local_shipping_rounded,
+                                'Driver',
+                                8,
+                              ),
+                            ],
+                          ),
                         ),
-                      )
-                    ],
-                  ),
-                ),
 
-                // User Profile & Logout
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: borderWhite)),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: const Color(0xFF4f46e5),
-                        child: Text(
-                          userEmail.isNotEmpty ? userEmail[0].toUpperCase() : 'U',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        // Theme & Language
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  dark
+                                      ? Icons.light_mode_rounded
+                                      : Icons.dark_mode_rounded,
+                                  color: const Color(0xFF64748b),
+                                  size: 18,
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => isDarkMode.value = !dark,
+                                tooltip: dark ? 'Modo Claro' : 'Modo Oscuro',
+                              ),
+                              const SizedBox(width: 12),
+                              const Icon(
+                                Icons.language_rounded,
+                                color: Color(0xFF64748b),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Idioma',
+                                style: TextStyle(
+                                  color: dark
+                                      ? const Color(0xFF94a3b8)
+                                      : const Color(0xFF4B5563),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Spacer(),
+                              DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: appLanguage.value,
+                                  dropdownColor: dark
+                                      ? const Color(0xFF1e293b)
+                                      : Colors.white,
+                                  style: TextStyle(
+                                    color: textP,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  icon: const Icon(
+                                    Icons.arrow_drop_down_rounded,
+                                    color: Color(0xFF64748b),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'en',
+                                      child: Text('EN'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'es',
+                                      child: Text('ES'),
+                                    ),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) appLanguage.value = v;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              userEmail.split('@')[0],
-                              style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text('Admin', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11)),
-                          ],
+
+                        // User Profile & Logout
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            border: Border(top: BorderSide(color: borderWhite)),
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: const Color(0xFF4f46e5),
+                                child: Text(
+                                  userEmail.isNotEmpty
+                                      ? userEmail[0].toUpperCase()
+                                      : 'U',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      userEmail.split('@')[0],
+                                      style: TextStyle(
+                                        color: textP,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      'Admin',
+                                      style: TextStyle(
+                                        color: dark
+                                            ? const Color(0xFF94a3b8)
+                                            : const Color(0xFF6B7280),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: _logout,
+                                icon: const Icon(
+                                  Icons.logout_rounded,
+                                  color: Color(0xFFef4444),
+                                  size: 20,
+                                ),
+                                tooltip: 'Cerrar Sesión',
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: _logout,
-                        icon: const Icon(Icons.logout_rounded, color: Color(0xFFef4444), size: 20),
-                        tooltip: 'Cerrar Sesión',
-                      )
-                    ],
+                      ],
+                    ),
                   ),
-                )
-              ],
-            ),
-          ),
-          
-          // Main Content Area
-          Expanded(
-            child: Container(
-              color: bgMain, // Dynamically changes to light or dark background
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Page Body - dynamically rendered per module
+
+                  // Main Content Area
                   Expanded(
                     child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(40),
-                      child: _buildBodyContent(),
+                      color:
+                          bgMain, // Dynamically changes to light or dark background
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Page Body - dynamically rendered per module
+                          Expanded(
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(40),
+                              child: _buildBodyContent(),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-        ],
-      );
-     }
-    ),
-   );
-  });
-}
+        );
+      },
+    );
+  }
 
   Widget _buildBodyContent() {
     if (_selectedIndex == 0) return const DashboardViewModule();
@@ -580,7 +729,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_selectedIndex == 3) return const AwbModule();
     if (_selectedIndex == 4) return const UsersModule();
     if (_selectedIndex == 5) return const SystemModule();
-    if (_selectedIndex == 6) return const CoordinatorModule();
+    if (_selectedIndex == 6) {
+      return const CoordinatorModule(singlePanelMode: true);
+    }
     if (_selectedIndex == 7) return const LocationModule();
     if (_selectedIndex == 8) return const DriverModule();
 
@@ -605,20 +756,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
-
   IconData _getIconForIndex(int index) {
     switch (index) {
-      case 0: return Icons.dashboard_rounded;
-      case 1: return Icons.flight_land_rounded;
-      case 2: return Icons.inventory_2_rounded;
-      case 3: return Icons.description_rounded;
-      case 4: return Icons.people_alt_rounded;
-      case 5: return Icons.settings_system_daydream_rounded;
-      case 6: return Icons.support_agent_rounded;
-      case 7: return Icons.location_on_rounded;
-      case 8: return Icons.local_shipping_rounded;
-      default: return Icons.dashboard_rounded;
+      case 0:
+        return Icons.dashboard_rounded;
+      case 1:
+        return Icons.flight_land_rounded;
+      case 2:
+        return Icons.inventory_2_rounded;
+      case 3:
+        return Icons.description_rounded;
+      case 4:
+        return Icons.people_alt_rounded;
+      case 5:
+        return Icons.settings_system_daydream_rounded;
+      case 6:
+        return Icons.support_agent_rounded;
+      case 7:
+        return Icons.location_on_rounded;
+      case 8:
+        return Icons.local_shipping_rounded;
+      default:
+        return Icons.dashboard_rounded;
     }
   }
 
@@ -626,11 +785,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isSelected = _selectedIndex == index;
     final bool dark = isDarkMode.value;
     final Color textP = dark ? Colors.white : const Color(0xFF111827);
-    final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-    final Color activeColor = dark ? const Color(0xFF818cf8) : const Color(0xFF4f46e5);
-    final Color activeBg = dark ? const Color(0xFF6366f1).withAlpha(25) : const Color(0xFF6366f1).withAlpha(20);
-    final Color activeBorder = dark ? const Color(0xFF6366f1).withAlpha(76) : const Color(0xFF6366f1).withAlpha(30);
-    
+    final Color textS = dark
+        ? const Color(0xFF94a3b8)
+        : const Color(0xFF4B5563);
+    final Color activeColor = dark
+        ? const Color(0xFF818cf8)
+        : const Color(0xFF4f46e5);
+    final Color activeBg = dark
+        ? const Color(0xFF6366f1).withAlpha(25)
+        : const Color(0xFF6366f1).withAlpha(20);
+    final Color activeBorder = dark
+        ? const Color(0xFF6366f1).withAlpha(76)
+        : const Color(0xFF6366f1).withAlpha(30);
+
     return InkWell(
       onTap: () => _onDestinationSelected(index),
       borderRadius: BorderRadius.circular(12),
@@ -647,11 +814,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: isSelected ? activeColor : textS,
-              size: 22,
-            ),
+            Icon(icon, color: isSelected ? activeColor : textS, size: 22),
             const SizedBox(width: 14),
             Text(
               title,

@@ -310,7 +310,7 @@ class _FlightModuleState extends State<FlightModule> {
     if (timeStr == null || timeStr.trim().isEmpty || timeStr == '-') return '-';
     try {
       if (timeStr.contains('T') || timeStr.contains('-')) {
-        final dt = DateTime.parse(timeStr);
+        final dt = DateTime.parse(timeStr).toLocal();
         return DateFormat('hh:mm a').format(dt).toUpperCase();
       }
       final parts = timeStr.trim().split(':');
@@ -452,7 +452,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
         if (ts != '-') {
             try {
               if (ts.contains('T') || ts.contains('-')) {
-                final dt = DateTime.parse(ts);
+                final dt = DateTime.parse(ts).toLocal();
                 ts = DateFormat('hh:mm a').format(dt).toUpperCase();
               } else {
                 final parts = ts.trim().split(':');
