@@ -439,6 +439,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
             'weight': uld['weight'],
             'isPriority': uld['priority'],
             'isBreak': uld['break'],
+            'status': 'Waiting',
             'created_at': DateTime.now().toIso8601String(),
           });
 
@@ -762,6 +763,33 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(15), 
+                                  borderRadius: BorderRadius.circular(6)
+                                ),
+                                child: Text(
+                                  '${awbs.length}', 
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                icon: Icon(
+                                  (u['showAwbs'] ?? true) ? Icons.visibility : Icons.visibility_off, 
+                                  color: (u['showAwbs'] ?? true) ? const Color(0xFF94a3b8) : const Color(0xFF64748b), 
+                                  size: 20
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _flightLocalUlds[i]['showAwbs'] = !(u['showAwbs'] ?? true);
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 12),
                               ElevatedButton.icon(
                                 onPressed: () => _showAddAwbDialog(i),
                                 icon: const Icon(Icons.add, size: 16),
@@ -794,7 +822,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                         ],
                       ),
                     ),
-                    if (awbs.isNotEmpty)
+                    if (awbs.isNotEmpty && (u['showAwbs'] ?? true))
                       Table(
                         columnWidths: const {
                            0: IntrinsicColumnWidth(),

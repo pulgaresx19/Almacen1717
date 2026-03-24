@@ -264,6 +264,7 @@ class _FlightModuleState extends State<FlightModule> {
   }
 
   void _showFlightDrawer(BuildContext context, Map<String, dynamic> flight, bool dark) {
+    bool hasUpdates = false;
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -282,7 +283,13 @@ class _FlightModuleState extends State<FlightModule> {
                 color: dark ? const Color(0xFF0f172a) : Colors.white,
                 boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
               ),
-              child: FlightDrawerDetails(flight: flight, dark: dark),
+              child: FlightDrawerDetails(
+                flight: flight, 
+                dark: dark,
+                onFlightUpdated: () {
+                  hasUpdates = true;
+                }
+              ),
             ),
           ),
         );
@@ -294,7 +301,9 @@ class _FlightModuleState extends State<FlightModule> {
         );
       },
     ).then((_) {
-      if (mounted) setState(() {});
+      if (hasUpdates && mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -337,7 +346,8 @@ class _FlightModuleState extends State<FlightModule> {
 class FlightDrawerDetails extends StatefulWidget {
   final Map<String, dynamic> flight;
   final bool dark;
-  const FlightDrawerDetails({super.key, required this.flight, required this.dark});
+  final VoidCallback? onFlightUpdated;
+  const FlightDrawerDetails({super.key, required this.flight, required this.dark, this.onFlightUpdated});
 
   @override
   State<FlightDrawerDetails> createState() => _FlightDrawerDetailsState();
@@ -625,6 +635,10 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
         .eq('carrier', widget.flight['carrier'])
         .eq('number', widget.flight['number'])
         .eq('date-arrived', widget.flight['date-arrived']);
+
+      if (widget.onFlightUpdated != null) {
+        widget.onFlightUpdated!();
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
