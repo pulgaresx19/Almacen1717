@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddAwbScreen extends StatefulWidget {
-  const AddAwbScreen({super.key});
+  final String? initialFlightId;
+  final String? initialUld;
+  const AddAwbScreen({super.key, this.initialFlightId, this.initialUld});
 
   @override
   State<AddAwbScreen> createState() => _AddAwbScreenState();
@@ -19,12 +21,16 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
   String? _selectedFlight;
   String _refUld = '';
   bool _isSaving = false;
+  late final TextEditingController _refUldCtrl;
 
   List<Map<String, dynamic>> _flights = [];
 
   @override
   void initState() {
     super.initState();
+    _selectedFlight = widget.initialFlightId;
+    _refUld = widget.initialUld ?? '';
+    _refUldCtrl = TextEditingController(text: _refUld);
     _loadFlights();
   }
 
@@ -47,6 +53,7 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
     _weightCtrl.dispose();
     _houseCtrl.dispose();
     _remarksCtrl.dispose();
+    _refUldCtrl.dispose();
     super.dispose();
   }
 
@@ -163,6 +170,7 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
                         const Text('Ref ULD', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 13, fontWeight: FontWeight.w500)),
                         const SizedBox(height: 8),
                         TextField(
+                          controller: _refUldCtrl,
                           onChanged: (v) => _refUld = v,
                           maxLength: 10,
                           style: const TextStyle(color: Colors.white),
