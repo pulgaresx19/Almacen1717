@@ -205,15 +205,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     final flights = isLeft ? _flightsLeft : _flightsRight;
     final selectedId = isLeft ? _selectedFlightIdLeft : _selectedFlightIdRight;
 
-    bool isFlightReceived = false;
     final match = selectedId != null
         ? flights
               .where((f) => '${f['carrier']}-${f['number']}' == selectedId)
               .toList()
         : [];
-    if (match.isNotEmpty) {
-      isFlightReceived = match.first['status']?.toString() == 'Received';
-    }
 
     return Stack(
       children: [
@@ -696,59 +692,119 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                             ),
                                           ),
                                           const SizedBox(width: 12),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 75,
-                                                alignment: Alignment.center,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
+                                          Builder(
+                                            builder: (ctx) {
+                                              bool allAwbChecked = false;
+                                              if (uld['awbList'] is List && (uld['awbList'] as List).isNotEmpty) {
+                                                allAwbChecked = (uld['awbList'] as List).every((awb) {
+                                                    bool checked = false;
+                                                    List<dynamic> dcList = [];
+                                                    if (awb['data-coordinator'] is List) {
+                                                      dcList = awb['data-coordinator'] as List;
+                                                    } else if (awb['data-coordinator'] is Map) {
+                                                      dcList = [awb['data-coordinator']];
+                                                    }
+                                                    final uldNum = uld['ULD-number']?.toString().toUpperCase();
+                                                    final uldCarrier = uld['refCarrier']?.toString();
+                                                    final uldFlight = uld['refNumber']?.toString();
+                                                    
+                                                    for (var dc in dcList) {
+                                                      if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                                          dc['refCarrier']?.toString() == uldCarrier &&
+                                                          dc['refNumber']?.toString() == uldFlight) {
+                                                        final bd = dc['breakdown'];
+                                                        if (bd is Map && bd.isNotEmpty) {
+                                                          checked = bd.values.any((val) {
+                                                            if (val is List) return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                                                            if (val is num) return val > 0;
+                                                            if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                                                            return false;
+                                                          });
+                                                        }
+                                                      }
+                                                    }
+                                                    return checked;
+                                                });
+                                              }
+                                              
+                                              final isCheckedStatus = uld['status'] == 'Checked';
+                                              final canCheck = !isCheckedStatus && allAwbChecked;
+
+                                              return Row(
+                                                children: [
+                                                  InkWell(
+                                                    onTap: canCheck ? () async {
+                                                      try {
+                                                        final uUser = Supabase.instance.client.auth.currentUser;
+                                                        String nameStr = uUser?.email?.split('@')[0] ?? 'Usuario';
+                                                        if (uUser != null) {
+                                                          try {
+                                                            final userRow = await Supabase.instance.client
+                                                                .from('Users')
+                                                                .select('full-name')
+                                                                .eq('id', uUser.id)
+                                                                .maybeSingle();
+                                                            if (userRow != null && userRow['full-name'] != null) {
+                                                              nameStr = userRow['full-name'];
+                                                            }
+                                                          } catch (_) {}
+                                                        }
+                                                        final tStr = DateTime.now().toIso8601String();
+                                                        final cData = {'user': nameStr, 'time': tStr};
+
+                                                        await Supabase.instance.client
+                                                          .from('ULD')
+                                                          .update({
+                                                            'status': 'Checked',
+                                                            'data-checked': cData,
+                                                          })
+                                                          .eq('ULD-number', uld['ULD-number'])
+                                                          .eq('refCarrier', uld['refCarrier'])
+                                                          .eq('refNumber', uld['refNumber']);
+                                                        if (mounted) {
+                                                          setState(() {
+                                                            uld['status'] = 'Checked';
+                                                            uld['data-checked'] = cData;
+                                                            uld['isExpanded'] = false;
+                                                          });
+                                                        }
+                                                      } catch (_) {}
+                                                    } : null,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                        decoration: BoxDecoration(
+                                                          color: isCheckedStatus ? const Color(0xFF10b981).withAlpha(15) : (canCheck ? const Color(0xFF6366f1) : const Color(0xFFf59e0b).withAlpha(15)),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: Row(
+                                                          children: [
+                                                            if (canCheck) ...[
+                                                              const Icon(Icons.check_circle_outline, color: Colors.white, size: 14),
+                                                              const SizedBox(width: 4),
+                                                            ],
+                                                            Text(
+                                                              isCheckedStatus ? 'Checked' : (canCheck ? 'Mark as Checked' : 'Pending'),
+                                                              style: TextStyle(
+                                                                color: isCheckedStatus ? const Color(0xFF10b981) : (canCheck ? Colors.white : const Color(0xFFd97706)),
+                                                                fontSize: 12,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                     ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      uld['status'] ==
-                                                          'Received'
-                                                      ? (dark
-                                                            ? Colors.white
-                                                                  .withAlpha(15)
-                                                            : const Color(
-                                                                0xFFF3F4F6,
-                                                              ))
-                                                      : const Color(
-                                                          0xFF6366f1,
-                                                        ).withAlpha(15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  uld['status'] == 'Received'
-                                                      ? 'Pending'
-                                                      : (uld['status'] ??
-                                                            'Break'),
-                                                  style: TextStyle(
-                                                    color:
-                                                        uld['status'] ==
-                                                            'Received'
-                                                        ? textS
-                                                        : const Color(
-                                                            0xFF6366f1,
-                                                          ),
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
+                                                  const SizedBox(width: 8),
+                                                  Icon(
+                                                    uld['isExpanded'] == true
+                                                        ? Icons.keyboard_arrow_up
+                                                        : Icons.keyboard_arrow_down,
+                                                    color: textS,
+                                                    size: 20,
                                                   ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Icon(
-                                                uld['isExpanded'] == true
-                                                    ? Icons.keyboard_arrow_up
-                                                    : Icons.keyboard_arrow_down,
-                                                color: textS,
-                                                size: 20,
-                                              ),
-                                            ],
+                                                ],
+                                              );
+                                            }
                                           ),
                                         ],
                                       ),
@@ -1411,6 +1467,35 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                     ),
                                   ),
                                 ),
+                              if (uld['data-checked'] != null)
+                                Positioned(
+                                  top: -8,
+                                  right: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFF10b981).withAlpha(100)),
+                                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.check_circle, size: 12, color: Color(0xFF10b981)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${uld['data-checked']?['user']?.toString() ?? 'User'} • ${DateFormat('MMM dd, HH:mm').format(DateTime.parse(uld['data-checked']?['time'] ?? DateTime.now().toIso8601String()))}',
+                                          style: TextStyle(
+                                            color: dark ? Colors.white70 : Colors.black87,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(),
                             ],
                           );
@@ -1459,10 +1544,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               final currentUlds = isLeft
                                   ? _uldsLeft
                                   : _uldsRight;
-                              bool allSelected =
+                              bool allUldsChecked =
                                   currentUlds.isNotEmpty &&
                                   currentUlds.every(
-                                    (u) => u['selected'] == true,
+                                    (u) => u['status'] == 'Checked',
                                   );
 
                               final flightList = isLeft
@@ -1473,25 +1558,14 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                     '${f['carrier']}-${f['number']}' ==
                                     selectedId,
                               );
+                              final bool isFlightChecked = currentFlightIdx != -1 && flightList[currentFlightIdx]['status'] == 'Checked';
 
                               Widget actionButton = ElevatedButton.icon(
-                                onPressed: isFlightReceived
+                                onPressed: isFlightChecked
                                     ? null
-                                    : allSelected
+                                    : allUldsChecked
                                     ? () async {
                                         try {
-                                          // Update ULDs
-                                          for (var u in currentUlds) {
-                                            if (u['id'] != null) {
-                                              await Supabase.instance.client
-                                                  .from('ULD')
-                                                  .update({
-                                                    'status': 'Received',
-                                                  })
-                                                  .eq('id', u['id']);
-                                            }
-                                          }
-
                                           // Update the parent Flight
                                           if (dt != null) {
                                             final parts = selectedId.split('-');
@@ -1542,7 +1616,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                 await Supabase.instance.client
                                                     .from('Flight')
                                                     .update({
-                                                      'status': 'Received',
+                                                      'status': 'Checked',
                                                       'first-truck':
                                                           firstTruckTime,
                                                       'last-truck':
@@ -1559,7 +1633,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
 
                                                 if (currentFlightIdx != -1) {
                                                   flightList[currentFlightIdx]['status'] =
-                                                      'Received';
+                                                      'Checked';
                                                   flightList[currentFlightIdx]['first-truck'] =
                                                       firstTruckTime;
                                                   flightList[currentFlightIdx]['last-truck'] =
@@ -1575,30 +1649,51 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                             }
                                           }
 
-                                          setState(() {
-                                            for (var u in currentUlds) {
-                                              if (u['id'] != null) {
-                                                _savedUldCheckboxState.remove(
-                                                  u['id'],
-                                                );
-                                              }
-                                            }
-                                          });
+                                          setState(() {});
                                           if (!context.mounted) return;
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                appLanguage.value == 'es'
-                                                    ? 'Vuelo procesado y ULDs actualizados a Received'
-                                                    : 'Flight processed. ULDs marked as Received',
-                                              ),
-                                              backgroundColor: const Color(
-                                                0xFF10b981,
+                                          showDialog(
+                                            context: context,
+                                            barrierColor: Colors.transparent,
+                                            builder: (ctx) => Center(
+                                              child: Material(
+                                                color: Colors.transparent,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                  decoration: BoxDecoration(
+                                                    color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    boxShadow: const [
+                                                      BoxShadow(
+                                                        color: Colors.black26,
+                                                        blurRadius: 10,
+                                                        offset: Offset(0, 4),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 28),
+                                                      const SizedBox(width: 12),
+                                                      Text(
+                                                        appLanguage.value == 'es' ? 'Vuelo actualizado correctamente' : 'Flight checked successfully',
+                                                        style: TextStyle(
+                                                          color: dark ? Colors.white : const Color(0xFF111827),
+                                                          fontSize: 15,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           );
+                                          Future.delayed(const Duration(milliseconds: 1500), () {
+                                            if (mounted && Navigator.canPop(context)) {
+                                              Navigator.pop(context);
+                                            }
+                                          });
                                         } catch (e) {
                                           if (!context.mounted) return;
                                           ScaffoldMessenger.of(
@@ -1612,25 +1707,21 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                       }
                                     : null,
                                 icon: Icon(
-                                  isFlightReceived
+                                  isFlightChecked
                                       ? Icons.verified
                                       : Icons.check_circle_outline,
                                   size: 20,
                                 ),
                                 label: Text(
-                                  'Mark Flight as Checked',
+                                  isFlightChecked ? 'Checked' : 'Mark Flight as Checked',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF10b981),
-                                  disabledBackgroundColor: const Color(
-                                    0xFF10b981,
-                                  ).withAlpha(100),
-                                  disabledForegroundColor: dark
-                                      ? Colors.white.withAlpha(150)
-                                      : Colors.black38,
+                                  backgroundColor: isFlightChecked ? const Color(0xFF38bdf8) : const Color(0xFF10b981),
+                                  disabledBackgroundColor: isFlightChecked ? const Color(0xFF38bdf8) : const Color(0xFF10b981).withAlpha(100),
+                                  disabledForegroundColor: Colors.white,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -1908,6 +1999,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     List<String> selectedLocations = [];
     final otherLocationCtrl = TextEditingController();
     bool isLoading = true;
+    bool isEditMode = true;
 
     final ctrls = {
       'AGI Skid': TextEditingController(),
@@ -1945,6 +2037,18 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       }
                       
                       if (data != null) {
+                        bool hasInput = false;
+                        if (data['breakdown'] is Map) {
+                          final bd = data['breakdown'] as Map;
+                          hasInput = bd.values.any((val) {
+                            if (val is List) return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                            if (val is num) return val > 0;
+                            if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                            return false;
+                          });
+                        }
+                        if (hasInput) isEditMode = false;
+
                         if (data['breakdown'] is Map) {
                         final bd = data['breakdown'] as Map;
                         for (var k in breakdown.keys) {
@@ -2012,6 +2116,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       width: 80,
                       height: 38,
                       child: TextField(
+                        enabled: isEditMode,
                         controller: ctrls[label],
                         inputFormatters: [
                           LengthLimitingTextInputFormatter(5),
@@ -2049,7 +2154,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                     ),
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: () {
+                      onTap: isEditMode ? () {
                         final val = int.tryParse(ctrls[label]!.text);
                         if (val != null && val > 0) {
                           setDialogState(() {
@@ -2061,19 +2166,19 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                             ctrls[label]!.clear();
                           });
                         }
-                      },
+                      } : null,
                       child: Container(
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6366f1),
+                          color: isEditMode ? const Color(0xFF6366f1) : const Color(0xFF6366f1).withAlpha(100),
                           borderRadius: BorderRadius.circular(
                             20,
                           ), // fully rounded circle like image
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.add,
-                          color: Colors.white,
+                          color: isEditMode ? Colors.white : Colors.white.withAlpha(150),
                           size: 20,
                         ),
                       ),
@@ -2086,7 +2191,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
             Widget buildLocationChip(String label) {
               final isSel = selectedLocations.contains(label);
               return InkWell(
-                onTap: () {
+                onTap: isEditMode ? () {
                   setDialogState(() {
                     if (isSel) {
                       selectedLocations.clear();
@@ -2096,7 +2201,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       if (label != 'Other') otherLocationCtrl.clear();
                     }
                   });
-                },
+                } : null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -2450,34 +2555,36 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                       ),
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 8),
-                                                  InkWell(
-                                                    onTap: () {
-                                                      setDialogState(() {
-                                                        breakdown[entry.key]!
-                                                            .removeAt(item.key);
-                                                      });
-                                                    },
-                                                    child: Container(
-                                                      padding:
-                                                          const EdgeInsets.all(4),
-                                                      decoration: BoxDecoration(
-                                                        border: Border.all(
-                                                          color: Colors.red
-                                                              .withAlpha(50),
+                                                  if (isEditMode) ...[
+                                                    const SizedBox(width: 8),
+                                                    InkWell(
+                                                      onTap: () {
+                                                        setDialogState(() {
+                                                          breakdown[entry.key]!
+                                                              .removeAt(item.key);
+                                                        });
+                                                      },
+                                                      child: Container(
+                                                        padding:
+                                                            const EdgeInsets.all(4),
+                                                        decoration: BoxDecoration(
+                                                          border: Border.all(
+                                                            color: Colors.red
+                                                                .withAlpha(50),
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
                                                         ),
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              4,
-                                                            ),
-                                                      ),
-                                                      child: const Icon(
-                                                        Icons.close,
-                                                        color: Color(0xFFef4444),
-                                                        size: 14,
+                                                        child: const Icon(
+                                                          Icons.close,
+                                                          color: Color(0xFFef4444),
+                                                          size: 14,
+                                                        ),
                                                       ),
                                                     ),
-                                                  ),
+                                                  ],
                                                 ],
                                               ),
                                             );
@@ -2516,27 +2623,28 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                             ),
                                           ),
                                           const Spacer(),
-                                          InkWell(
-                                            onTap: () {
-                                              setDialogState(() {
-                                                breakdown[entry.key]!.clear();
-                                              });
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.all(4),
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: Colors.red.withAlpha(50),
+                                          if (isEditMode)
+                                            InkWell(
+                                              onTap: () {
+                                                setDialogState(() {
+                                                  breakdown[entry.key]!.clear();
+                                                });
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                    color: Colors.red.withAlpha(50),
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(4),
                                                 ),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Icon(
-                                                Icons.close,
-                                                color: Color(0xFFef4444),
-                                                size: 14,
+                                                child: const Icon(
+                                                  Icons.close,
+                                                  color: Color(0xFFef4444),
+                                                  size: 14,
+                                                ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                     );
@@ -2575,8 +2683,9 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               width: 200,
                               height: 38,
                               child: TextField(
+                                enabled: isEditMode,
                                 controller: otherLocationCtrl,
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                style: TextStyle(color: isEditMode ? Colors.white : Colors.white.withAlpha(150), fontSize: 13),
                                 decoration: InputDecoration(
                                   hintText: 'Enter custom location...',
                                   hintStyle: TextStyle(
@@ -2617,7 +2726,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                   height: 48,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366f1),
+                      backgroundColor: isEditMode ? const Color(0xFF6366f1) : Colors.white.withAlpha(10),
+                      foregroundColor: isEditMode ? Colors.white : Colors.white.withAlpha(100),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -2625,6 +2735,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                     onPressed: isSaving
                         ? null
                         : () async {
+                            if (!isEditMode) {
+                              setDialogState(() => isEditMode = true);
+                              return;
+                            }
                             setDialogState(() => isSaving = true);
                             try {
                               final existing = await Supabase.instance.client
@@ -2710,10 +2824,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               strokeWidth: 2,
                             ),
                           )
-                        : const Text(
-                            'Save',
+                        : Text(
+                            isEditMode ? 'Save' : 'Edit',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isEditMode ? Colors.white : Colors.white.withAlpha(100),
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
