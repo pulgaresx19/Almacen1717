@@ -505,6 +505,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                   parsedAwbs.add({
                                                     'number':
                                                         awbRow['AWB-number'],
+                                                    'total':
+                                                        awbRow['total'],
+                                                    'data-coordinator':
+                                                        awbRow['data-coordinator'],
                                                     'pieces':
                                                         innerItem['pieces'],
                                                     'weight':
@@ -512,6 +516,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                     'remarks':
                                                         innerItem['remarks'],
                                                     'hawbs': validHawbs,
+                                                    'isNew': innerItem['isNew'] == true,
                                                   });
                                                 }
                                               }
@@ -925,15 +930,52 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                         final awb =
                                                             (uld['awbList']
                                                                 as List)[awbIdx];
+                                                        
+                                                        bool isChecked = false;
+                                                        List<dynamic> dcList = [];
+                                                        if (awb['data-coordinator'] is List) {
+                                                          dcList = awb['data-coordinator'] as List;
+                                                        } else if (awb['data-coordinator'] is Map) {
+                                                          dcList = [awb['data-coordinator']];
+                                                        }
+                                                        
+                                                        final uldNum = uld['ULD-number']?.toString().toUpperCase();
+                                                        final uldCarrier = uld['refCarrier']?.toString();
+                                                        final uldFlight = uld['refNumber']?.toString();
+                                                        
+                                                        for (var dc in dcList) {
+                                                          if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                                              dc['refCarrier']?.toString() == uldCarrier &&
+                                                              dc['refNumber']?.toString() == uldFlight) {
+                                                            final bd = dc['breakdown'];
+                                                            if (bd is Map && bd.isNotEmpty) {
+                                                              bool hasInput = bd.values.any((val) {
+                                                                if (val is List) {
+                                                                  return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                                                                }
+                                                                if (val is num) return val > 0;
+                                                                if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                                                                return false;
+                                                              });
+                                                              if (hasInput) isChecked = true;
+                                                            }
+                                                          }
+                                                        }
+
                                                         return Column(
                                                           children: [
                                                             InkWell(
-                                                              onTap: () =>
-                                                                  _showAwbDetailsOverlay(
-                                                                    context,
-                                                                    awb,
-                                                                    dark,
-                                                                  ),
+                                                              onTap: () async {
+                                                                final res = await _showAwbDetailsOverlay(
+                                                                  context,
+                                                                  awb,
+                                                                  dark,
+                                                                  uld,
+                                                                );
+                                                                if (res != null && mounted) {
+                                                                  setState(() {});
+                                                                }
+                                                              },
                                                               child: Padding(
                                                                 padding:
                                                                     const EdgeInsets.symmetric(
@@ -1301,6 +1343,26 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                                     ] else ...[
                                                                       const Spacer(),
                                                                     ],
+                                                                    if (isChecked)
+                                                                      Container(
+                                                                        margin: const EdgeInsets.only(left: 8),
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                        decoration: BoxDecoration(
+                                                                          color: const Color(0xFF6366f1).withAlpha(30),
+                                                                          borderRadius: BorderRadius.circular(4),
+                                                                          border: Border.all(
+                                                                            color: const Color(0xFF6366f1).withAlpha(50),
+                                                                          ),
+                                                                        ),
+                                                                        child: Row(
+                                                                          mainAxisSize: MainAxisSize.min,
+                                                                          children: const [
+                                                                            Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
+                                                                            SizedBox(width: 4),
+                                                                            Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                                          ],
+                                                                        ),
+                                                                      ),
                                                                   ],
                                                                 ),
                                                               ),
@@ -1659,6 +1721,37 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                     Divider(color: borderC),
                                 itemBuilder: (c, i) {
                                   final awb = list[i];
+                                  bool isChecked = false;
+                                  List<dynamic> dcList = [];
+                                  if (awb['data-coordinator'] is List) {
+                                    dcList = awb['data-coordinator'] as List;
+                                  } else if (awb['data-coordinator'] is Map) {
+                                    dcList = [awb['data-coordinator']];
+                                  }
+                                  
+                                  final uldNum = activeUld['ULD-number']?.toString().toUpperCase();
+                                  final uldCarrier = activeUld['refCarrier']?.toString();
+                                  final uldFlight = activeUld['refNumber']?.toString();
+                                  
+                                  for (var dc in dcList) {
+                                    if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                        dc['refCarrier']?.toString() == uldCarrier &&
+                                        dc['refNumber']?.toString() == uldFlight) {
+                                      final bd = dc['breakdown'];
+                                      if (bd is Map && bd.isNotEmpty) {
+                                        bool hasInput = bd.values.any((val) {
+                                          if (val is List) {
+                                            return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                                          }
+                                          if (val is num) return val > 0;
+                                          if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                                          return false;
+                                        });
+                                        if (hasInput) isChecked = true;
+                                      }
+                                    }
+                                  }
+
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 4,
@@ -1700,6 +1793,26 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                             textAlign: TextAlign.right,
                                           ),
                                         ),
+                                        if (isChecked)
+                                          Container(
+                                            margin: const EdgeInsets.only(left: 12),
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF6366f1).withAlpha(30),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: const Color(0xFF6366f1).withAlpha(50),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: const [
+                                                Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
+                                                SizedBox(width: 4),
+                                                Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   );
@@ -1783,6 +1896,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     BuildContext context,
     Map<String, dynamic> awb,
     bool dark,
+    [Map<String, dynamic>? uldOverride]
   ) async {
     Map<String, List<int>> breakdown = {
       'AGI Skid': [],
@@ -1814,14 +1928,24 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
               // Fetch from Supabase
               Supabase.instance.client
                   .from('AWB')
-                  .select('data-coordinator')
+                  .select('total, data-coordinator')
                   .eq('AWB-number', awb['number'])
                   .maybeSingle()
                   .then((res) {
-                    if (res != null && res['data-coordinator'] is Map) {
-                      final data = res['data-coordinator'];
-
-                      if (data['breakdown'] is Map) {
+                    if (res != null) {
+                      if (res['total'] != null) awb['total'] = res['total'];
+                      Map<dynamic, dynamic>? data;
+                      if (res['data-coordinator'] is List) {
+                        final listDc = res['data-coordinator'] as List;
+                        final uldNum = uldOverride?['ULD-number']?.toString().toUpperCase();
+                        final match = listDc.where((d) => d is Map && d['refULD']?.toString().toUpperCase() == uldNum).toList();
+                        if (match.isNotEmpty) data = match.first as Map;
+                      } else if (res['data-coordinator'] is Map) {
+                        data = res['data-coordinator'];
+                      }
+                      
+                      if (data != null) {
+                        if (data['breakdown'] is Map) {
                         final bd = data['breakdown'] as Map;
                         for (var k in breakdown.keys) {
                           String legacyKey = k;
@@ -1836,6 +1960,12 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                             breakdown[k] = (bd[legacyKey] as List)
                                 .map((e) => int.tryParse(e.toString()) ?? 0)
                                 .toList();
+                          } else if (bd[k] is num || bd[k] is String) {
+                            int val = int.tryParse(bd[k].toString()) ?? 0;
+                            breakdown[k] = val > 0 ? [val] : [];
+                          } else if (bd[legacyKey] is num || bd[legacyKey] is String) {
+                            int val = int.tryParse(bd[legacyKey].toString()) ?? 0;
+                            breakdown[k] = val > 0 ? [val] : [];
                           }
                         }
                       }
@@ -1849,6 +1979,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                             selectedLocations = ['Other'];
                             otherLocationCtrl.text = loc;
                           }
+                        }
                         }
                       }
                     }
@@ -2001,7 +2132,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
               title: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left, color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.pop(dialogCtx),
                   ),
                   Expanded(
@@ -2037,6 +2168,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             _buildStatMini('PIECES', '${awb['pieces'] ?? '-'}'),
+                            _buildStatMini('TOTAL', '${awb['total'] ?? '-'}'),
                             _buildStatMini(
                               'WEIGHT',
                               '${awb['weight'] ?? '-'} kg',
@@ -2044,12 +2176,89 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                             _buildStatMini(
                               'HOUSES',
                               '${(awb['hawbs'] as List?)?.length ?? '0'}',
+                              onTap: () {
+                                final hList = (awb['hawbs'] as List?) ?? [];
+                                if (hList.isEmpty) return;
+                                showDialog(
+                                  context: dialogCtx,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: const Color(0xFF1e293b),
+                                    elevation: 8,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    titlePadding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      16,
+                                      16,
+                                      8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    title: Row(
+                                      children: const [
+                                        Icon(
+                                          Icons.inventory_2_outlined,
+                                          color: Color(0xFF6366f1),
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'House Numbers',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    content: Container(
+                                      width: 250,
+                                      constraints: const BoxConstraints(
+                                        maxHeight: 250,
+                                      ),
+                                      child: ListView.separated(
+                                        shrinkWrap: true,
+                                        itemCount: hList.length,
+                                        separatorBuilder:
+                                            (_, _) => const Divider(
+                                              color: Color(0xFF334155),
+                                            ),
+                                        itemBuilder: (c, i) {
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                            child: Text(
+                                              hList[i].toString(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                             _buildStatMini(
                               'REMARKS',
-                              (awb['remarks']?.toString().isEmpty ?? true)
+                              (awb['remarks']?.toString().trim().isEmpty ?? true)
                                   ? '-'
-                                  : 'Yes',
+                                  : awb['remarks'].toString().trim(),
                             ),
                           ],
                         ),
@@ -2423,26 +2632,62 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                   .select('data-coordinator')
                                   .eq('AWB-number', awb['number'])
                                   .maybeSingle();
-                              Map<String, dynamic> coordData = {};
-                              if (existing != null &&
-                                  existing['data-coordinator'] is Map) {
-                                coordData = Map<String, dynamic>.from(
-                                  existing['data-coordinator'],
-                                );
+                              List<dynamic> existingDcList = [];
+                              if (existing != null) {
+                                if (existing['data-coordinator'] is List) {
+                                  existingDcList = List.from(existing['data-coordinator']);
+                                } else if (existing['data-coordinator'] is Map) {
+                                  existingDcList = [existing['data-coordinator']];
+                                }
                               }
-                              coordData['breakdown'] = breakdown;
+
+                              Map<String, dynamic> coordData = {};
+                              
+                              final uldNum = uldOverride?['ULD-number']?.toString().toUpperCase() ?? '';
+                              final uldCar = uldOverride?['refCarrier']?.toString() ?? '';
+                              final uldFlt = uldOverride?['refNumber']?.toString() ?? '';
+                              final uldDate = uldOverride?['refDate']?.toString() ?? '';
+
+                              // Find existing map for this ULD if any
+                              int matchIndex = existingDcList.indexWhere((d) => d is Map && d['refULD']?.toString().toUpperCase() == uldNum && d['refNumber']?.toString() == uldFlt);
+                              if (matchIndex != -1) {
+                                coordData = Map<String, dynamic>.from(existingDcList[matchIndex]);
+                              }
+                              
+                              Map<String, dynamic> breakdownToSave = {};
+                              breakdown.forEach((key, list) {
+                                if (key == 'AGI Skid') {
+                                  breakdownToSave[key] = list;
+                                } else {
+                                  breakdownToSave[key] = list.isNotEmpty ? list.first : 0;
+                                }
+                              });
+                              coordData['breakdown'] = breakdownToSave;
+                              
                               coordData['selectedLocations'] = selectedLocations.map((loc) {
                                 if (loc == 'Other' && otherLocationCtrl.text.trim().isNotEmpty) {
                                   return otherLocationCtrl.text.trim();
                                 }
                                 return loc;
                               }).toList();
+                              
+                              coordData['refULD'] = uldNum;
+                              coordData['refCarrier'] = uldCar;
+                              coordData['refNumber'] = uldFlt;
+                              coordData['refDate'] = uldDate;
+
+                              if (matchIndex != -1) {
+                                existingDcList[matchIndex] = coordData;
+                              } else {
+                                existingDcList.add(coordData);
+                              }
 
                               await Supabase.instance.client
                                   .from('AWB')
-                                  .update({'data-coordinator': coordData})
+                                  .update({'data-coordinator': existingDcList})
                                   .eq('AWB-number', awb['number']);
 
+                              awb['data-coordinator'] = existingDcList;
                               if (mounted) setState(() {});
                               if (dialogCtx.mounted) {
                                 Navigator.pop(dialogCtx, awb);
@@ -2483,8 +2728,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     );
   }
 
-  Widget _buildStatMini(String label, String value) {
-    return Column(
+  Widget _buildStatMini(String label, String value, {VoidCallback? onTap}) {
+    Widget content = Column(
       children: [
         Text(
           label,
@@ -2505,6 +2750,18 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
         ),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: content,
+        ),
+      );
+    }
+    return content;
   }
 
   Future<dynamic> _showAddAwbOverlay(
@@ -3019,6 +3276,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               'refCarrier':
                                   currentFlight['carrier']?.toString() ?? '',
                               'house_number': houseArr,
+                              'isNew': true,
                             };
 
                             final existingAwb = await Supabase.instance.client
