@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -897,12 +897,15 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                           'time': tStr,
                                                           if (finalDiscList.isNotEmpty) 'discrepancies': finalDiscList
                                                         };
+                                                        
+                                                        final summaryList = _getAwbsWithLocations([uld]);
 
                                                         await Supabase.instance.client
                                                           .from('ULD')
                                                           .update({
                                                             'status': 'Checked',
                                                             'data-checked': cData,
+                                                            'inf-location-requerid': summaryList.isNotEmpty ? summaryList : null,
                                                           })
                                                           .eq('ULD-number', uld['ULD-number'])
                                                           .eq('refCarrier', uld['refCarrier'])
@@ -1676,8 +1679,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceEvenly,
+                              spacing: 32,
+                              runSpacing: 16,
                               children: [
                                 _buildTotalStat(
                                   'Checked',
@@ -1687,6 +1692,26 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                   (isLeft ? _uldsLeft : _uldsRight).length,
                                   const Color(0xFF10b981),
                                 ),
+                                  _buildTotalStat(
+                                    'Priority',
+                                    (isLeft ? _uldsLeft : _uldsRight)
+                                        .where((u) => u['isPriority'] == true && u['status'] == 'Checked')
+                                        .length,
+                                    (isLeft ? _uldsLeft : _uldsRight)
+                                        .where((u) => u['isPriority'] == true)
+                                        .length,
+                                    const Color(0xFFef4444),
+                                  ),
+                                Builder(builder: (ctx) {
+                                  final awbsWithLocs = _getAwbsWithLocations(isLeft ? _uldsLeft : _uldsRight);
+                                  return _buildTotalStat(
+                                    'Req. Locations',
+                                    awbsWithLocs.length,
+                                    -1,
+                                    const Color(0xFF8b5cf6),
+                                    onTap: () => _showAllLocationsModal(context, awbsWithLocs),
+                                  );
+                                }),
                               ],
                             ),
                           ),
@@ -2016,7 +2041,32 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                       barrierLabel: '',
                                       transitionDuration: const Duration(milliseconds: 300),
                                       pageBuilder: (context, anim1, anim2) {
-                                        final reportData = flightList[currentFlightIdx]['report-final'] as List<dynamic>;
+                                        final rawReport = flightList[currentFlightIdx]['report-final'];
+                                        List<dynamic> reportData = [];
+                                        String? sentBy;
+                                        String? sentAtStr;
+                                        if (rawReport is List) {
+                                          reportData = rawReport;
+                                        } else if (rawReport is Map) {
+                                          reportData = (rawReport['items'] as List?) ?? [];
+                                          sentBy = rawReport['sentBy']?.toString();
+                                          sentAtStr = rawReport['sentAt']?.toString();
+                                        }
+
+                                        String formattedDate = '';
+                                        if (sentAtStr != null) {
+                                          try {
+                                            final dtSent = DateTime.parse(sentAtStr).toLocal();
+                                            int h = dtSent.hour;
+                                            int m = dtSent.minute;
+                                            bool pm = h >= 12;
+                                            int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+                                            String mm = m < 10 ? '0$m' : '$m';
+                                            String suff = pm ? 'pm' : 'am';
+                                            formattedDate = '${dtSent.day}/${dtSent.month} $h12:$mm $suff';
+                                          } catch (_) {}
+                                        }
+
                                         return Align(
                                           alignment: Alignment.centerRight,
                                           child: Material(
@@ -2046,6 +2096,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                               Text('Sent Report View', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
                                                               const SizedBox(height: 4),
                                                               Text('${reportData.length} total items in report', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 13)),
+                                                              if (sentBy != null) ...[
+                                                                const SizedBox(height: 2),
+                                                                Text('Sent by: $sentBy${formattedDate.isNotEmpty ? ' at $formattedDate' : ''}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                              ],
                                                             ],
                                                           ),
                                                         ),
@@ -2458,17 +2512,38 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                               final parts = selectedId.split('-');
                                                               final dtStr = dt != null ? DateFormat('yyyy-MM-dd').format(dt) : '';
                                                               
+                                                              final uUser = Supabase.instance.client.auth.currentUser;
+                                                              String nameStr = uUser?.email?.split('@')[0] ?? 'Usuario';
+                                                              if (uUser != null) {
+                                                                try {
+                                                                  final userRow = await Supabase.instance.client
+                                                                      .from('Users')
+                                                                      .select('full-name')
+                                                                      .eq('id', uUser.id)
+                                                                      .maybeSingle();
+                                                                  if (userRow != null && userRow['full-name'] != null) {
+                                                                    nameStr = userRow['full-name'];
+                                                                  }
+                                                                } catch (_) {}
+                                                              }
+                                                              
+                                                              final finalReportData = {
+                                                                'sentBy': nameStr,
+                                                                'sentAt': DateTime.now().toIso8601String(),
+                                                                'items': finalReport
+                                                              };
+
                                                               await Supabase.instance.client
                                                                 .from('Flight')
                                                                 .update({
-                                                                  'report-final': finalReport,
+                                                                  'report-final': finalReportData,
                                                                 })
                                                                 .eq('carrier', parts[0])
                                                                 .eq('number', parts[1].split(' -')[0].trim())
                                                                 .eq('date-arrived', dtStr);
                                                                 
                                                               if (currentFlightIdx != -1) {
-                                                                flightList[currentFlightIdx]['report-final'] = finalReport;
+                                                                flightList[currentFlightIdx]['report-final'] = finalReportData;
                                                                 setState(() {});
                                                               }
                                                               
@@ -2545,7 +2620,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                           setStateDialog(() => isVerifying = true);
                                                           
                                                           try {
-                                                            final uniqueAwbs = localDiscrepancies.map((e) => e['awb']?.toString()).where((e) => e != null && e != 'N/A').toSet().toList();
+                                                            final uniqueAwbs = localDiscrepancies.map((e) => e['awb']?.toString()).whereType<String>().where((e) => e != 'N/A').toSet().toList();
                                                             if (uniqueAwbs.isNotEmpty) {
                                                               final awbData = await Supabase.instance.client
                                                                   .from('AWB')
@@ -2990,8 +3065,9 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     );
   }
 
-  Widget _buildTotalStat(String label, int rem, int total, Color color) {
-    return Column(
+  Widget _buildTotalStat(String label, int rem, int total, Color color, {VoidCallback? onTap}) {
+    Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         RichText(
           text: TextSpan(
@@ -3004,14 +3080,15 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextSpan(
-                text: ' / $total',
-                style: const TextStyle(
-                  color: Color(0xFF94a3b8),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              if (total != -1)
+                TextSpan(
+                  text: ' / $total',
+                  style: const TextStyle(
+                    color: Color(0xFF94a3b8),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -3026,6 +3103,182 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
         ),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: content,
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      child: content,
+    );
+  }
+
+  void _showAllLocationsModal(BuildContext context, List<Map<String, dynamic>> matchingAwbs) {
+    final dark = isDarkMode.value;
+    final bgC = dark ? const Color(0xFF1e293b) : Colors.white;
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b);
+    final borderC = dark ? Colors.white.withAlpha(20) : const Color(0xFFe2e8f0);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: bgC,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.location_on_rounded, color: Color(0xFF6366f1)),
+              const SizedBox(width: 8),
+              Text(
+                'Required Locations',
+                style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: matchingAwbs.isEmpty
+                ? Text('No AWBs found.', style: TextStyle(color: textS))
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: matchingAwbs.length,
+                    separatorBuilder: (_, _) => Divider(color: borderC),
+                    itemBuilder: (context, index) {
+                      final item = matchingAwbs[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('${item['awb']}', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 16)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366f1).withAlpha(20),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text('ULD: ${item['uld']}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 13, fontWeight: FontWeight.w600)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFf1f5f9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('PCs: ${item['pieces']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 12)),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFf1f5f9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('${item['weight']} kg', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 12)),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF8b5cf6)),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    (item['locations'] as List).join(', '),
+                                    style: const TextStyle(color: Color(0xFF8b5cf6), fontWeight: FontWeight.bold, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (item['remarks'] != null && item['remarks'].toString().trim().isNotEmpty && item['remarks'].toString().trim() != '-')
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text('Remarks: ${item['remarks']}', style: TextStyle(color: const Color(0xFFd97706), fontSize: 13, fontStyle: FontStyle.italic)),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _getAwbsWithLocations(List<Map<String, dynamic>> ulds) {
+    List<Map<String, dynamic>> matchingAwbs = [];
+    for (var u in ulds) {
+      if (u['inf-location-requerid'] != null && u['inf-location-requerid'] is List) {
+        for (var item in u['inf-location-requerid']) {
+          if (item is Map<String, dynamic>) {
+            matchingAwbs.add(item);
+          } else if (item is Map) {
+            matchingAwbs.add(Map<String, dynamic>.from(item));
+          }
+        }
+      } else if (u['awbList'] is List) {
+        for (var awbItem in u['awbList']) {
+          List<dynamic> dcList = [];
+          if (awbItem['data-coordinator'] is List) {
+            dcList = awbItem['data-coordinator'] as List;
+          } else if (awbItem['data-coordinator'] is Map) {
+            dcList = [awbItem['data-coordinator']];
+          }
+          final uldNum = u['ULD-number']?.toString().toUpperCase();
+          final uCarrier = u['refCarrier']?.toString();
+          final uFlight = u['refNumber']?.toString();
+          
+          List<String> assignedLocs = [];
+          for (var dc in dcList) {
+            if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                dc['refCarrier']?.toString() == uCarrier &&
+                dc['refNumber']?.toString() == uFlight) {
+              if (dc['selectedLocations'] is List) {
+                for (var loc in dc['selectedLocations']) {
+                  String locStr = loc.toString().trim().toUpperCase();
+                  if (locStr.isNotEmpty) {
+                    assignedLocs.add(locStr);
+                  }
+                }
+              }
+            }
+          }
+          if (assignedLocs.isNotEmpty) {
+            matchingAwbs.add({
+              'awb': awbItem['number']?.toString() ?? 'N/A',
+              'uld': uldNum ?? 'Unknown',
+              'pieces': awbItem['pieces']?.toString() ?? '-',
+              'weight': awbItem['weight']?.toString() ?? '-',
+              'remarks': awbItem['remarks']?.toString() ?? '-',
+              'locations': assignedLocs,
+            });
+          }
+        }
+      }
+    }
+    return matchingAwbs;
   }
 
   Future<dynamic> _showAwbDetailsOverlay(

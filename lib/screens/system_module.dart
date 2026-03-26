@@ -1029,7 +1029,7 @@ class _SystemModuleState extends State<SystemModule> {
                                               await Supabase.instance.client
                                                   .from('ULD')
                                                   .update({
-                                                    'status': 'Received',
+                                                    'isReceived': true,
                                                   })
                                                   .eq('id', u['id']);
                                             }

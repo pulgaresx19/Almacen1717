@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -18,6 +18,9 @@ class LocationModule extends StatefulWidget {
 }
 
 class _LocationModuleState extends State<LocationModule> {
+  // Local storage for discrepancy reports, saving AWB, ULD, diff and notes.
+  List<Map<String, dynamic>> localDiscrepancyReports = [];
+
   DateTime? _dateLeft;
   DateTime? _dateRight;
 
@@ -205,15 +208,11 @@ class _LocationModuleState extends State<LocationModule> {
     final flights = isLeft ? _flightsLeft : _flightsRight;
     final selectedId = isLeft ? _selectedFlightIdLeft : _selectedFlightIdRight;
 
-    bool isFlightReceived = false;
     final match = selectedId != null
         ? flights
               .where((f) => '${f['carrier']}-${f['number']}' == selectedId)
               .toList()
         : [];
-    if (match.isNotEmpty) {
-      isFlightReceived = match.first['status']?.toString() == 'Received';
-    }
 
     return Stack(
       children: [
@@ -230,7 +229,9 @@ class _LocationModuleState extends State<LocationModule> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        appLanguage.value == 'es' ? 'Locación' : 'Location',
+                        appLanguage.value == 'es'
+                            ? 'Localización'
+                            : 'Location',
                         style: TextStyle(
                           color: textP,
                           fontSize: 24,
@@ -240,8 +241,8 @@ class _LocationModuleState extends State<LocationModule> {
                       const SizedBox(height: 4),
                       Text(
                         appLanguage.value == 'es'
-                            ? 'Módulo para asignar los artículos (AWB) en locación'
-                            : 'Module to assign items (AWBs) to location',
+                            ? 'Módulo para añadir ubicación a los AWBs correspondientes'
+                            : 'Module for adding locations to the corresponding AWBs',
                         style: TextStyle(
                           color: textS,
                           fontSize: 13,
@@ -316,11 +317,11 @@ class _LocationModuleState extends State<LocationModule> {
                   children: flights.map((f) {
                     final chipId = '${f['carrier']}-${f['number']}';
                     final isSel = selectedId == chipId;
-
                     Color textColor = isSel ? Colors.white : textP;
                     Color selColor = const Color(0xFF6366f1);
                     Color unselBgColor = bgCard;
                     Color borderColor = isSel ? Colors.transparent : borderC;
+
 
                     return ChoiceChip(
                       label: Text(
@@ -503,6 +504,10 @@ class _LocationModuleState extends State<LocationModule> {
                                                   parsedAwbs.add({
                                                     'number':
                                                         awbRow['AWB-number'],
+                                                    'total':
+                                                        awbRow['total'],
+                                                    'data-coordinator':
+                                                        awbRow['data-coordinator'],
                                                     'pieces':
                                                         innerItem['pieces'],
                                                     'weight':
@@ -510,6 +515,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                     'remarks':
                                                         innerItem['remarks'],
                                                     'hawbs': validHawbs,
+                                                    'isNew': innerItem['isNew'] == true,
                                                   });
                                                 }
                                               }
@@ -689,59 +695,277 @@ class _LocationModuleState extends State<LocationModule> {
                                             ),
                                           ),
                                           const SizedBox(width: 12),
-                                          Row(
-                                            children: [
-                                              Container(
-                                                width: 75,
-                                                alignment: Alignment.center,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 4,
+                                          Builder(
+                                            builder: (ctx) {
+                                              bool allAwbChecked = false;
+                                              int discrepantAwbCount = 0;
+                                              List<Map<String, dynamic>> discrepantAwbsList = [];
+
+                                              if (uld['data-checked'] != null && uld['data-checked']['discrepancies'] != null) {
+                                                final discs = uld['data-checked']['discrepancies'] as List;
+                                                for (var d in discs) {
+                                                  if (d is Map) {
+                                                    discrepantAwbsList.add({
+                                                      'awb': d['awb']?.toString() ?? 'N/A',
+                                                      'label': d['label']?.toString() ?? ''
+                                                    });
+                                                  }
+                                                }
+                                                discrepantAwbCount = discrepantAwbsList.length;
+                                                allAwbChecked = true;
+                                              } else if (uld['awbList'] is List && (uld['awbList'] as List).isNotEmpty) {
+                                                final listAwb = uld['awbList'] as List;
+                                                int checkedCount = 0;
+                                                for (var awbItem in listAwb) {
+                                                  bool checked = false;
+                                                  bool hasDisc = false;
+                                                  List<dynamic> dcList = [];
+                                                  if (awbItem['data-coordinator'] is List) {
+                                                    dcList = awbItem['data-coordinator'] as List;
+                                                  } else if (awbItem['data-coordinator'] is Map) {
+                                                    dcList = [awbItem['data-coordinator']];
+                                                  }
+                                                  final uldNum = uld['ULD-number']?.toString().toUpperCase();
+                                                  final uldCarrier = uld['refCarrier']?.toString();
+                                                  final uldFlight = uld['refNumber']?.toString();
+                                                  
+                                                  for (var dc in dcList) {
+                                                    if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                                        dc['refCarrier']?.toString() == uldCarrier &&
+                                                        dc['refNumber']?.toString() == uldFlight) {
+                                                      final bd = dc['breakdown'];
+                                                      if (bd is Map && bd.isNotEmpty) {
+                                                        checked = bd.values.any((val) {
+                                                          if (val is List) return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                                                          if (val is num) return val > 0;
+                                                          if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                                                          return false;
+                                                        });
+                                                      }
+                                                      if (dc['discrepancy'] != null && dc['discrepancy']['confirmed'] == true) {
+                                                        hasDisc = true;
+                                                        bool isNotFound = dc['discrepancy']['notFound'] == true;
+                                                        if (isNotFound) checked = true;
+                                                        int rExp = dc['discrepancy']['expected'] as int? ?? 0;
+                                                        int rRev = dc['discrepancy']['received'] as int? ?? 0;
+                                                        int diff = (rExp - rRev).abs();
+                                                        String tStr = rExp > rRev ? 'SHORT' : 'OVER';
+                                                        discrepantAwbsList.add({
+                                                          'awb': awbItem['number']?.toString() ?? 'N/A',
+                                                          'label': isNotFound ? 'NOT FOUND' : '$diff PCs $tStr'
+                                                        });
+                                                      }
+                                                    }
+                                                  }
+                                                  
+                                                  if (awbItem['isNew'] == true) {
+                                                    if (!hasDisc) {
+                                                      hasDisc = true;
+                                                      discrepantAwbsList.add({
+                                                        'awb': awbItem['number']?.toString() ?? 'N/A',
+                                                        'label': 'NEW (ADDED)'
+                                                      });
+                                                    } else {
+                                                      int idx = discrepantAwbsList.indexWhere((e) => e['awb'] == awbItem['number']?.toString());
+                                                      if (idx != -1) {
+                                                        discrepantAwbsList[idx]['label'] = '${discrepantAwbsList[idx]['label']} (NEW)';
+                                                      }
+                                                    }
+                                                  }
+
+                                                  if (checked) checkedCount++;
+                                                  if (hasDisc) discrepantAwbCount++;
+                                                }
+                                                allAwbChecked = checkedCount == listAwb.length;
+                                              }
+                                              
+                                              final isCheckedStatus = uld['status'] == 'Checked';
+                                              final canCheck = !isCheckedStatus && allAwbChecked;
+
+                                              return Row(
+                                                children: [
+                                                  if (discrepantAwbCount > 0) ...[
+                                                    GestureDetector(
+                                                      onTap: () {
+                                                        showDialog(
+                                                          context: ctx,
+                                                          builder: (dCtx) {
+                                                            return AlertDialog(
+                                                              backgroundColor: const Color(0xFF1e293b),
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                              title: const Text('Discrepancies', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                                              content: Container(
+                                                                width: 320,
+                                                                constraints: const BoxConstraints(maxHeight: 400),
+                                                                child: ListView.builder(
+                                                                  shrinkWrap: true,
+                                                                  itemCount: discrepantAwbsList.length,
+                                                                  itemBuilder: (context, idx) {
+                                                                    final d = discrepantAwbsList[idx];
+                                                                    return Padding(
+                                                                      padding: const EdgeInsets.only(bottom: 12.0),
+                                                                      child: Container(
+                                                                        padding: const EdgeInsets.all(12),
+                                                                        decoration: BoxDecoration(
+                                                                          color: const Color(0xFF0f172a),
+                                                                          borderRadius: BorderRadius.circular(8),
+                                                                          border: Border.all(color: const Color(0xFF334155)),
+                                                                        ),
+                                                                        child: Row(
+                                                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                                          children: [
+                                                                            Text(d['awb'].toString(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                                                            Container(
+                                                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                              decoration: BoxDecoration(
+                                                                                color: const Color(0xFFef4444).withAlpha(30),
+                                                                                borderRadius: BorderRadius.circular(4),
+                                                                                border: Border.all(color: const Color(0xFFef4444).withAlpha(60)),
+                                                                              ),
+                                                                              child: Text(d['label'], style: const TextStyle(color: Color(0xFFef4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    );
+                                                                  },
+                                                                ),
+                                                              ),
+                                                              actions: [
+                                                                TextButton(
+                                                                  onPressed: () => Navigator.pop(dCtx),
+                                                                  style: TextButton.styleFrom(
+                                                                    backgroundColor: const Color(0xFF334155),
+                                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                                  ),
+                                                                  child: const Text('Close', style: TextStyle(color: Colors.white)),
+                                                                )
+                                                              ],
+                                                            );
+                                                          }
+                                                        );
+                                                      },
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFef4444).withAlpha(30),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          border: Border.all(color: const Color(0xFFef4444).withAlpha(60)),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.warning_rounded, size: 12, color: Color(0xFFef4444)),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              '$discrepantAwbCount Discrepanc${discrepantAwbCount > 1 ? 'ies' : 'y'}',
+                                                              style: const TextStyle(color: Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
                                                     ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      uld['status'] ==
-                                                          'Received'
-                                                      ? (dark
-                                                            ? Colors.white
-                                                                  .withAlpha(15)
-                                                            : const Color(
-                                                                0xFFF3F4F6,
-                                                              ))
-                                                      : const Color(
-                                                          0xFF6366f1,
-                                                        ).withAlpha(15),
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  uld['status'] == 'Received'
-                                                      ? 'Pending'
-                                                      : (uld['status'] ??
-                                                            'Break'),
-                                                  style: TextStyle(
-                                                    color:
-                                                        uld['status'] ==
-                                                            'Received'
-                                                        ? textS
-                                                        : const Color(
-                                                            0xFF6366f1,
-                                                          ),
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
+                                                    const SizedBox(width: 12),
+                                                  ],
+                                                  InkWell(
+                                                    onTap: canCheck ? () async {
+                                                      try {
+                                                        final uUser = Supabase.instance.client.auth.currentUser;
+                                                        String nameStr = uUser?.email?.split('@')[0] ?? 'Usuario';
+                                                        if (uUser != null) {
+                                                          try {
+                                                            final userRow = await Supabase.instance.client
+                                                                .from('Users')
+                                                                .select('full-name')
+                                                                .eq('id', uUser.id)
+                                                                .maybeSingle();
+                                                            if (userRow != null && userRow['full-name'] != null) {
+                                                              nameStr = userRow['full-name'];
+                                                            }
+                                                          } catch (_) {}
+                                                        }
+                                                        final tStr = DateTime.now().toUtc().toIso8601String();
+                                                        final List<Map<String, dynamic>> finalDiscList = discrepantAwbsList.map((e) => {
+                                                          'uld': uld['ULD-number']?.toString().toUpperCase(),
+                                                          'awb': e['awb'],
+                                                          'label': e['label']
+                                                        }).toList();
+                                                        final cData = {
+                                                          'user': nameStr, 
+                                                          'time': tStr,
+                                                          if (finalDiscList.isNotEmpty) 'discrepancies': finalDiscList
+                                                        };
+                                                        
+                                                        final summaryList = _getAwbsWithLocations([uld]);
+
+                                                        await Supabase.instance.client
+                                                          .from('ULD')
+                                                          .update({
+                                                            'status': 'Checked',
+                                                            'data-checked': cData,
+                                                            'inf-location-requerid': summaryList.isNotEmpty ? summaryList : null,
+                                                          })
+                                                          .eq('ULD-number', uld['ULD-number'])
+                                                          .eq('refCarrier', uld['refCarrier'])
+                                                          .eq('refNumber', uld['refNumber']);
+                                                        if (mounted) {
+                                                          setState(() {
+                                                            uld['status'] = 'Checked';
+                                                            uld['data-checked'] = cData;
+                                                            uld['isExpanded'] = false;
+                                                          });
+                                                        }
+
+                                                        final cFL = match.isNotEmpty ? match.first : null;
+                                                        if (cFL != null && cFL['start-break'] == null) {
+                                                          final sTime = DateTime.now().toUtc().toIso8601String();
+                                                          await Supabase.instance.client
+                                                              .from('Flight')
+                                                              .update({'start-break': sTime})
+                                                              .eq('id', cFL['id']);
+                                                          if (mounted) {
+                                                            setState(() {
+                                                              cFL['start-break'] = sTime;
+                                                            });
+                                                          }
+                                                        }
+                                                      } catch (_) {}
+                                                    } : null,
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                        decoration: BoxDecoration(
+                                                          color: isCheckedStatus ? const Color(0xFF10b981).withAlpha(15) : (canCheck ? const Color(0xFF6366f1) : const Color(0xFFf59e0b).withAlpha(15)),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: Row(
+                                                          children: [
+                                                            if (canCheck) ...[
+                                                              const Icon(Icons.check_circle_outline, color: Colors.white, size: 14),
+                                                              const SizedBox(width: 4),
+                                                            ],
+                                                            Text(
+                                                              isCheckedStatus ? 'Checked' : (canCheck ? 'Mark as Checked' : 'Pending'),
+                                                              style: TextStyle(
+                                                                color: isCheckedStatus ? const Color(0xFF10b981) : (canCheck ? Colors.white : const Color(0xFFd97706)),
+                                                                fontSize: 12,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  const SizedBox(width: 8),
+                                                  Icon(
+                                                    uld['isExpanded'] == true
+                                                        ? Icons.keyboard_arrow_up
+                                                        : Icons.keyboard_arrow_down,
+                                                    color: textS,
+                                                    size: 20,
                                                   ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Icon(
-                                                uld['isExpanded'] == true
-                                                    ? Icons.keyboard_arrow_up
-                                                    : Icons.keyboard_arrow_down,
-                                                color: textS,
-                                                size: 20,
-                                              ),
-                                            ],
+                                                ],
+                                              );
+                                            }
                                           ),
                                         ],
                                       ),
@@ -793,15 +1017,13 @@ class _LocationModuleState extends State<LocationModule> {
                                                             FontWeight.bold,
                                                       ),
                                                     ),
-                                                    InkWell(
-                                                      onTap: () async {
-                                                        final f =
-                                                            match.isNotEmpty
-                                                            ? match.first
-                                                            : null;
-                                                        if (f != null) {
-                                                          final res =
-                                                              await _showAddAwbOverlay(
+                                                    if (uld['status'] != 'Checked')
+                                                      InkWell(
+                                                        onTap: () async {
+                                                          final f = match.isNotEmpty ? match.first : null;
+                                                          if (f != null) {
+                                                            final res =
+                                                                await _showAddAwbOverlay(
                                                                 context,
                                                                 uld,
                                                                 f,
@@ -915,23 +1137,97 @@ class _LocationModuleState extends State<LocationModule> {
                                                     ),
                                                   )
                                                 else
-                                                  Column(
-                                                    children: List.generate(
-                                                      (uld['awbList'] as List)
-                                                          .length,
-                                                      (awbIdx) {
-                                                        final awb =
-                                                            (uld['awbList']
-                                                                as List)[awbIdx];
+                                                  Builder(
+                                                      builder: (context) {
+                                                        final filteredAwbs = (uld['awbList'] as List).where((awb) {
+                                                          List<dynamic> dcList = [];
+                                                          if (awb['data-coordinator'] is List) {
+                                                            dcList = awb['data-coordinator'] as List;
+                                                          } else if (awb['data-coordinator'] is Map) {
+                                                            dcList = [awb['data-coordinator']];
+                                                          }
+                                                          
+                                                          final uldNum = uld['ULD-number']?.toString().toUpperCase();
+                                                          final uldCarrier = uld['refCarrier']?.toString();
+                                                          final uldFlight = uld['refNumber']?.toString();
+                                                          
+                                                          for (var dc in dcList) {
+                                                            if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                                                dc['refCarrier']?.toString() == uldCarrier &&
+                                                                dc['refNumber']?.toString() == uldFlight) {
+                                                              if (dc['discrepancy'] != null && dc['discrepancy']['notFound'] == true) {
+                                                                return false;
+                                                              }
+                                                            }
+                                                          }
+                                                          return true;
+                                                        }).toList();
+
+                                                        return Column(
+                                                          children: List.generate(
+                                                            filteredAwbs.length,
+                                                            (awbIdx) {
+                                                              final awb = filteredAwbs[awbIdx];
+                                                        
+
+                                                        
+                                                        bool isChecked = false;
+                                                        bool hasDiscrepancy = false;
+                                                        String discrepancyBadge = 'Discrepancy';
+                                                        List<dynamic> dcList = [];
+                                                        if (awb['data-coordinator'] is List) {
+                                                          dcList = awb['data-coordinator'] as List;
+                                                        } else if (awb['data-coordinator'] is Map) {
+                                                          dcList = [awb['data-coordinator']];
+                                                        }
+                                                        
+                                                        final uldNum = uld['ULD-number']?.toString().toUpperCase();
+                                                        final uldCarrier = uld['refCarrier']?.toString();
+                                                        final uldFlight = uld['refNumber']?.toString();
+                                                        
+                                                        for (var dc in dcList) {
+                                                          if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                                              dc['refCarrier']?.toString() == uldCarrier &&
+                                                              dc['refNumber']?.toString() == uldFlight) {
+                                                            final bd = dc['breakdown'];
+                                                            if (bd is Map && bd.isNotEmpty) {
+                                                              bool hasInput = bd.values.any((val) {
+                                                                if (val is List) {
+                                                                  return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                                                                }
+                                                                if (val is num) return val > 0;
+                                                                if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                                                                return false;
+                                                              });
+                                                              if (hasInput) isChecked = true;
+                                                              if (dc['discrepancy'] != null && dc['discrepancy']['confirmed'] == true) {
+                                                                hasDiscrepancy = true;
+                                                                bool isNotFound = dc['discrepancy']['notFound'] == true;
+                                                                if (isNotFound) isChecked = true;
+                                                                int exp = dc['discrepancy']['expected'] as int? ?? 0;
+                                                                int rec = dc['discrepancy']['received'] as int? ?? 0;
+                                                                int diff = (exp - rec).abs();
+                                                                String term = exp > rec ? 'SHORT' : 'OVER';
+                                                                discrepancyBadge = isNotFound ? 'NOT FOUND' : '$diff PCs $term';
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+
                                                         return Column(
                                                           children: [
                                                             InkWell(
-                                                              onTap: () =>
-                                                                  _showAwbDetailsOverlay(
-                                                                    context,
-                                                                    awb,
-                                                                    dark,
-                                                                  ),
+                                                              onTap: () async {
+                                                                final res = await _showAwbDetailsOverlay(
+                                                                  context,
+                                                                  awb,
+                                                                  dark,
+                                                                  uld,
+                                                                );
+                                                                if (res != null && mounted) {
+                                                                  setState(() {});
+                                                                }
+                                                              },
                                                               child: Padding(
                                                                 padding:
                                                                     const EdgeInsets.symmetric(
@@ -1032,50 +1328,6 @@ class _LocationModuleState extends State<LocationModule> {
                                                                         ),
                                                                       ),
                                                                     ),
-                                                                    if (awb['isNew'] ==
-                                                                        true) ...[
-                                                                      const SizedBox(
-                                                                        width:
-                                                                            8,
-                                                                      ),
-                                                                      Container(
-                                                                        padding: const EdgeInsets.symmetric(
-                                                                          horizontal:
-                                                                              4,
-                                                                          vertical:
-                                                                              2,
-                                                                        ),
-                                                                        decoration: BoxDecoration(
-                                                                          color: const Color(
-                                                                            0xFF10b981,
-                                                                          ).withAlpha(30),
-                                                                          borderRadius:
-                                                                              BorderRadius.circular(
-                                                                                4,
-                                                                              ),
-                                                                          border: Border.all(
-                                                                            color:
-                                                                                const Color(
-                                                                                  0xFF10b981,
-                                                                                ).withAlpha(
-                                                                                  100,
-                                                                                ),
-                                                                          ),
-                                                                        ),
-                                                                        child: const Text(
-                                                                          'NEW',
-                                                                          style: TextStyle(
-                                                                            color: Color(
-                                                                              0xFF10b981,
-                                                                            ),
-                                                                            fontSize:
-                                                                                9,
-                                                                            fontWeight:
-                                                                                FontWeight.bold,
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                    ],
                                                                     if (awb['hawbs'] !=
                                                                             null &&
                                                                         (awb['hawbs']
@@ -1299,15 +1551,61 @@ class _LocationModuleState extends State<LocationModule> {
                                                                     ] else ...[
                                                                       const Spacer(),
                                                                     ],
+                                                                    if (awb['isNew'] == true)
+                                                                      Container(
+                                                                        margin: const EdgeInsets.only(left: 8),
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                                        decoration: BoxDecoration(
+                                                                          color: const Color(0xFF10b981).withAlpha(30),
+                                                                          borderRadius: BorderRadius.circular(4),
+                                                                          border: Border.all(color: const Color(0xFF10b981).withAlpha(100)),
+                                                                        ),
+                                                                        child: const Text('NEW', style: TextStyle(color: Color(0xFF10b981), fontSize: 9, fontWeight: FontWeight.bold)),
+                                                                      ),
+                                                                    if (hasDiscrepancy)
+                                                                      Container(
+                                                                        margin: const EdgeInsets.only(left: 8),
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                        decoration: BoxDecoration(
+                                                                          color: const Color(0xFFef4444).withAlpha(30),
+                                                                          borderRadius: BorderRadius.circular(4),
+                                                                          border: Border.all(color: const Color(0xFFef4444).withAlpha(60)),
+                                                                        ),
+                                                                        child: Row(
+                                                                          mainAxisSize: MainAxisSize.min,
+                                                                          children: [
+                                                                            const Icon(Icons.warning_rounded, size: 10, color: Color(0xFFef4444)),
+                                                                            const SizedBox(width: 4),
+                                                                            Text(discrepancyBadge, style: const TextStyle(color: Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    if (isChecked)
+                                                                      Container(
+                                                                        margin: const EdgeInsets.only(left: 8),
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                        decoration: BoxDecoration(
+                                                                          color: const Color(0xFF6366f1).withAlpha(30),
+                                                                          borderRadius: BorderRadius.circular(4),
+                                                                          border: Border.all(
+                                                                            color: const Color(0xFF6366f1).withAlpha(50),
+                                                                          ),
+                                                                        ),
+                                                                        child: Row(
+                                                                          mainAxisSize: MainAxisSize.min,
+                                                                          children: const [
+                                                                            Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
+                                                                            SizedBox(width: 4),
+                                                                            Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                                          ],
+                                                                        ),
+                                                                      ),
                                                                   ],
                                                                 ),
                                                               ),
                                                             ),
                                                             if (awbIdx <
-                                                                (uld['awbList']
-                                                                            as List)
-                                                                        .length -
-                                                                    1)
+                                                                filteredAwbs.length - 1)
                                                               Divider(
                                                                 color: borderC,
                                                                 height: 1,
@@ -1317,8 +1615,10 @@ class _LocationModuleState extends State<LocationModule> {
                                                         );
                                                       },
                                                     ),
-                                                  ),
-                                              ],
+                                                  );
+                                                },
+                                              ),
+                                          ],
                                             ),
                                     ),
                                 ],
@@ -1347,96 +1647,36 @@ class _LocationModuleState extends State<LocationModule> {
                                     ),
                                   ),
                                 ),
-                              Builder(
-                                builder: (ctx) {
-                                  String? indTime;
-                                  if (match.isNotEmpty) {
-                                    final f = match.first;
-                                    if (f['time-truck-arrived'] != null &&
-                                        f['time-truck-arrived'] is Map) {
-                                      indTime =
-                                          f['time-truck-arrived'][uld['ULD-number']
-                                              ?.toString()];
-                                    }
-                                  }
-
-                                  if (indTime == null) return const SizedBox();
-
-                                  String toAmPmUld(String t) {
-                                    try {
-                                      if (t.contains('T')) {
-                                        final dt = DateTime.parse(t).toLocal();
-                                        int h = dt.hour;
-                                        int m = dt.minute;
-                                        bool pm = h >= 12;
-                                        int h12 = h > 12
-                                            ? h - 12
-                                            : (h == 0 ? 12 : h);
-                                        return '${dt.day}/${dt.month} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-                                      }
-                                      final pts = t.split(':');
-                                      if (pts.length >= 2) {
-                                        int h = int.parse(pts[0]);
-                                        int m = int.parse(pts[1]);
-                                        bool pm = h >= 12;
-                                        int h12 = h > 12
-                                            ? h - 12
-                                            : (h == 0 ? 12 : h);
-                                        return '$h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-                                      }
-                                    } catch (_) {}
-                                    return t;
-                                  }
-
-                                  return Positioned(
-                                    top: -10,
-                                    right: 18,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: dark
-                                            ? const Color(0xFF1e293b)
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: const Color(
-                                            0xFF10b981,
-                                          ).withAlpha(100),
-                                        ),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Colors.black12,
-                                            blurRadius: 2,
-                                            offset: Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.check_circle,
-                                            color: Color(0xFF10b981),
-                                            size: 11,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            toAmPmUld(indTime),
-                                            style: const TextStyle(
-                                              color: Color(0xFF10b981),
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                              if (uld['data-checked'] != null)
+                                Positioned(
+                                  top: -8,
+                                  right: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFF10b981).withAlpha(100)),
+                                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
                                     ),
-                                  );
-                                },
-                              ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.check_circle, size: 12, color: Color(0xFF10b981)),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${uld['data-checked']?['user']?.toString() ?? 'User'} • ${DateFormat('MMM dd, h:mm a').format(DateTime.parse(uld['data-checked']?['time'] ?? DateTime.now().toIso8601String()).toLocal())}',
+                                          style: TextStyle(
+                                            color: dark ? Colors.white70 : Colors.black87,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(),
                             ],
                           );
                         },
@@ -1459,8 +1699,10 @@ class _LocationModuleState extends State<LocationModule> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceEvenly,
+                              spacing: 32,
+                              runSpacing: 16,
                               children: [
                                 _buildTotalStat(
                                   'Checked',
@@ -1470,6 +1712,26 @@ class _LocationModuleState extends State<LocationModule> {
                                   (isLeft ? _uldsLeft : _uldsRight).length,
                                   const Color(0xFF10b981),
                                 ),
+                                  _buildTotalStat(
+                                    'Priority',
+                                    (isLeft ? _uldsLeft : _uldsRight)
+                                        .where((u) => u['isPriority'] == true && u['status'] == 'Checked')
+                                        .length,
+                                    (isLeft ? _uldsLeft : _uldsRight)
+                                        .where((u) => u['isPriority'] == true)
+                                        .length,
+                                    const Color(0xFFef4444),
+                                  ),
+                                Builder(builder: (ctx) {
+                                  final awbsWithLocs = _getAwbsWithLocations(isLeft ? _uldsLeft : _uldsRight);
+                                  return _buildTotalStat(
+                                    'Req. Locations',
+                                    awbsWithLocs.length,
+                                    -1,
+                                    const Color(0xFF8b5cf6),
+                                    onTap: () => _showAllLocationsModal(context, awbsWithLocs),
+                                  );
+                                }),
                               ],
                             ),
                           ),
@@ -1484,10 +1746,10 @@ class _LocationModuleState extends State<LocationModule> {
                               final currentUlds = isLeft
                                   ? _uldsLeft
                                   : _uldsRight;
-                              bool allSelected =
+                              bool allUldsChecked =
                                   currentUlds.isNotEmpty &&
                                   currentUlds.every(
-                                    (u) => u['selected'] == true,
+                                    (u) => u['status'] == 'Checked',
                                   );
 
                               final flightList = isLeft
@@ -1498,25 +1760,121 @@ class _LocationModuleState extends State<LocationModule> {
                                     '${f['carrier']}-${f['number']}' ==
                                     selectedId,
                               );
+                              final bool isFlightChecked = currentFlightIdx != -1 && flightList[currentFlightIdx]['status'] == 'Checked';
 
-                              Widget actionButton = ElevatedButton.icon(
-                                onPressed: isFlightReceived
+                              int totalFlightDiscrepancies = 0;
+                              List<Map<String, dynamic>> allFlightDiscrepancies = [];
+
+                              for (var u in currentUlds) {
+                                if (u['data-checked'] != null && u['data-checked']['discrepancies'] != null) {
+                                  final discs = u['data-checked']['discrepancies'] as List;
+                                  for (var d in discs) {
+                                    if (d is Map) {
+                                      allFlightDiscrepancies.add({
+                                        'uld': d['uld']?.toString() ?? 'N/A',
+                                        'awb': d['awb']?.toString() ?? 'N/A',
+                                        'label': d['label']?.toString() ?? ''
+                                      });
+                                    }
+                                  }
+                                  totalFlightDiscrepancies += discs.length;
+                                } else if (u['awbList'] is List) {
+                                  for (var awbItem in u['awbList']) {
+                                    bool hasDisc = false;
+                                    List<dynamic> dcList = [];
+                                    if (awbItem['data-coordinator'] is List) {
+                                      dcList = awbItem['data-coordinator'] as List;
+                                    } else if (awbItem['data-coordinator'] is Map) {
+                                      dcList = [awbItem['data-coordinator']];
+                                    }
+                                    
+                                    final uldNum = u['ULD-number']?.toString().toUpperCase();
+                                    final uCarrier = u['refCarrier']?.toString();
+                                    final uFlight = u['refNumber']?.toString();
+                                    
+                                    for (var dc in dcList) {
+                                      if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                          dc['refCarrier']?.toString() == uCarrier &&
+                                          dc['refNumber']?.toString() == uFlight) {
+                                        
+                                        if (dc['discrepancy'] != null && dc['discrepancy']['confirmed'] == true) {
+                                          hasDisc = true;
+                                          bool isNotFound = dc['discrepancy']['notFound'] == true;
+                                          int rExp = dc['discrepancy']['expected'] as int? ?? 0;
+                                          int rRev = dc['discrepancy']['received'] as int? ?? 0;
+                                          int diff = (rExp - rRev).abs();
+                                          String tStr = rExp > rRev ? 'SHORT' : 'OVER';
+                                          allFlightDiscrepancies.add({
+                                            'uld': uldNum ?? 'Unknown ULD',
+                                            'awb': awbItem['number']?.toString() ?? 'N/A',
+                                            'label': isNotFound ? 'NOT FOUND' : '$diff PCs $tStr'
+                                          });
+                                          break;
+                                        }
+                                      }
+                                    }
+                                    
+                                    if (awbItem['isNew'] == true) {
+                                      if (!hasDisc) {
+                                        hasDisc = true;
+                                        allFlightDiscrepancies.add({
+                                          'uld': u['ULD-number']?.toString().toUpperCase() ?? 'N/A',
+                                          'awb': awbItem['number']?.toString() ?? 'N/A',
+                                          'label': 'NEW (ADDED)'
+                                        });
+                                      } else {
+                                        int idx = allFlightDiscrepancies.indexWhere((e) => e['awb'] == awbItem['number']?.toString());
+                                        if (idx != -1) {
+                                          allFlightDiscrepancies[idx]['label'] = '${allFlightDiscrepancies[idx]['label']} (NEW)';
+                                        }
+                                      }
+                                    }
+                                    if (hasDisc) totalFlightDiscrepancies++;
+                                  }
+                                }
+                              }
+
+                              bool hasSentReport = currentFlightIdx != -1 && flightList[currentFlightIdx]['report-final'] != null;
+
+                              Widget baseActionButton = ElevatedButton.icon(
+                                onPressed: isFlightChecked
                                     ? null
-                                    : allSelected
+                                    : allUldsChecked
                                     ? () async {
-                                        try {
-                                          // Update ULDs
-                                          for (var u in currentUlds) {
-                                            if (u['id'] != null) {
-                                              await Supabase.instance.client
-                                                  .from('ULD')
-                                                  .update({
-                                                    'status': 'Received',
-                                                  })
-                                                  .eq('id', u['id']);
-                                            }
-                                          }
+                                        if (totalFlightDiscrepancies > 0 && !hasSentReport) {
+                                          showDialog(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              title: Row(
+                                                children: [
+                                                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 28),
+                                                  const SizedBox(width: 12),
+                                                  Text(
+                                                    appLanguage.value == 'es' ? 'Acción Requerida' : 'Action Required',
+                                                    style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ],
+                                              ),
+                                              content: Text(
+                                                appLanguage.value == 'es' 
+                                                  ? 'Debes verificar y enviar el reporte de discrepancias antes de poder marcar este vuelo como finalizado.' 
+                                                  : 'You must verify and submit the discrepancies report before you can mark this flight as completed.',
+                                                style: TextStyle(color: textP, fontSize: 15, height: 1.5),
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(ctx),
+                                                  child: Text(appLanguage.value == 'es' ? 'Entendido' : 'Understood', style: const TextStyle(color: Color(0xFF38bdf8), fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          return;
+                                        }
 
+                                        try {
                                           // Update the parent Flight
                                           if (dt != null) {
                                             final parts = selectedId.split('-');
@@ -1564,10 +1922,13 @@ class _LocationModuleState extends State<LocationModule> {
                                                           as String;
                                                 }
 
+                                                final eBreakTime =
+                                                    DateTime.now().toUtc().toIso8601String();
                                                 await Supabase.instance.client
                                                     .from('Flight')
                                                     .update({
-                                                      'status': 'Received',
+                                                      'status': 'Checked',
+                                                      'end-break': eBreakTime,
                                                       'first-truck':
                                                           firstTruckTime,
                                                       'last-truck':
@@ -1584,7 +1945,9 @@ class _LocationModuleState extends State<LocationModule> {
 
                                                 if (currentFlightIdx != -1) {
                                                   flightList[currentFlightIdx]['status'] =
-                                                      'Received';
+                                                      'Checked';
+                                                  flightList[currentFlightIdx]['end-break'] =
+                                                      eBreakTime;
                                                   flightList[currentFlightIdx]['first-truck'] =
                                                       firstTruckTime;
                                                   flightList[currentFlightIdx]['last-truck'] =
@@ -1600,30 +1963,52 @@ class _LocationModuleState extends State<LocationModule> {
                                             }
                                           }
 
-                                          setState(() {
-                                            for (var u in currentUlds) {
-                                              if (u['id'] != null) {
-                                                _savedUldCheckboxState.remove(
-                                                  u['id'],
-                                                );
-                                              }
-                                            }
-                                          });
+                                          setState(() {});
                                           if (!context.mounted) return;
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                appLanguage.value == 'es'
-                                                    ? 'Vuelo procesado y ULDs actualizados a Received'
-                                                    : 'Flight processed. ULDs marked as Received',
-                                              ),
-                                              backgroundColor: const Color(
-                                                0xFF10b981,
+                                          showDialog(
+                                            context: context,
+                                            barrierColor: Colors.transparent,
+                                            builder: (ctx) => Center(
+                                              child: Material(
+                                                color: Colors.transparent,
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                  decoration: BoxDecoration(
+                                                    color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    boxShadow: const [
+                                                      BoxShadow(
+                                                        color: Colors.black26,
+                                                        blurRadius: 10,
+                                                        offset: Offset(0, 4),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 28),
+                                                      const SizedBox(width: 12),
+                                                      Text(
+                                                        appLanguage.value == 'es' ? 'Vuelo actualizado correctamente' : 'Flight checked successfully',
+                                                        style: TextStyle(
+                                                          color: dark ? Colors.white : const Color(0xFF111827),
+                                                          fontSize: 15,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           );
+                                          Future.delayed(const Duration(milliseconds: 1500), () {
+                                            if (!context.mounted) return;
+                                            if (Navigator.canPop(context)) {
+                                              Navigator.pop(context);
+                                            }
+                                          });
                                         } catch (e) {
                                           if (!context.mounted) return;
                                           ScaffoldMessenger.of(
@@ -1637,25 +2022,25 @@ class _LocationModuleState extends State<LocationModule> {
                                       }
                                     : null,
                                 icon: Icon(
-                                  isFlightReceived
+                                  isFlightChecked
                                       ? Icons.verified
                                       : Icons.check_circle_outline,
                                   size: 20,
                                 ),
                                 label: Text(
-                                  'Mark Flight as Checked',
+                                  isFlightChecked ? 'Checked' : 'Mark Flight as Checked',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF10b981),
-                                  disabledBackgroundColor: const Color(
-                                    0xFF10b981,
-                                  ).withAlpha(100),
-                                  disabledForegroundColor: dark
-                                      ? Colors.white.withAlpha(150)
-                                      : Colors.black38,
+                                  backgroundColor: isFlightChecked 
+                                    ? const Color(0xFF38bdf8) 
+                                    : (allUldsChecked && (totalFlightDiscrepancies == 0 || hasSentReport) 
+                                      ? const Color(0xFF10b981) 
+                                      : const Color(0xFF10b981).withAlpha(100)),
+                                  disabledBackgroundColor: isFlightChecked ? const Color(0xFF38bdf8) : const Color(0xFF10b981).withAlpha(100),
+                                  disabledForegroundColor: Colors.white,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -1666,8 +2051,7 @@ class _LocationModuleState extends State<LocationModule> {
                                   ),
                                 ),
                               );
-
-                              return actionButton;
+                              return baseActionButton;
                             },
                           ),
                         ],
@@ -1746,6 +2130,47 @@ class _LocationModuleState extends State<LocationModule> {
                                     Divider(color: borderC),
                                 itemBuilder: (c, i) {
                                   final awb = list[i];
+                                  bool isChecked = false;
+                                  bool hasDiscrepancy = false;
+                                  String discrepancyBadge = 'Discrepancy';
+                                  List<dynamic> dcList = [];
+                                  if (awb['data-coordinator'] is List) {
+                                    dcList = awb['data-coordinator'] as List;
+                                  } else if (awb['data-coordinator'] is Map) {
+                                    dcList = [awb['data-coordinator']];
+                                  }
+                                  
+                                  final uldNum = activeUld['ULD-number']?.toString().toUpperCase();
+                                  final uldCarrier = activeUld['refCarrier']?.toString();
+                                  final uldFlight = activeUld['refNumber']?.toString();
+                                  
+                                  for (var dc in dcList) {
+                                    if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                                        dc['refCarrier']?.toString() == uldCarrier &&
+                                        dc['refNumber']?.toString() == uldFlight) {
+                                      final bd = dc['breakdown'];
+                                      if (bd is Map && bd.isNotEmpty) {
+                                        bool hasInput = bd.values.any((val) {
+                                          if (val is List) {
+                                            return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                                          }
+                                          if (val is num) return val > 0;
+                                          if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                                          return false;
+                                        });
+                                        if (hasInput) isChecked = true;
+                                        if (dc['discrepancy'] != null && dc['discrepancy']['confirmed'] == true) {
+                                          hasDiscrepancy = true;
+                                          int exp = dc['discrepancy']['expected'] as int? ?? 0;
+                                          int rec = dc['discrepancy']['received'] as int? ?? 0;
+                                          int diff = (exp - rec).abs();
+                                          String term = exp > rec ? 'SHORT' : 'OVER';
+                                          discrepancyBadge = '$diff PCs $term';
+                                        }
+                                      }
+                                    }
+                                  }
+
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 4,
@@ -1786,6 +2211,44 @@ class _LocationModuleState extends State<LocationModule> {
                                             ),
                                             textAlign: TextAlign.right,
                                           ),
+                                        ),
+                                        if (hasDiscrepancy)
+                                          Container(
+                                            margin: const EdgeInsets.only(left: 12),
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFef4444).withAlpha(30),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: const Color(0xFFef4444).withAlpha(60)),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(Icons.warning_rounded, size: 10, color: Color(0xFFef4444)),
+                                                const SizedBox(width: 4),
+                                                Text(discrepancyBadge, style: const TextStyle(color: Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
+                                          ),
+                                        if (isChecked)
+                                          Container(
+                                            margin: const EdgeInsets.only(left: 8),
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF6366f1).withAlpha(30),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: const Color(0xFF6366f1).withAlpha(50),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: const [
+                                                Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
+                                                SizedBox(width: 4),
+                                                Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ],
+                                            ),
                                         ),
                                       ],
                                     ),
@@ -1828,8 +2291,9 @@ class _LocationModuleState extends State<LocationModule> {
     );
   }
 
-  Widget _buildTotalStat(String label, int rem, int total, Color color) {
-    return Column(
+  Widget _buildTotalStat(String label, int rem, int total, Color color, {VoidCallback? onTap}) {
+    Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         RichText(
           text: TextSpan(
@@ -1842,14 +2306,15 @@ class _LocationModuleState extends State<LocationModule> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              TextSpan(
-                text: ' / $total',
-                style: const TextStyle(
-                  color: Color(0xFF94a3b8),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+              if (total != -1)
+                TextSpan(
+                  text: ' / $total',
+                  style: const TextStyle(
+                    color: Color(0xFF94a3b8),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1864,28 +2329,209 @@ class _LocationModuleState extends State<LocationModule> {
         ),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: content,
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      child: content,
+    );
+  }
+
+  void _showAllLocationsModal(BuildContext context, List<Map<String, dynamic>> matchingAwbs) {
+    final dark = isDarkMode.value;
+    final bgC = dark ? const Color(0xFF1e293b) : Colors.white;
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b);
+    final borderC = dark ? Colors.white.withAlpha(20) : const Color(0xFFe2e8f0);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: bgC,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.location_on_rounded, color: Color(0xFF6366f1)),
+              const SizedBox(width: 8),
+              Text(
+                'Required Locations',
+                style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: matchingAwbs.isEmpty
+                ? Text('No AWBs found.', style: TextStyle(color: textS))
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: matchingAwbs.length,
+                    separatorBuilder: (_, _) => Divider(color: borderC),
+                    itemBuilder: (context, index) {
+                      final item = matchingAwbs[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('${item['awb']}', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 16)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366f1).withAlpha(20),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text('ULD: ${item['uld']}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 13, fontWeight: FontWeight.w600)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFf1f5f9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('PCs: ${item['pieces']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 12)),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFf1f5f9),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text('${item['weight']} kg', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 12)),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF8b5cf6)),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    (item['locations'] as List).join(', '),
+                                    style: const TextStyle(color: Color(0xFF8b5cf6), fontWeight: FontWeight.bold, fontSize: 13),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (item['remarks'] != null && item['remarks'].toString().trim().isNotEmpty && item['remarks'].toString().trim() != '-')
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text('Remarks: ${item['remarks']}', style: TextStyle(color: const Color(0xFFd97706), fontSize: 13, fontStyle: FontStyle.italic)),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _getAwbsWithLocations(List<Map<String, dynamic>> ulds) {
+    List<Map<String, dynamic>> matchingAwbs = [];
+    for (var u in ulds) {
+      if (u['inf-location-requerid'] != null && u['inf-location-requerid'] is List) {
+        for (var item in u['inf-location-requerid']) {
+          if (item is Map<String, dynamic>) {
+            matchingAwbs.add(item);
+          } else if (item is Map) {
+            matchingAwbs.add(Map<String, dynamic>.from(item));
+          }
+        }
+      } else if (u['awbList'] is List) {
+        for (var awbItem in u['awbList']) {
+          List<dynamic> dcList = [];
+          if (awbItem['data-coordinator'] is List) {
+            dcList = awbItem['data-coordinator'] as List;
+          } else if (awbItem['data-coordinator'] is Map) {
+            dcList = [awbItem['data-coordinator']];
+          }
+          final uldNum = u['ULD-number']?.toString().toUpperCase();
+          final uCarrier = u['refCarrier']?.toString();
+          final uFlight = u['refNumber']?.toString();
+          
+          List<String> assignedLocs = [];
+          for (var dc in dcList) {
+            if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
+                dc['refCarrier']?.toString() == uCarrier &&
+                dc['refNumber']?.toString() == uFlight) {
+              if (dc['selectedLocations'] is List) {
+                for (var loc in dc['selectedLocations']) {
+                  String locStr = loc.toString().trim().toUpperCase();
+                  if (locStr.isNotEmpty) {
+                    assignedLocs.add(locStr);
+                  }
+                }
+              }
+            }
+          }
+          if (assignedLocs.isNotEmpty) {
+            matchingAwbs.add({
+              'awb': awbItem['number']?.toString() ?? 'N/A',
+              'uld': uldNum ?? 'Unknown',
+              'pieces': awbItem['pieces']?.toString() ?? '-',
+              'weight': awbItem['weight']?.toString() ?? '-',
+              'remarks': awbItem['remarks']?.toString() ?? '-',
+              'locations': assignedLocs,
+            });
+          }
+        }
+      }
+    }
+    return matchingAwbs;
   }
 
   Future<dynamic> _showAwbDetailsOverlay(
     BuildContext context,
     Map<String, dynamic> awb,
     bool dark,
+    [Map<String, dynamic>? uldOverride]
   ) async {
     Map<String, List<int>> breakdown = {
       'AGI Skid': [],
       'Pre Skid': [],
-      'Crate(s)': [],
-      'Box(es)': [],
+      'Crate': [],
+      'Box': [],
       'Other': [],
     };
     List<String> selectedLocations = [];
+    final otherLocationCtrl = TextEditingController();
     bool isLoading = true;
+    bool isEditMode = true;
+    Map<dynamic, dynamic>? initialData;
+    bool isNotFound = false;
 
     final ctrls = {
       'AGI Skid': TextEditingController(),
       'Pre Skid': TextEditingController(),
-      'Crate(s)': TextEditingController(),
-      'Box(es)': TextEditingController(),
+      'Crate': TextEditingController(),
+      'Box': TextEditingController(),
       'Other': TextEditingController(),
     };
 
@@ -1900,20 +2546,62 @@ class _LocationModuleState extends State<LocationModule> {
               // Fetch from Supabase
               Supabase.instance.client
                   .from('AWB')
-                  .select('data-coordinator')
+                  .select('total, data-coordinator')
                   .eq('AWB-number', awb['number'])
                   .maybeSingle()
                   .then((res) {
-                    if (res != null && res['data-coordinator'] is Map) {
-                      final data = res['data-coordinator'];
+                    if (res != null) {
+                      if (res['total'] != null) awb['total'] = res['total'];
+                      Map<dynamic, dynamic>? data;
+                      if (res['data-coordinator'] is List) {
+                        final listDc = res['data-coordinator'] as List;
+                        final uldNum = uldOverride?['ULD-number']?.toString().toUpperCase();
+                        final match = listDc.where((d) => d is Map && d['refULD']?.toString().toUpperCase() == uldNum).toList();
+                        if (match.isNotEmpty) data = match.first as Map;
+                      } else if (res['data-coordinator'] is Map) {
+                        data = res['data-coordinator'];
+                      }
+                      
+                      if (data != null) {
+                        initialData = data;
+                        bool hasInput = false;
+                        if (data['breakdown'] is Map) {
+                          final bd = data['breakdown'] as Map;
+                          hasInput = bd.values.any((val) {
+                            if (val is List) return val.any((e) => (int.tryParse(e.toString()) ?? 0) > 0);
+                            if (val is num) return val > 0;
+                            if (val is String) return (int.tryParse(val) ?? 0) > 0;
+                            return false;
+                          });
+                        }
+                        if (hasInput) isEditMode = false;
 
-                      if (data['breakdown'] is Map) {
+                        if (data['discrepancy'] is Map && data['discrepancy']['notFound'] == true) {
+                          isNotFound = true;
+                          isEditMode = false;
+                        }
+
+                        if (data['breakdown'] is Map) {
                         final bd = data['breakdown'] as Map;
                         for (var k in breakdown.keys) {
+                          String legacyKey = k;
+                          if (k == 'Crate') legacyKey = 'Crate(s)';
+                          if (k == 'Box') legacyKey = 'Box(es)';
+
                           if (bd[k] is List) {
                             breakdown[k] = (bd[k] as List)
                                 .map((e) => int.tryParse(e.toString()) ?? 0)
                                 .toList();
+                          } else if (bd[legacyKey] is List) {
+                            breakdown[k] = (bd[legacyKey] as List)
+                                .map((e) => int.tryParse(e.toString()) ?? 0)
+                                .toList();
+                          } else if (bd[k] is num || bd[k] is String) {
+                            int val = int.tryParse(bd[k].toString()) ?? 0;
+                            breakdown[k] = val > 0 ? [val] : [];
+                          } else if (bd[legacyKey] is num || bd[legacyKey] is String) {
+                            int val = int.tryParse(bd[legacyKey].toString()) ?? 0;
+                            breakdown[k] = val > 0 ? [val] : [];
                           }
                         }
                       }
@@ -1921,6 +2609,14 @@ class _LocationModuleState extends State<LocationModule> {
                         selectedLocations = List<String>.from(
                           data['selectedLocations'],
                         );
+                        if (selectedLocations.isNotEmpty) {
+                          String loc = selectedLocations.first;
+                          if (!['15-25°C', '2-8°C', 'PSV', 'DG', 'Oversize', 'Small rack', 'Animal Live', 'Other'].contains(loc)) {
+                            selectedLocations = ['Other'];
+                            otherLocationCtrl.text = loc;
+                          }
+                        }
+                        }
                       }
                     }
                     if (dialogCtx.mounted) setDialogState(() {});
@@ -1948,38 +2644,42 @@ class _LocationModuleState extends State<LocationModule> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: SizedBox(
-                        height: 38,
-                        child: TextField(
-                          controller: ctrls[label],
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                    SizedBox(
+                      width: 80,
+                      height: 38,
+                      child: TextField(
+                        enabled: isEditMode && !isNotFound,
+                        controller: ctrls[label],
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(5),
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withAlpha(50),
                           ),
-                          decoration: InputDecoration(
-                            hintText: '0',
-                            hintStyle: TextStyle(
-                              color: Colors.white.withAlpha(50),
+                          filled: true,
+                          fillColor: Colors.white.withAlpha(10),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(
+                              color: Colors.white.withAlpha(20),
                             ),
-                            filled: true,
-                            fillColor: Colors.white.withAlpha(10),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide(
-                                color: Colors.white.withAlpha(20),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF8b5cf6),
-                              ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF8b5cf6),
                             ),
                           ),
                         ),
@@ -1987,27 +2687,31 @@ class _LocationModuleState extends State<LocationModule> {
                     ),
                     const SizedBox(width: 8),
                     InkWell(
-                      onTap: () {
+                      onTap: (isEditMode && !isNotFound) ? () {
                         final val = int.tryParse(ctrls[label]!.text);
                         if (val != null && val > 0) {
                           setDialogState(() {
-                            breakdown[label]!.add(val);
+                            if (label == 'AGI Skid') {
+                              breakdown[label]!.add(val);
+                            } else {
+                              breakdown[label] = [val];
+                            }
                             ctrls[label]!.clear();
                           });
                         }
-                      },
+                      } : null,
                       child: Container(
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6366f1),
+                          color: (isEditMode && !isNotFound) ? const Color(0xFF6366f1) : const Color(0xFF6366f1).withAlpha(100),
                           borderRadius: BorderRadius.circular(
                             20,
                           ), // fully rounded circle like image
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.add,
-                          color: Colors.white,
+                          color: (isEditMode && !isNotFound) ? Colors.white : Colors.white.withAlpha(150),
                           size: 20,
                         ),
                       ),
@@ -2020,15 +2724,17 @@ class _LocationModuleState extends State<LocationModule> {
             Widget buildLocationChip(String label) {
               final isSel = selectedLocations.contains(label);
               return InkWell(
-                onTap: () {
+                onTap: (isEditMode && !isNotFound) ? () {
                   setDialogState(() {
                     if (isSel) {
-                      selectedLocations.remove(label);
+                      selectedLocations.clear();
+                      if (label == 'Other') otherLocationCtrl.clear();
                     } else {
-                      selectedLocations.add(label);
+                      selectedLocations = [label];
+                      if (label != 'Other') otherLocationCtrl.clear();
                     }
                   });
-                },
+                } : null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -2064,7 +2770,7 @@ class _LocationModuleState extends State<LocationModule> {
               title: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left, color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.pop(dialogCtx),
                   ),
                   Expanded(
@@ -2079,7 +2785,41 @@ class _LocationModuleState extends State<LocationModule> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 40),
+                  FilterChip(
+                    label: const Text('Not Found', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    selected: isNotFound,
+                    onSelected: isEditMode
+                        ? (val) {
+                            setDialogState(() {
+                              isNotFound = val;
+                              if (val) {
+                                selectedLocations.clear();
+                                otherLocationCtrl.clear();
+                                for (var k in breakdown.keys) {
+                                  breakdown[k]!.clear();
+                                }
+                                for (var k in ctrls.keys) {
+                                  ctrls[k]!.clear();
+                                }
+                              }
+                            });
+                          }
+                        : null,
+                    selectedColor: const Color(0xFFef4444).withAlpha(50),
+                    checkmarkColor: const Color(0xFFef4444),
+                    labelStyle: TextStyle(
+                      color: isNotFound ? const Color(0xFFef4444) : Colors.white,
+                    ),
+                    backgroundColor: Colors.white.withAlpha(5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: isNotFound
+                            ? const Color(0xFFef4444).withAlpha(100)
+                            : Colors.white.withAlpha(20),
+                      ),
+                    ),
+                  ),
                 ],
               ),
               content: SizedBox(
@@ -2100,6 +2840,7 @@ class _LocationModuleState extends State<LocationModule> {
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             _buildStatMini('PIECES', '${awb['pieces'] ?? '-'}'),
+                            _buildStatMini('TOTAL', '${awb['total'] ?? '-'}'),
                             _buildStatMini(
                               'WEIGHT',
                               '${awb['weight'] ?? '-'} kg',
@@ -2107,16 +2848,136 @@ class _LocationModuleState extends State<LocationModule> {
                             _buildStatMini(
                               'HOUSES',
                               '${(awb['hawbs'] as List?)?.length ?? '0'}',
+                              onTap: () {
+                                final hList = (awb['hawbs'] as List?) ?? [];
+                                if (hList.isEmpty) return;
+                                showDialog(
+                                  context: dialogCtx,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: const Color(0xFF1e293b),
+                                    elevation: 8,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    titlePadding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      16,
+                                      16,
+                                      8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    title: Row(
+                                      children: const [
+                                        Icon(
+                                          Icons.inventory_2_outlined,
+                                          color: Color(0xFF6366f1),
+                                          size: 18,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'House Numbers',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    content: Container(
+                                      width: 250,
+                                      constraints: const BoxConstraints(
+                                        maxHeight: 250,
+                                      ),
+                                      child: ListView.separated(
+                                        shrinkWrap: true,
+                                        itemCount: hList.length,
+                                        separatorBuilder:
+                                            (_, _) => const Divider(
+                                              color: Color(0xFF334155),
+                                            ),
+                                        itemBuilder: (c, i) {
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                            child: Text(
+                                              hList[i].toString(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
                             ),
                             _buildStatMini(
                               'REMARKS',
-                              (awb['remarks']?.toString().isEmpty ?? true)
+                              (awb['remarks']?.toString().trim().isEmpty ?? true)
                                   ? '-'
-                                  : 'Yes',
+                                  : awb['remarks'].toString().trim(),
                             ),
                           ],
                         ),
                       ),
+                      if (initialData != null && initialData!['discrepancy'] != null && initialData!['discrepancy']['confirmed'] == true)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16.0),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withAlpha(20),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.withAlpha(50)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber_rounded, size: 18, color: Colors.orange),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Builder(
+                                    builder: (ctx) {
+                                      int exp = initialData!['discrepancy']['expected'] as int? ?? 0;
+                                      int rec = initialData!['discrepancy']['received'] as int? ?? 0;
+                                      int diff = (exp - rec).abs();
+                                      String term = exp > rec ? 'SHORT' : 'OVER';
+                                      
+                                      return RichText(
+                                        text: TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: 'Discrepancy Confirmed: Expected $exp PCs, Received $rec PCs.  ',
+                                              style: const TextStyle(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.w600),
+                                            ),
+                                            TextSpan(
+                                              text: '$diff PCs $term',
+                                              style: const TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.w800),
+                                            ),
+                                          ]
+                                        ),
+                                      );
+                                    }
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 20),
 
                       Row(
@@ -2175,8 +3036,8 @@ class _LocationModuleState extends State<LocationModule> {
                               children: [
                                 buildControlRow('AGI Skid'),
                                 buildControlRow('Pre Skid'),
-                                buildControlRow('Crate(s)'),
-                                buildControlRow('Box(es)'),
+                                buildControlRow('Crate'),
+                                buildControlRow('Box'),
                                 buildControlRow('Other'),
                               ],
                             ),
@@ -2198,121 +3059,206 @@ class _LocationModuleState extends State<LocationModule> {
                                 children: breakdown.entries.where((e) => e.value.isNotEmpty).map((
                                   entry,
                                 ) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(5),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Colors.white.withAlpha(10),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              entry.key.toUpperCase(),
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                            Text(
-                                              '${entry.value.fold<int>(0, (a, b) => a + b)} pcs',
-                                              style: const TextStyle(
-                                                color: Color(0xFF94a3b8),
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
+                                  int itemCount = entry.value.length;
+                                  int totalPcs = entry.value.fold<int>(0, (a, b) => a + b);
+
+                                  String getDisplayName(String key, int count) {
+                                    if (count <= 1) return key.toUpperCase();
+                                    if (key == 'Box') return 'BOXES';
+                                    return '${key.toUpperCase()}S';
+                                  }
+
+                                  if (entry.key == 'AGI Skid') {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withAlpha(5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white.withAlpha(10),
                                         ),
-                                        const SizedBox(height: 8),
-                                        ...entry.value.asMap().entries.map((
-                                          item,
-                                        ) {
-                                          return Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 6,
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Text(
-                                                  '#${item.key + 1}',
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 24,
+                                                height: 24,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white.withAlpha(25),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Text(
+                                                  '$itemCount',
                                                   style: const TextStyle(
-                                                    color: Color(0xFF64748b),
+                                                    color: Color(0xFFcbd5e1),
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 8,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                getDisplayName(entry.key, itemCount),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              Text(
+                                                '$totalPcs pcs',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF94a3b8),
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          ...entry.value.asMap().entries.map((
+                                            item,
+                                          ) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 6,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Text(
+                                                    '#${item.key + 1}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF64748b),
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 8,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white
+                                                            .withAlpha(5),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              4,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        '${item.value}',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 13,
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                         ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white
-                                                          .withAlpha(5),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
-                                                          ),
-                                                    ),
-                                                    child: Text(
-                                                      '${item.value}',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.bold,
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                InkWell(
-                                                  onTap: () {
-                                                    setDialogState(() {
-                                                      breakdown[entry.key]!
-                                                          .removeAt(item.key);
-                                                    });
-                                                  },
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.all(4),
-                                                    decoration: BoxDecoration(
-                                                      border: Border.all(
-                                                        color: Colors.red
-                                                            .withAlpha(50),
-                                                      ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
+                                                  if (isEditMode && !isNotFound) ...[
+                                                    const SizedBox(width: 8),
+                                                    InkWell(
+                                                      onTap: () {
+                                                        setDialogState(() {
+                                                          breakdown[entry.key]!
+                                                              .removeAt(item.key);
+                                                        });
+                                                      },
+                                                      child: Container(
+                                                        padding:
+                                                            const EdgeInsets.all(4),
+                                                        decoration: BoxDecoration(
+                                                          border: Border.all(
+                                                            color: Colors.red
+                                                                .withAlpha(50),
                                                           ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
+                                                        ),
+                                                        child: const Icon(
+                                                          Icons.close,
+                                                          color: Color(0xFFef4444),
+                                                          size: 14,
+                                                        ),
+                                                      ),
                                                     ),
-                                                    child: const Icon(
-                                                      Icons.close,
-                                                      color: Color(0xFFef4444),
-                                                      size: 14,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
+                                                  ],
+                                                ],
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                      ),
+                                    );
+                                  } else {
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withAlpha(5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.white.withAlpha(10),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            '$totalPcs',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                          );
-                                        }),
-                                      ],
-                                    ),
-                                  );
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            getDisplayName(entry.key, totalPcs),
+                                            style: const TextStyle(
+                                              color: Color(0xFF94a3b8),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          if (isEditMode && !isNotFound)
+                                            InkWell(
+                                              onTap: () {
+                                                setDialogState(() {
+                                                  breakdown[entry.key]!.clear();
+                                                });
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4),
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(
+                                                    color: Colors.red.withAlpha(50),
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.close,
+                                                  color: Color(0xFFef4444),
+                                                  size: 14,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }
                                 }).toList(),
                               ),
                             ),
@@ -2332,6 +3278,7 @@ class _LocationModuleState extends State<LocationModule> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           buildLocationChip('15-25°C'),
                           buildLocationChip('2-8°C'),
@@ -2341,6 +3288,41 @@ class _LocationModuleState extends State<LocationModule> {
                           buildLocationChip('Small rack'),
                           buildLocationChip('Animal Live'),
                           buildLocationChip('Other'),
+                          if (selectedLocations.contains('Other'))
+                            SizedBox(
+                              width: 200,
+                              height: 38,
+                              child: TextField(
+                                enabled: isEditMode && !isNotFound,
+                                controller: otherLocationCtrl,
+                                style: TextStyle(color: (isEditMode && !isNotFound) ? Colors.white : Colors.white.withAlpha(150), fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Enter custom location...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withAlpha(50),
+                                    fontSize: 13,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white.withAlpha(5),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 0,
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: BorderSide(
+                                      color: Colors.white.withAlpha(20),
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                    borderSide: const BorderSide(
+                                      color: Color(0xFF8b5cf6),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],
@@ -2349,12 +3331,14 @@ class _LocationModuleState extends State<LocationModule> {
               ),
               actionsPadding: const EdgeInsets.all(24),
               actions: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
+                if (uldOverride?['status'] != 'Checked')
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366f1),
+                      backgroundColor: isEditMode ? const Color(0xFF6366f1) : Colors.white.withAlpha(10),
+                      foregroundColor: isEditMode ? Colors.white : Colors.white.withAlpha(100),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -2362,6 +3346,88 @@ class _LocationModuleState extends State<LocationModule> {
                     onPressed: isSaving
                         ? null
                         : () async {
+                            if (!isEditMode) {
+                              setDialogState(() => isEditMode = true);
+                              return;
+                            }
+                            int expectedPieces = int.tryParse(awb['pieces']?.toString() ?? '0') ?? 0;
+                            if (isNotFound) {
+                              // By-pass the discrepancy dialog because 'Not Found' is explicitly a discrepancy
+                            } else if (totalChecked != expectedPieces &&
+                                breakdown.values.any((list) => list.isNotEmpty)) {
+                              bool? confirmed = await showDialog<bool>(
+                                context: dialogCtx,
+                                builder: (ctx) {
+                                  int diff = (expectedPieces - totalChecked).abs();
+                                  String term = expectedPieces > totalChecked ? 'missing' : 'extra';
+                                  return AlertDialog(
+                                    backgroundColor: const Color(0xFF1e293b),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    title: const Row(
+                                      children: [
+                                        Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                                        SizedBox(width: 8),
+                                        Text('Discrepancy Detected', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('You should have received $expectedPieces pieces but you only received $totalChecked.', style: const TextStyle(color: Colors.white70)),
+                                        const SizedBox(height: 16),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFef4444).withAlpha(40),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: const Color(0xFFef4444).withAlpha(100), width: 2),
+                                          ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.error_outline_rounded, color: Color(0xFFef4444), size: 36),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                '${diff.toString().toUpperCase()} ${term.toUpperCase()}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFFef4444),
+                                                  fontSize: 28,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: 1.5,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              const Text('PIECES', style: TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text('Do you want to confirm this discrepancy?', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF6366f1),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                                        ),
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Confirm', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  );
+                                }
+                              );
+                              if (confirmed != true) return;
+                            }
+
                             setDialogState(() => isSaving = true);
                             try {
                               final existing = await Supabase.instance.client
@@ -2369,22 +3435,79 @@ class _LocationModuleState extends State<LocationModule> {
                                   .select('data-coordinator')
                                   .eq('AWB-number', awb['number'])
                                   .maybeSingle();
-                              Map<String, dynamic> coordData = {};
-                              if (existing != null &&
-                                  existing['data-coordinator'] is Map) {
-                                coordData = Map<String, dynamic>.from(
-                                  existing['data-coordinator'],
-                                );
+                              List<dynamic> existingDcList = [];
+                              if (existing != null) {
+                                if (existing['data-coordinator'] is List) {
+                                  existingDcList = List.from(existing['data-coordinator']);
+                                } else if (existing['data-coordinator'] is Map) {
+                                  existingDcList = [existing['data-coordinator']];
+                                }
                               }
-                              coordData['breakdown'] = breakdown;
-                              coordData['selectedLocations'] =
-                                  selectedLocations;
+
+                              Map<String, dynamic> coordData = {};
+                              
+                              final uldNum = uldOverride?['ULD-number']?.toString().toUpperCase() ?? '';
+                              final uldCar = uldOverride?['refCarrier']?.toString() ?? '';
+                              final uldFlt = uldOverride?['refNumber']?.toString() ?? '';
+                              final uldDate = uldOverride?['refDate']?.toString() ?? '';
+
+                              // Find existing map for this ULD if any
+                              int matchIndex = existingDcList.indexWhere((d) => d is Map && d['refULD']?.toString().toUpperCase() == uldNum && d['refNumber']?.toString() == uldFlt);
+                              if (matchIndex != -1) {
+                                coordData = Map<String, dynamic>.from(existingDcList[matchIndex]);
+                              }
+                              
+                              Map<String, dynamic> breakdownToSave = {};
+                              breakdown.forEach((key, list) {
+                                if (key == 'AGI Skid') {
+                                  breakdownToSave[key] = list;
+                                } else {
+                                  breakdownToSave[key] = list.isNotEmpty ? list.first : 0;
+                                }
+                              });
+                              coordData['breakdown'] = breakdownToSave;
+                              
+                              if (isNotFound) {
+                                coordData['discrepancy'] = {
+                                  'confirmed': true,
+                                  'expected': expectedPieces,
+                                  'received': 0,
+                                  'notFound': true,
+                                };
+                              } else if (totalChecked != expectedPieces && breakdown.values.any((list) => list.isNotEmpty)) {
+                                coordData['discrepancy'] = {
+                                  'confirmed': true,
+                                  'expected': expectedPieces,
+                                  'received': totalChecked
+                                };
+                              } else {
+                                coordData.remove('discrepancy');
+                              }
+                              
+                              coordData['selectedLocations'] = selectedLocations.map((loc) {
+                                if (loc == 'Other' && otherLocationCtrl.text.trim().isNotEmpty) {
+                                  return otherLocationCtrl.text.trim();
+                                }
+                                return loc;
+                              }).toList();
+                              
+                              coordData['refULD'] = uldNum;
+                              coordData['refCarrier'] = uldCar;
+                              coordData['refNumber'] = uldFlt;
+                              coordData['refDate'] = uldDate;
+
+                              if (matchIndex != -1) {
+                                existingDcList[matchIndex] = coordData;
+                              } else {
+                                existingDcList.add(coordData);
+                              }
 
                               await Supabase.instance.client
                                   .from('AWB')
-                                  .update({'data-coordinator': coordData})
+                                  .update({'data-coordinator': existingDcList})
                                   .eq('AWB-number', awb['number']);
 
+                              awb['data-coordinator'] = existingDcList;
                               if (mounted) setState(() {});
                               if (dialogCtx.mounted) {
                                 Navigator.pop(dialogCtx, awb);
@@ -2407,10 +3530,10 @@ class _LocationModuleState extends State<LocationModule> {
                               strokeWidth: 2,
                             ),
                           )
-                        : const Text(
-                            'Save',
+                        : Text(
+                            isEditMode ? 'Save' : 'Edit',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: isEditMode ? Colors.white : Colors.white.withAlpha(100),
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
@@ -2425,8 +3548,8 @@ class _LocationModuleState extends State<LocationModule> {
     );
   }
 
-  Widget _buildStatMini(String label, String value) {
-    return Column(
+  Widget _buildStatMini(String label, String value, {VoidCallback? onTap}) {
+    Widget content = Column(
       children: [
         Text(
           label,
@@ -2447,6 +3570,18 @@ class _LocationModuleState extends State<LocationModule> {
         ),
       ],
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: content,
+        ),
+      );
+    }
+    return content;
   }
 
   Future<dynamic> _showAddAwbOverlay(
@@ -2961,6 +4096,7 @@ class _LocationModuleState extends State<LocationModule> {
                               'refCarrier':
                                   currentFlight['carrier']?.toString() ?? '',
                               'house_number': houseArr,
+                              'isNew': true,
                             };
 
                             final existingAwb = await Supabase.instance.client
@@ -3010,7 +4146,7 @@ class _LocationModuleState extends State<LocationModule> {
                                   .from('AWB')
                                   .insert(payload);
                             }
-                            if (!ctx.mounted) return;
+                            if (!dialogCtx.mounted) return;
 
                             final fullCreatedAwbObject = {
                               'number': newAwb,
@@ -3021,10 +4157,10 @@ class _LocationModuleState extends State<LocationModule> {
                               'data-AWB': [dataAwb],
                               'isNew': true,
                             };
-                            Navigator.pop(ctx, fullCreatedAwbObject);
+                            Navigator.of(dialogCtx).pop(fullCreatedAwbObject);
                           } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            if (!dialogCtx.mounted) return;
+                            ScaffoldMessenger.of(dialogCtx).showSnackBar(
                               SnackBar(content: Text('Error: $e')),
                             );
                             setDialogState(() => isSaving = false);
