@@ -418,6 +418,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
         'cant-noBreak': _isNoBreakAuto ? _cNoBreak : (int.tryParse(_noBreakCtrl.text) ?? 0),
         'date-arrived': fDate,
         'time-arrived': fTime.isEmpty ? null : fTime,
+        'time-truck-arrived': {},
         'remarks': _remarksCtrl.text,
         'status': _status,
         'created_at': DateTime.now().toIso8601String(),
@@ -502,11 +503,51 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
       }
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Toda la estructura guardada con éxito', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
-        if (widget.onPop != null) {
-          widget.onPop!(true);
-        } else {
-          Navigator.pop(context, true);
+        await showDialog(
+          context: context,
+          barrierColor: Colors.black45,
+          barrierDismissible: false,
+          builder: (ctx) {
+            Future.delayed(const Duration(seconds: 2), () {
+              if (ctx.mounted) Navigator.pop(ctx);
+            });
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              backgroundColor: const Color(0xFF1e293b),
+              child: const Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF10b981),
+                      size: 64,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Flight structure created successfully',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+
+        if (mounted) {
+          if (widget.onPop != null) {
+            widget.onPop!(true);
+          } else {
+            Navigator.pop(context, true);
+          }
         }
       }
     } catch (e) {

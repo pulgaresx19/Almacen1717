@@ -38,6 +38,9 @@ class _SystemModuleState extends State<SystemModule> {
   bool _isLoadingUldsLeft = false;
   bool _isLoadingUldsRight = false;
 
+  bool _showReceivedOverlayLeft = false;
+  bool _showReceivedOverlayRight = false;
+
   final Map<dynamic, bool> _savedUldCheckboxState = {};
 
   Future<void> _fetchUldsForFlight(
@@ -211,7 +214,7 @@ class _SystemModuleState extends State<SystemModule> {
               .toList()
         : [];
     if (match.isNotEmpty) {
-      isFlightReceived = match.first['status']?.toString() == 'Received';
+      isFlightReceived = match.first['isReceived'] == true;
     }
 
     return Stack(
@@ -339,7 +342,7 @@ class _SystemModuleState extends State<SystemModule> {
                         : (isLeft
                               ? (_selectedFlightIdRight == chipId)
                               : (_selectedFlightIdLeft == chipId));
-                    final isReceived = f['status']?.toString() == 'Received';
+                    final isReceived = f['isReceived'] == true;
 
                     Color textColor = isOppositeSel
                         ? (dark ? Colors.white30 : Colors.black26)
@@ -1040,15 +1043,15 @@ class _SystemModuleState extends State<SystemModule> {
                                                 'yyyy-MM-dd',
                                               ).format(dt);
                                               try {
-                                                final Map<String, dynamic>
-                                                truckArrivedJson =
-                                                    (currentFlightIdx != -1 &&
-                                                        flightList[currentFlightIdx]['local-truck-arrived'] !=
-                                                            null)
-                                                    ? Map<String, dynamic>.from(
-                                                        flightList[currentFlightIdx]['local-truck-arrived'],
-                                                      )
-                                                    : <String, dynamic>{};
+                                                final Map<String, dynamic> truckArrivedJson = <String, dynamic>{};
+                                                if (currentFlightIdx != -1) {
+                                                  if (flightList[currentFlightIdx]['time-truck-arrived'] is Map) {
+                                                    truckArrivedJson.addAll(Map<String, dynamic>.from(flightList[currentFlightIdx]['time-truck-arrived']));
+                                                  }
+                                                  if (flightList[currentFlightIdx]['local-truck-arrived'] is Map) {
+                                                    truckArrivedJson.addAll(Map<String, dynamic>.from(flightList[currentFlightIdx]['local-truck-arrived']));
+                                                  }
+                                                }
 
                                                 String firstTruckTime =
                                                     DateTime.now()
@@ -1082,7 +1085,7 @@ class _SystemModuleState extends State<SystemModule> {
                                                 await Supabase.instance.client
                                                     .from('Flight')
                                                     .update({
-                                                      'status': 'Received',
+                                                      'isReceived': true,
                                                       'first-truck':
                                                           firstTruckTime,
                                                       'last-truck':
@@ -1098,8 +1101,7 @@ class _SystemModuleState extends State<SystemModule> {
                                                     );
 
                                                 if (currentFlightIdx != -1) {
-                                                  flightList[currentFlightIdx]['status'] =
-                                                      'Received';
+                                                  flightList[currentFlightIdx]['isReceived'] = true;
                                                   flightList[currentFlightIdx]['first-truck'] =
                                                       firstTruckTime;
                                                   flightList[currentFlightIdx]['last-truck'] =
@@ -1124,20 +1126,28 @@ class _SystemModuleState extends State<SystemModule> {
                                               }
                                             }
                                           });
-                                          if (!context.mounted) return;
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                appLanguage.value == 'es'
-                                                    ? 'Vuelo procesado y ULDs actualizados a Received'
-                                                    : 'Flight processed. ULDs marked as Received',
-                                              ),
-                                              backgroundColor: const Color(
-                                                0xFF10b981,
-                                              ),
-                                            ),
+                                          setState(() {
+                                            if (isLeft) {
+                                              _showReceivedOverlayLeft = true;
+                                            } else {
+                                              _showReceivedOverlayRight = true;
+                                            }
+                                          });
+                                          Future.delayed(
+                                            const Duration(seconds: 2),
+                                            () {
+                                              if (mounted) {
+                                                setState(() {
+                                                  if (isLeft) {
+                                                    _showReceivedOverlayLeft =
+                                                        false;
+                                                  } else {
+                                                    _showReceivedOverlayRight =
+                                                        false;
+                                                  }
+                                                });
+                                              }
+                                            },
                                           );
                                         } catch (e) {
                                           if (!context.mounted) return;
@@ -1220,45 +1230,56 @@ class _SystemModuleState extends State<SystemModule> {
                                   return t;
                                 }
 
-                                return Column(
+                                return Row(
                                   mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Row(
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(
-                                          Icons.access_time,
-                                          size: 13,
-                                          color: Color(0xFF94a3b8),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.access_time,
+                                              size: 13,
+                                              color: Color(0xFF94a3b8),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'First Truck: ${toAmPm(currentFlight['first-truck']?.toString())}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF94a3b8),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'First: ${toAmPm(currentFlight['first-truck']?.toString())}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF94a3b8),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        const Icon(
-                                          Icons.done_all,
-                                          size: 13,
-                                          color: Color(0xFF10b981),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Last: ${toAmPm(currentFlight['last-truck']?.toString())}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF10b981),
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.done_all,
+                                              size: 13,
+                                              color: Color(0xFF10b981),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Last Truck: ${toAmPm(currentFlight['last-truck']?.toString())}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF10b981),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(width: 12),
                                     actionButton,
                                   ],
                                 );
@@ -1421,6 +1442,51 @@ class _SystemModuleState extends State<SystemModule> {
             ),
           ),
         ],
+        if (isLeft ? _showReceivedOverlayLeft : _showReceivedOverlayRight)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black45,
+              padding: const EdgeInsets.all(32),
+              alignment: Alignment.center,
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 400),
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF1e293b) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF10b981),
+                      size: 64,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      appLanguage.value == 'es'
+                          ? 'Vuelo ${selectedId?.replaceAll('-', ' ') ?? ''} recibido exitosamente'
+                          : 'Flight ${selectedId?.replaceAll('-', ' ') ?? ''} received successfully',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textP,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
