@@ -706,31 +706,65 @@ class _LocationModuleState extends State<LocationModule> {
                                                     builder: (context) {
                                                       final bool isSaved = _isUldSaved(uld);
                                                       final bool isChecked = uld['status'] == 'Checked';
-                                                      
-                                                      String badgeText;
-                                                      Color badgeColor;
-                                                      
+
+                                                      if (!isChecked && !isSaved) return const SizedBox.shrink();
+
                                                       if (isSaved) {
-                                                        badgeText = 'Saved';
-                                                        badgeColor = const Color(0xFF10b981);
-                                                      } else if (isChecked) {
-                                                        badgeText = 'ULD ready to save';
-                                                        badgeColor = const Color(0xFF3b82f6);
-                                                      } else {
-                                                        badgeText = 'Pending';
-                                                        badgeColor = const Color(0xFFd97706);
+                                                        return Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF10b981).withAlpha(15),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Text('Saved', style: TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                        );
+                                                      }
+
+                                                      final bool allAwbsLocated = _areAllAwbsLocated(uld);
+
+                                                      if (allAwbsLocated) {
+                                                        return TextButton(
+                                                          style: TextButton.styleFrom(
+                                                            backgroundColor: const Color(0xFF6366f1),
+                                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          ),
+                                                          onPressed: () async {
+                                                            setState(() => uld['isSaving'] = true);
+                                                            try {
+                                                              await Supabase.instance.client.from('ULD').update({
+                                                                'isSaved': true
+                                                              }).eq('id', uld['id']);
+
+                                                              if (mounted) {
+                                                                setState(() {
+                                                                  uld['isSaved'] = true;
+                                                                  uld['isSaving'] = false;
+                                                                  uld['isExpanded'] = false;
+                                                                });
+                                                              }
+                                                            } catch(e) {
+                                                              debugPrint('Error saving ULD: $e');
+                                                              if (mounted) {
+                                                                setState(() => uld['isSaving'] = false);
+                                                              }
+                                                            }
+                                                          },
+                                                          child: uld['isSaving'] == true
+                                                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                                              : const Text('Mark ULD as Ready', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+                                                        );
                                                       }
 
                                                       return Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                         decoration: BoxDecoration(
-                                                          color: badgeColor.withAlpha(15),
+                                                          color: const Color(0xFF3b82f6).withAlpha(15),
                                                           borderRadius: BorderRadius.circular(6),
                                                         ),
-                                                        child: Text(
-                                                          badgeText,
+                                                        child: const Text(
+                                                          'ULD ready to save',
                                                           style: TextStyle(
-                                                            color: badgeColor,
+                                                            color: Color(0xFF3b82f6),
                                                             fontSize: 12,
                                                             fontWeight: FontWeight.bold,
                                                           ),
@@ -2287,13 +2321,21 @@ class _LocationModuleState extends State<LocationModule> {
   }
 
   bool _isUldSaved(Map<String, dynamic> uld) {
+    return uld['isSaved'] == true;
+  }
+
+  bool _areAllAwbsLocated(Map<String, dynamic> uld) {
     if (uld['awbList'] is! List) return false;
+    final awbList = uld['awbList'] as List;
+    if (awbList.isEmpty) return false;
+    
     int bCount = 0;
     int sCount = 0;
     final uldNum = uld['ULD-number']?.toString().toUpperCase();
     final uCarrier = uld['refCarrier']?.toString();
     final uFlight = uld['refNumber']?.toString();
-    for (var awb in (uld['awbList'] as List)) {
+    
+    for (var awb in awbList) {
       bool isBreak = false;
       bool isSaved = false;
       List<dynamic> dcList = [];
@@ -2318,11 +2360,23 @@ class _LocationModuleState extends State<LocationModule> {
           if (dc['discrepancy'] != null && dc['discrepancy']['notFound'] == true) {
             isBreak = true;
           }
-          if (dc['selectedLocations'] != null && dc['selectedLocations'] is List && (dc['selectedLocations'] as List).isNotEmpty) {
-            isSaved = true;
-          }
         }
       }
+      
+      List<dynamic> locList = [];
+      if (awb['data-location'] is List) {
+        locList = awb['data-location'] as List;
+      } else if (awb['data-location'] is Map) {
+        locList = [awb['data-location']];
+      }
+      for (var loc in locList) {
+        if (loc is Map && loc['refULD']?.toString().toUpperCase() == uldNum &&
+            loc['refCarrier']?.toString() == uCarrier &&
+            loc['refNumber']?.toString() == uFlight) {
+          isSaved = true;
+        }
+      }
+
       if (isBreak) bCount++;
       if (isSaved) sCount++;
     }
@@ -3034,10 +3088,11 @@ class _LocationModuleState extends State<LocationModule> {
               ),
               actionsPadding: const EdgeInsets.all(24),
               actions: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
+                if (uldOverride?['isSaved'] != true)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isViewMode ? const Color(0xFF3b82f6) : (allSet ? const Color(0xFF6366f1) : Colors.white.withAlpha(10)),
                       foregroundColor: (allSet || isViewMode) ? Colors.white : Colors.white.withAlpha(100),
