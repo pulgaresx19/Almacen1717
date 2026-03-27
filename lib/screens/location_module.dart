@@ -707,7 +707,16 @@ class _LocationModuleState extends State<LocationModule> {
                                                       final bool isSaved = _isUldSaved(uld);
                                                       final bool isChecked = uld['status'] == 'Checked';
 
-                                                      if (!isChecked && !isSaved) return const SizedBox.shrink();
+                                                      if (!isChecked && !isSaved) {
+                                                        return Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFd97706).withAlpha(15),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Text('Pending', style: TextStyle(color: Color(0xFFd97706), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                        );
+                                                      }
 
                                                       if (isSaved) {
                                                         return Container(
@@ -1038,6 +1047,15 @@ class _LocationModuleState extends State<LocationModule> {
                                                           children: [
                                                             InkWell(
                                                               onTap: () async {
+                                                                if (uld['status'] != 'Checked' && uld['isSaved'] != true) {
+                                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                                    SnackBar(
+                                                                      content: Text(appLanguage.value == 'es' ? 'El ULD debe estar en Checked para asignar locaciones' : 'ULD must be Checked to assign locations'),
+                                                                      backgroundColor: const Color(0xFFd97706),
+                                                                    ),
+                                                                  );
+                                                                  return;
+                                                                }
                                                                 final res = await _showAwbDetailsOverlay(
                                                                   context,
                                                                   awb,
@@ -1578,10 +1596,10 @@ class _LocationModuleState extends State<LocationModule> {
                               final currentUlds = isLeft
                                   ? _uldsLeft
                                   : _uldsRight;
-                              bool allUldsChecked =
+                              bool allUldsSaved =
                                   currentUlds.isNotEmpty &&
                                   currentUlds.every(
-                                    (u) => u['status'] == 'Checked',
+                                    (u) => u['isSaved'] == true,
                                   );
 
                               final flightList = isLeft
@@ -1592,205 +1610,35 @@ class _LocationModuleState extends State<LocationModule> {
                                     '${f['carrier']}-${f['number']}' ==
                                     selectedId,
                               );
-                              final bool isFlightChecked = currentFlightIdx != -1 && flightList[currentFlightIdx]['status'] == 'Checked';
-
-                              int totalFlightDiscrepancies = 0;
-                              List<Map<String, dynamic>> allFlightDiscrepancies = [];
-
-                              for (var u in currentUlds) {
-                                if (u['data-checked'] != null && u['data-checked']['discrepancies'] != null) {
-                                  final discs = u['data-checked']['discrepancies'] as List;
-                                  for (var d in discs) {
-                                    if (d is Map) {
-                                      allFlightDiscrepancies.add({
-                                        'uld': d['uld']?.toString() ?? 'N/A',
-                                        'awb': d['awb']?.toString() ?? 'N/A',
-                                        'label': d['label']?.toString() ?? ''
-                                      });
-                                    }
-                                  }
-                                  totalFlightDiscrepancies += discs.length;
-                                } else if (u['awbList'] is List) {
-                                  for (var awbItem in u['awbList']) {
-                                    bool hasDisc = false;
-                                    List<dynamic> dcList = [];
-                                    if (awbItem['data-coordinator'] is List) {
-                                      dcList = awbItem['data-coordinator'] as List;
-                                    } else if (awbItem['data-coordinator'] is Map) {
-                                      dcList = [awbItem['data-coordinator']];
-                                    }
-                                    
-                                    final uldNum = u['ULD-number']?.toString().toUpperCase();
-                                    final uCarrier = u['refCarrier']?.toString();
-                                    final uFlight = u['refNumber']?.toString();
-                                    
-                                    for (var dc in dcList) {
-                                      if (dc is Map && dc['refULD']?.toString().toUpperCase() == uldNum &&
-                                          dc['refCarrier']?.toString() == uCarrier &&
-                                          dc['refNumber']?.toString() == uFlight) {
-                                        
-                                        if (dc['discrepancy'] != null && dc['discrepancy']['confirmed'] == true) {
-                                          hasDisc = true;
-                                          bool isNotFound = dc['discrepancy']['notFound'] == true;
-                                          int rExp = dc['discrepancy']['expected'] as int? ?? 0;
-                                          int rRev = dc['discrepancy']['received'] as int? ?? 0;
-                                          int diff = (rExp - rRev).abs();
-                                          String tStr = rExp > rRev ? 'SHORT' : 'OVER';
-                                          allFlightDiscrepancies.add({
-                                            'uld': uldNum ?? 'Unknown ULD',
-                                            'awb': awbItem['number']?.toString() ?? 'N/A',
-                                            'label': isNotFound ? 'NOT FOUND' : '$diff PCs $tStr'
-                                          });
-                                          break;
-                                        }
-                                      }
-                                    }
-                                    
-                                    if (awbItem['isNew'] == true) {
-                                      if (!hasDisc) {
-                                        hasDisc = true;
-                                        allFlightDiscrepancies.add({
-                                          'uld': u['ULD-number']?.toString().toUpperCase() ?? 'N/A',
-                                          'awb': awbItem['number']?.toString() ?? 'N/A',
-                                          'label': 'NEW (ADDED)'
-                                        });
-                                      } else {
-                                        int idx = allFlightDiscrepancies.indexWhere((e) => e['awb'] == awbItem['number']?.toString());
-                                        if (idx != -1) {
-                                          allFlightDiscrepancies[idx]['label'] = '${allFlightDiscrepancies[idx]['label']} (NEW)';
-                                        }
-                                      }
-                                    }
-                                    if (hasDisc) totalFlightDiscrepancies++;
-                                  }
-                                }
-                              }
-
-                              bool hasSentReport = currentFlightIdx != -1 && flightList[currentFlightIdx]['report-final'] != null;
+                              final bool isFlightReady = currentFlightIdx != -1 && flightList[currentFlightIdx]['status'] == 'Ready';
 
                               Widget baseActionButton = ElevatedButton.icon(
-                                onPressed: isFlightChecked
+                                onPressed: isFlightReady
                                     ? null
-                                    : allUldsChecked
+                                    : allUldsSaved
                                     ? () async {
-                                        if (totalFlightDiscrepancies > 0 && !hasSentReport) {
-                                          showDialog(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                              title: Row(
-                                                children: [
-                                                  const Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 28),
-                                                  const SizedBox(width: 12),
-                                                  Text(
-                                                    appLanguage.value == 'es' ? 'Acción Requerida' : 'Action Required',
-                                                    style: TextStyle(color: textP, fontWeight: FontWeight.bold),
-                                                  ),
-                                                ],
-                                              ),
-                                              content: Text(
-                                                appLanguage.value == 'es' 
-                                                  ? 'Debes verificar y enviar el reporte de discrepancias antes de poder marcar este vuelo como finalizado.' 
-                                                  : 'You must verify and submit the discrepancies report before you can mark this flight as completed.',
-                                                style: TextStyle(color: textP, fontSize: 15, height: 1.5),
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(ctx),
-                                                  child: Text(appLanguage.value == 'es' ? 'Entendido' : 'Understood', style: const TextStyle(color: Color(0xFF38bdf8), fontWeight: FontWeight.bold)),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          return;
-                                        }
-
                                         try {
-                                          // Update the parent Flight
                                           if (dt != null) {
-                                            final parts = selectedId.split('-');
+                                            final parts = selectedId!.split('-');
                                             if (parts.length >= 2) {
                                               final dateStr = DateFormat(
                                                 'yyyy-MM-dd',
                                               ).format(dt);
-                                              try {
-                                                final Map<String, dynamic>
-                                                truckArrivedJson =
-                                                    (currentFlightIdx != -1 &&
-                                                        flightList[currentFlightIdx]['local-truck-arrived'] !=
-                                                            null)
-                                                    ? Map<String, dynamic>.from(
-                                                        flightList[currentFlightIdx]['local-truck-arrived'],
-                                                      )
-                                                    : <String, dynamic>{};
-
-                                                String firstTruckTime =
-                                                    DateTime.now()
-                                                        .toUtc()
-                                                        .toIso8601String();
-                                                String lastTruckTime =
-                                                    firstTruckTime;
-
-                                                if (truckArrivedJson
-                                                    .isNotEmpty) {
-                                                  List<String> times =
-                                                      truckArrivedJson.values
-                                                          .map(
-                                                            (v) => v.toString(),
-                                                          )
-                                                          .toList();
-                                                  times.sort(
-                                                    (a, b) => a.compareTo(b),
+                                              
+                                              await Supabase.instance.client
+                                                  .from('Flight')
+                                                  .update({
+                                                    'status': 'Ready',
+                                                  })
+                                                  .eq('carrier', parts[0])
+                                                  .eq('number', parts[1])
+                                                  .eq(
+                                                    'date-arrived',
+                                                    dateStr,
                                                   );
-                                                  firstTruckTime = times.first;
-                                                  lastTruckTime = times.last;
-                                                } else if (currentFlightIdx !=
-                                                        -1 &&
-                                                    flightList[currentFlightIdx]['local-first-truck'] !=
-                                                        null) {
-                                                  firstTruckTime =
-                                                      flightList[currentFlightIdx]['local-first-truck']
-                                                          as String;
-                                                }
 
-                                                final eBreakTime =
-                                                    DateTime.now().toUtc().toIso8601String();
-                                                await Supabase.instance.client
-                                                    .from('Flight')
-                                                    .update({
-                                                      'status': 'Checked',
-                                                      'end-break': eBreakTime,
-                                                      'first-truck':
-                                                          firstTruckTime,
-                                                      'last-truck':
-                                                          lastTruckTime,
-                                                      'time-truck-arrived':
-                                                          truckArrivedJson,
-                                                    })
-                                                    .eq('carrier', parts[0])
-                                                    .eq('number', parts[1])
-                                                    .eq(
-                                                      'date-arrived',
-                                                      dateStr,
-                                                    );
-
-                                                if (currentFlightIdx != -1) {
-                                                  flightList[currentFlightIdx]['status'] =
-                                                      'Checked';
-                                                  flightList[currentFlightIdx]['end-break'] =
-                                                      eBreakTime;
-                                                  flightList[currentFlightIdx]['first-truck'] =
-                                                      firstTruckTime;
-                                                  flightList[currentFlightIdx]['last-truck'] =
-                                                      lastTruckTime;
-                                                  flightList[currentFlightIdx]['time-truck-arrived'] =
-                                                      truckArrivedJson;
-                                                }
-                                              } catch (dbErr) {
-                                                debugPrint(
-                                                  'Flight update err: $dbErr',
-                                                );
+                                              if (currentFlightIdx != -1) {
+                                                flightList[currentFlightIdx]['status'] = 'Ready';
                                               }
                                             }
                                           }
@@ -1822,7 +1670,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                       const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 28),
                                                       const SizedBox(width: 12),
                                                       Text(
-                                                        appLanguage.value == 'es' ? 'Vuelo actualizado correctamente' : 'Flight checked successfully',
+                                                        appLanguage.value == 'es' ? '¡Vuelo marcado como Ready!' : 'Flight marked as Ready!',
                                                         style: TextStyle(
                                                           color: dark ? Colors.white : const Color(0xFF111827),
                                                           fontSize: 15,
@@ -1854,24 +1702,24 @@ class _LocationModuleState extends State<LocationModule> {
                                       }
                                     : null,
                                 icon: Icon(
-                                  isFlightChecked
+                                  isFlightReady
                                       ? Icons.verified
                                       : Icons.check_circle_outline,
                                   size: 20,
                                 ),
                                 label: Text(
-                                  isFlightChecked ? 'Checked' : 'Mark Flight as Checked',
+                                  isFlightReady ? 'Ready' : 'Mark Flight as Ready',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: isFlightChecked 
+                                  backgroundColor: isFlightReady 
                                     ? const Color(0xFF38bdf8) 
-                                    : (allUldsChecked && (totalFlightDiscrepancies == 0 || hasSentReport) 
+                                    : (allUldsSaved
                                       ? const Color(0xFF10b981) 
                                       : const Color(0xFF10b981).withAlpha(100)),
-                                  disabledBackgroundColor: isFlightChecked ? const Color(0xFF38bdf8) : const Color(0xFF10b981).withAlpha(100),
+                                  disabledBackgroundColor: isFlightReady ? const Color(0xFF38bdf8) : const Color(0xFF10b981).withAlpha(100),
                                   disabledForegroundColor: Colors.white,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
