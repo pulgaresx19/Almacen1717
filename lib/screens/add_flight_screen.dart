@@ -418,7 +418,6 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
         'cant-noBreak': _isNoBreakAuto ? _cNoBreak : (int.tryParse(_noBreakCtrl.text) ?? 0),
         'date-arrived': fDate,
         'time-arrived': fTime.isEmpty ? null : fTime,
-        'time-truck-arrived': {},
         'remarks': _remarksCtrl.text,
         'status': _status,
         'created_at': DateTime.now().toIso8601String(),

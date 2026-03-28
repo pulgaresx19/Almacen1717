@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
@@ -41,123 +41,168 @@ class _SystemModuleState extends State<SystemModule> {
   bool _showReceivedOverlayLeft = false;
   bool _showReceivedOverlayRight = false;
 
-  final Map<dynamic, bool> _savedUldCheckboxState = {};
+  Future<String> _getAuthorName() async {
+    String userName = Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
+    try {
+      final uUser = Supabase.instance.client.auth.currentUser;
+      if (uUser != null) {
+        final userRow = await Supabase.instance.client
+            .from('Users')
+            .select('full-name')
+            .eq('id', uUser.id)
+            .maybeSingle();
+        if (userRow != null && userRow['full-name'] != null) {
+          userName = userRow['full-name'];
+        }
+      }
+    } catch (_) {}
+    return userName;
+  }
 
-  Future<void> _fetchUldsForFlight(
+
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSubLeft;
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSubRight;
+  StreamSubscription<List<Map<String, dynamic>>>? _flightSubLeft;
+  StreamSubscription<List<Map<String, dynamic>>>? _flightSubRight;
+
+  @override
+  void dispose() {
+    _uldSubLeft?.cancel();
+    _uldSubRight?.cancel();
+    _flightSubLeft?.cancel();
+    _flightSubRight?.cancel();
+    super.dispose();
+  }
+
+  void _fetchUldsForFlight(
     bool isLeft,
     Map<String, dynamic> flight,
-  ) async {
+  ) {
     if (isLeft) {
+      _uldSubLeft?.cancel();
       setState(() => _isLoadingUldsLeft = true);
-    } else {
-      setState(() => _isLoadingUldsRight = true);
-    }
-
-    try {
-      final res = await Supabase.instance.client
+      _uldSubLeft = Supabase.instance.client
           .from('ULD')
-          .select()
-          .eq('refCarrier', flight['carrier'])
-          .eq('refNumber', flight['number'])
-          .eq('refDate', flight['date-arrived']);
-
-      if (mounted) {
-        setState(() {
-          final mapped = List<Map<String, dynamic>>.from(
-            res.map((x) => Map<String, dynamic>.from(x)),
-          );
-          for (var u in mapped) {
-            if (u['id'] != null &&
-                _savedUldCheckboxState.containsKey(u['id'])) {
-              u['selected'] = _savedUldCheckboxState[u['id']];
-            } else {
-              u['selected'] = false;
-            }
-          }
-
-          mapped.sort((a, b) {
-            String aNum = (a['ULD-number'] ?? '').toString();
-            String bNum = (b['ULD-number'] ?? '').toString();
-
-            bool aBulk = aNum.toUpperCase() == 'BULK';
-            bool bBulk = bNum.toUpperCase() == 'BULK';
-            if (aBulk && !bBulk) return -1;
-            if (!aBulk && bBulk) return 1;
-
-            bool aBreak = a['isBreak'] == true;
-            bool bBreak = b['isBreak'] == true;
-            if (aBreak && !bBreak) return -1;
-            if (!aBreak && bBreak) return 1;
-
-            return aNum.compareTo(bNum);
-          });
-
-          if (isLeft) {
-            _uldsLeft = mapped;
-            _isLoadingUldsLeft = false;
-          } else {
-            _uldsRight = mapped;
-            _isLoadingUldsRight = false;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Error: $e');
-      if (mounted) {
-        setState(() {
-          if (isLeft) {
-            _isLoadingUldsLeft = false;
-          } else {
-            _isLoadingUldsRight = false;
-          }
-        });
-      }
+          .stream(primaryKey: ['id'])
+          .eq('refDate', flight['date-arrived'])
+          .listen((data) {
+        if (!mounted) return;
+        final filtered = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number']).toList();
+        _processUldsData(isLeft, filtered);
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingUldsLeft = false);
+      });
+    } else {
+      _uldSubRight?.cancel();
+      setState(() => _isLoadingUldsRight = true);
+      _uldSubRight = Supabase.instance.client
+          .from('ULD')
+          .stream(primaryKey: ['id'])
+          .eq('refDate', flight['date-arrived'])
+          .listen((data) {
+        if (!mounted) return;
+        final filtered = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number']).toList();
+        _processUldsData(isLeft, filtered);
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingUldsRight = false);
+      });
     }
   }
 
-  Future<void> _fetchFlights(bool isLeft, DateTime dt) async {
+  void _processUldsData(bool isLeft, List<Map<String, dynamic>> data) {
+    final existingUlds = isLeft ? List<Map<String, dynamic>>.from(_uldsLeft) : List<Map<String, dynamic>>.from(_uldsRight);
+    final mapped = List<Map<String, dynamic>>.from(data.map((x) => Map<String, dynamic>.from(x)));
+    
+    for (var i = 0; i < mapped.length; i++) {
+        var newUld = mapped[i];
+        try {
+            final old = existingUlds.firstWhere((e) => e['id'] == newUld['id']);
+            if (old.containsKey('isExpanded')) newUld['isExpanded'] = old['isExpanded'];
+            if (old.containsKey('awbList')) newUld['awbList'] = old['awbList'];
+            if (old.containsKey('isLoadingAwbs')) newUld['isLoadingAwbs'] = old['isLoadingAwbs'];
+            if (old.containsKey('selected')) newUld['selected'] = old['selected'];
+        } catch (_) {}
+    }
+
+    mapped.sort((a, b) {
+        String aNum = (a['ULD-number'] ?? '').toString();
+        String bNum = (b['ULD-number'] ?? '').toString();
+
+        bool aBulk = aNum.toUpperCase() == 'BULK';
+        bool bBulk = bNum.toUpperCase() == 'BULK';
+        if (aBulk && !bBulk) return -1;
+        if (!aBulk && bBulk) return 1;
+
+        bool aBreak = a['isBreak'] == true;
+        bool bBreak = b['isBreak'] == true;
+        if (aBreak && !bBreak) return -1;
+        if (!aBreak && bBreak) return 1;
+
+        return aNum.compareTo(bNum);
+    });
+
+    setState(() {
+      if (isLeft) {
+        _uldsLeft = mapped;
+        _isLoadingUldsLeft = false;
+      } else {
+        _uldsRight = mapped;
+        _isLoadingUldsRight = false;
+      }
+    });
+  }
+
+  void _fetchFlights(bool isLeft, DateTime dt) {
     if (isLeft) {
-      setState(() => _isLoadingLeft = true);
+        _flightSubLeft?.cancel();
+        setState(() => _isLoadingLeft = true);
     } else {
-      setState(() => _isLoadingRight = true);
+        _flightSubRight?.cancel();
+        setState(() => _isLoadingRight = true);
     }
 
     final dateStr = DateFormat('yyyy-MM-dd').format(dt);
 
-    try {
-      final res = await Supabase.instance.client
+    if (isLeft) {
+      _flightSubLeft = Supabase.instance.client
           .from('Flight')
-          .select()
-          .eq('date-arrived', dateStr);
-
-      if (mounted) {
+          .stream(primaryKey: ['id'])
+          .eq('date-arrived', dateStr)
+          .listen((data) {
+        if (!mounted) return;
         setState(() {
-          final pendingFlights = List<Map<String, dynamic>>.from(res);
-
-          if (isLeft) {
-            _flightsLeft = pendingFlights;
-            _isLoadingLeft = false;
-            _selectedFlightIdLeft = null;
-            _uldsLeft.clear();
-          } else {
-            _flightsRight = pendingFlights;
-            _isLoadingRight = false;
-            _selectedFlightIdRight = null;
-            _uldsRight.clear();
+          _flightsLeft = List<Map<String, dynamic>>.from(data);
+          _isLoadingLeft = false;
+          if (_selectedFlightIdLeft != null && !_flightsLeft.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdLeft)) {
+             _selectedFlightIdLeft = null;
+             _uldsLeft.clear();
           }
         });
-      }
-    } catch (e) {
-      debugPrint('Error: $e');
-      if (mounted) {
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingLeft = false);
+      });
+    } else {
+      _flightSubRight = Supabase.instance.client
+          .from('Flight')
+          .stream(primaryKey: ['id'])
+          .eq('date-arrived', dateStr)
+          .listen((data) {
+        if (!mounted) return;
         setState(() {
-          if (isLeft) {
-            _isLoadingLeft = false;
-          } else {
-            _isLoadingRight = false;
+          _flightsRight = List<Map<String, dynamic>>.from(data);
+          _isLoadingRight = false;
+          if (_selectedFlightIdRight != null && !_flightsRight.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdRight)) {
+             _selectedFlightIdRight = null;
+             _uldsRight.clear();
           }
         });
-      }
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingRight = false);
+      });
     }
   }
 
@@ -712,9 +757,7 @@ class _SystemModuleState extends State<SystemModule> {
                                           width: 20,
                                           height: 20,
                                           child: Checkbox(
-                                            value: isFlightReceived
-                                                ? true
-                                                : uld['selected'] == true,
+                                            value: isFlightReceived || ((uld['data-received'] as Map?)?.isNotEmpty == true),
                                             activeColor: isFlightReceived
                                                 ? const Color(0xFF10b981)
                                                 : const Color(0xFF6366f1),
@@ -729,13 +772,10 @@ class _SystemModuleState extends State<SystemModule> {
                                                     .shrinkWrap,
                                             onChanged: isFlightReceived
                                                 ? null
-                                                : (v) {
+                                                : (v) async {
+                                                    final bool isChecked = v == true;
+                                                    final authorName = await _getAuthorName();
                                                     setState(() {
-                                                      uld['selected'] = v;
-                                                      if (uld['id'] != null) {
-                                                        _savedUldCheckboxState[uld['id']] =
-                                                            v ?? false;
-                                                      }
                                                       final currentFlightList =
                                                           isLeft
                                                           ? _flightsLeft
@@ -746,40 +786,43 @@ class _SystemModuleState extends State<SystemModule> {
                                                                 '${f['carrier']}-${f['number']}' ==
                                                                 selectedId,
                                                           );
-                                                      if (idx != -1) {
-                                                        if (v == true) {
-                                                          if (currentFlightList[idx]['local-first-truck'] ==
-                                                              null) {
-                                                            currentFlightList[idx]['local-first-truck'] =
-                                                                DateTime.now()
-                                                                    .toUtc()
-                                                                    .toIso8601String();
+                                                      String truckTime = DateTime.now().toUtc().toIso8601String();
+
+                                                      if (isChecked) {
+                                                        final payload = {
+                                                          'user': authorName,
+                                                          'time': truckTime,
+                                                          'status': true,
+                                                        };
+                                                        uld['data-received'] = payload;
+
+                                                        if (idx != -1) {
+                                                          if (currentFlightList[idx]['local-first-truck'] == null) {
+                                                            currentFlightList[idx]['local-first-truck'] = truckTime;
                                                           }
-                                                          currentFlightList[idx]['local-truck-arrived'] ??=
-                                                              <
-                                                                String,
-                                                                dynamic
-                                                              >{};
-                                                          String uldKey =
-                                                              uld['ULD-number']
-                                                                  ?.toString() ??
-                                                              'Unknown';
-                                                          currentFlightList[idx]['local-truck-arrived'][uldKey] =
-                                                              DateTime.now()
-                                                                  .toUtc()
-                                                                  .toIso8601String();
-                                                        } else {
-                                                          if (currentFlightList[idx]['local-truck-arrived'] !=
-                                                              null) {
-                                                            String uldKey =
-                                                                uld['ULD-number']
-                                                                    ?.toString() ??
-                                                                'Unknown';
-                                                            (currentFlightList[idx]['local-truck-arrived']
-                                                                    as Map)
-                                                                .remove(uldKey);
-                                                          }
+                                                          currentFlightList[idx]['local-truck-arrived'] ??= <String, dynamic>{};
+                                                          String uldKey = uld['ULD-number']?.toString() ?? 'Unknown';
+                                                          currentFlightList[idx]['local-truck-arrived'][uldKey] = truckTime;
                                                         }
+
+                                                        Supabase.instance.client.from('ULD').update({
+                                                          'data-received': payload
+                                                        }).eq('id', uld['id']).catchError((e) {
+                                                          debugPrint('data-received Update Err: $e');
+                                                        });
+                                                      } else {
+                                                        uld['data-received'] = {};
+
+                                                        if (idx != -1 && currentFlightList[idx]['local-truck-arrived'] != null) {
+                                                          String uldKey = uld['ULD-number']?.toString() ?? 'Unknown';
+                                                          (currentFlightList[idx]['local-truck-arrived'] as Map).remove(uldKey);
+                                                        }
+
+                                                        Supabase.instance.client.from('ULD').update({
+                                                          'data-received': {}
+                                                        }).eq('id', uld['id']).catchError((e) {
+                                                          debugPrint('data-received Reset Err: $e');
+                                                        });
                                                       }
                                                     });
                                                   },
@@ -817,21 +860,8 @@ class _SystemModuleState extends State<SystemModule> {
                               Builder(
                                 builder: (ctx) {
                                   String? indTime;
-                                  if (match.isNotEmpty) {
-                                    final f = match.first;
-                                    if (f['time-truck-arrived'] != null &&
-                                        f['time-truck-arrived'] is Map) {
-                                      indTime =
-                                          f['time-truck-arrived'][uld['ULD-number']
-                                              ?.toString()];
-                                    }
-                                    if (indTime == null &&
-                                        f['local-truck-arrived'] != null &&
-                                        f['local-truck-arrived'] is Map) {
-                                      indTime =
-                                          f['local-truck-arrived'][uld['ULD-number']
-                                              ?.toString()];
-                                    }
+                                  if (uld['data-received'] != null && uld['data-received'] is Map) {
+                                    indTime = uld['data-received']['time'];
                                   }
 
                                   if (indTime == null) return const SizedBox();
@@ -941,9 +971,7 @@ class _SystemModuleState extends State<SystemModule> {
                                   (isLeft ? _uldsLeft : _uldsRight)
                                       .where(
                                         (u) =>
-                                            (isFlightReceived
-                                                ? true
-                                                : u['selected'] == true) &&
+                                            (isFlightReceived || ((u['data-received'] as Map?)?.isNotEmpty == true)) &&
                                             u['isBreak'] == true,
                                       )
                                       .length,
@@ -957,9 +985,7 @@ class _SystemModuleState extends State<SystemModule> {
                                   (isLeft ? _uldsLeft : _uldsRight)
                                       .where(
                                         (u) =>
-                                            (isFlightReceived
-                                                ? true
-                                                : u['selected'] == true) &&
+                                            (isFlightReceived || ((u['data-received'] as Map?)?.isNotEmpty == true)) &&
                                             (u['isBreak'] == false ||
                                                 u['isBreak'] == null),
                                       )
@@ -977,9 +1003,7 @@ class _SystemModuleState extends State<SystemModule> {
                                   'Total',
                                   (isLeft ? _uldsLeft : _uldsRight)
                                       .where(
-                                        (u) => (isFlightReceived
-                                            ? true
-                                            : u['selected'] == true),
+                                        (u) => (isFlightReceived || ((u['data-received'] as Map?)?.isNotEmpty == true)),
                                       )
                                       .length,
                                   (isLeft ? _uldsLeft : _uldsRight).length,
@@ -1002,7 +1026,7 @@ class _SystemModuleState extends State<SystemModule> {
                               bool allSelected =
                                   currentUlds.isNotEmpty &&
                                   currentUlds.every(
-                                    (u) => u['selected'] == true,
+                                    (u) => ((u['data-received'] as Map?)?.isNotEmpty == true),
                                   );
 
                               final flightList = isLeft
@@ -1023,18 +1047,8 @@ class _SystemModuleState extends State<SystemModule> {
                                     : allSelected
                                     ? () async {
                                         try {
-                                          // Update ULDs
-                                          for (var u in currentUlds) {
-                                            if (u['id'] != null) {
-                                              await Supabase.instance.client
-                                                  .from('ULD')
-                                                  .update({
-                                                    'isReceived': true,
-                                                  })
-                                                  .eq('id', u['id']);
-                                            }
-                                          }
-
+                                            // The ULDs are already individually updated 
+                                            // via the Checkbox real-time JSONB update.
                                           // Update the parent Flight
                                           if (dt != null) {
                                             final parts = selectedId.split('-');
@@ -1045,9 +1059,6 @@ class _SystemModuleState extends State<SystemModule> {
                                               try {
                                                 final Map<String, dynamic> truckArrivedJson = <String, dynamic>{};
                                                 if (currentFlightIdx != -1) {
-                                                  if (flightList[currentFlightIdx]['time-truck-arrived'] is Map) {
-                                                    truckArrivedJson.addAll(Map<String, dynamic>.from(flightList[currentFlightIdx]['time-truck-arrived']));
-                                                  }
                                                   if (flightList[currentFlightIdx]['local-truck-arrived'] is Map) {
                                                     truckArrivedJson.addAll(Map<String, dynamic>.from(flightList[currentFlightIdx]['local-truck-arrived']));
                                                   }
@@ -1090,8 +1101,6 @@ class _SystemModuleState extends State<SystemModule> {
                                                           firstTruckTime,
                                                       'last-truck':
                                                           lastTruckTime,
-                                                      'time-truck-arrived':
-                                                          truckArrivedJson,
                                                     })
                                                     .eq('carrier', parts[0])
                                                     .eq('number', parts[1])
@@ -1106,8 +1115,6 @@ class _SystemModuleState extends State<SystemModule> {
                                                       firstTruckTime;
                                                   flightList[currentFlightIdx]['last-truck'] =
                                                       lastTruckTime;
-                                                  flightList[currentFlightIdx]['time-truck-arrived'] =
-                                                      truckArrivedJson;
                                                 }
                                               } catch (dbErr) {
                                                 debugPrint(
@@ -1117,15 +1124,7 @@ class _SystemModuleState extends State<SystemModule> {
                                             }
                                           }
 
-                                          setState(() {
-                                            for (var u in currentUlds) {
-                                              if (u['id'] != null) {
-                                                _savedUldCheckboxState.remove(
-                                                  u['id'],
-                                                );
-                                              }
-                                            }
-                                          });
+
                                           setState(() {
                                             if (isLeft) {
                                               _showReceivedOverlayLeft = true;

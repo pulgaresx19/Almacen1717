@@ -143,10 +143,10 @@ class _FlightModuleState extends State<FlightModule> {
   }
 
   Widget _buildFlightList(bool dark) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: Supabase.instance.client.from('Flight').select().order('date-arrived', ascending: false),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Supabase.instance.client.from('Flight').stream(primaryKey: ['id']).order('date-arrived', ascending: false),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
         }
         

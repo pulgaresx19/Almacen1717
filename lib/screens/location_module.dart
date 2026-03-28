@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -41,124 +42,180 @@ class _LocationModuleState extends State<LocationModule> {
   bool _isLoadingUldsLeft = false;
   bool _isLoadingUldsRight = false;
 
-  final Map<dynamic, bool> _savedUldCheckboxState = {};
+  Future<String> _getAuthorName() async {
+    String userName = Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
+    try {
+      final uUser = Supabase.instance.client.auth.currentUser;
+      if (uUser != null) {
+        final userRow = await Supabase.instance.client
+            .from('Users')
+            .select('full-name')
+            .eq('id', uUser.id)
+            .maybeSingle();
+        if (userRow != null && userRow['full-name'] != null) {
+          userName = userRow['full-name'];
+        }
+      }
+    } catch (_) {}
+    return userName;
+  }
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSubLeft;
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSubRight;
+  StreamSubscription<List<Map<String, dynamic>>>? _flightSubLeft;
+  StreamSubscription<List<Map<String, dynamic>>>? _flightSubRight;
 
-  Future<void> _fetchUldsForFlight(
+  @override
+  void dispose() {
+    _uldSubLeft?.cancel();
+    _uldSubRight?.cancel();
+    _flightSubLeft?.cancel();
+    _flightSubRight?.cancel();
+    super.dispose();
+  }
+
+  void _fetchUldsForFlight(
     bool isLeft,
     Map<String, dynamic> flight,
-  ) async {
+  ) {
     if (isLeft) {
+      _uldSubLeft?.cancel();
       setState(() => _isLoadingUldsLeft = true);
-    } else {
-      setState(() => _isLoadingUldsRight = true);
-    }
-
-    try {
-      final res = await Supabase.instance.client
+      _uldSubLeft = Supabase.instance.client
           .from('ULD')
-          .select()
-          .eq('refCarrier', flight['carrier'])
-          .eq('refNumber', flight['number'])
+          .stream(primaryKey: ['id'])
           .eq('refDate', flight['date-arrived'])
-          .eq('isBreak', true);
-
-      if (mounted) {
-        setState(() {
-          final mapped = List<Map<String, dynamic>>.from(
-            res.map((x) => Map<String, dynamic>.from(x)),
-          );
-          for (var u in mapped) {
-            if (u['id'] != null &&
-                _savedUldCheckboxState.containsKey(u['id'])) {
-              u['selected'] = _savedUldCheckboxState[u['id']];
-            } else {
-              u['selected'] = false;
-            }
-          }
-
-          mapped.sort((a, b) {
-            String aNum = (a['ULD-number'] ?? '').toString();
-            String bNum = (b['ULD-number'] ?? '').toString();
-
-            bool aBulk = aNum.toUpperCase() == 'BULK';
-            bool bBulk = bNum.toUpperCase() == 'BULK';
-            if (aBulk && !bBulk) return -1;
-            if (!aBulk && bBulk) return 1;
-
-            bool aBreak = a['isBreak'] == true;
-            bool bBreak = b['isBreak'] == true;
-            if (aBreak && !bBreak) return -1;
-            if (!aBreak && bBreak) return 1;
-
-            return aNum.compareTo(bNum);
-          });
-
-          if (isLeft) {
-            _uldsLeft = mapped;
-            _isLoadingUldsLeft = false;
-          } else {
-            _uldsRight = mapped;
-            _isLoadingUldsRight = false;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Error: $e');
-      if (mounted) {
-        setState(() {
-          if (isLeft) {
-            _isLoadingUldsLeft = false;
-          } else {
-            _isLoadingUldsRight = false;
-          }
-        });
-      }
+          .listen((data) {
+        if (!mounted) return;
+        final filtered = data.where((u) {
+          final isChecked = (u['data-checked'] as Map?)?.isNotEmpty == true;
+          return u['refCarrier'] == flight['carrier'] &&
+              u['refNumber'] == flight['number'] &&
+              u['isBreak'] == true &&
+              isChecked;
+        }).toList();
+        _processUldsData(isLeft, filtered);
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingUldsLeft = false);
+      });
+    } else {
+      _uldSubRight?.cancel();
+      setState(() => _isLoadingUldsRight = true);
+      _uldSubRight = Supabase.instance.client
+          .from('ULD')
+          .stream(primaryKey: ['id'])
+          .eq('refDate', flight['date-arrived'])
+          .listen((data) {
+        if (!mounted) return;
+        final filtered = data.where((u) {
+          final isChecked = (u['data-checked'] as Map?)?.isNotEmpty == true;
+          return u['refCarrier'] == flight['carrier'] &&
+              u['refNumber'] == flight['number'] &&
+              u['isBreak'] == true &&
+              isChecked;
+        }).toList();
+        _processUldsData(isLeft, filtered);
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingUldsRight = false);
+      });
     }
   }
 
-  Future<void> _fetchFlights(bool isLeft, DateTime dt) async {
+  void _processUldsData(bool isLeft, List<Map<String, dynamic>> data) {
+    final existingUlds = isLeft ? List<Map<String, dynamic>>.from(_uldsLeft) : List<Map<String, dynamic>>.from(_uldsRight);
+    final mapped = List<Map<String, dynamic>>.from(data.map((x) => Map<String, dynamic>.from(x)));
+    
+    for (var i = 0; i < mapped.length; i++) {
+        var newUld = mapped[i];
+        if (!newUld.containsKey('selected')) newUld['selected'] = false;
+        
+        try {
+            final old = existingUlds.firstWhere((e) => e['id'] == newUld['id']);
+            if (old.containsKey('isExpanded')) newUld['isExpanded'] = old['isExpanded'];
+            if (old.containsKey('awbList')) newUld['awbList'] = old['awbList'];
+            if (old.containsKey('isLoadingAwbs')) newUld['isLoadingAwbs'] = old['isLoadingAwbs'];
+            if (old.containsKey('selected')) newUld['selected'] = old['selected'];
+        } catch (_) {}
+    }
+
+    mapped.sort((a, b) {
+        String aNum = (a['ULD-number'] ?? '').toString();
+        String bNum = (b['ULD-number'] ?? '').toString();
+
+        bool aBulk = aNum.toUpperCase() == 'BULK';
+        bool bBulk = bNum.toUpperCase() == 'BULK';
+        if (aBulk && !bBulk) return -1;
+        if (!aBulk && bBulk) return 1;
+
+        bool aBreak = a['isBreak'] == true;
+        bool bBreak = b['isBreak'] == true;
+        if (aBreak && !bBreak) return -1;
+        if (!aBreak && bBreak) return 1;
+
+        return aNum.compareTo(bNum);
+    });
+
+    setState(() {
+      if (isLeft) {
+        _uldsLeft = mapped;
+        _isLoadingUldsLeft = false;
+      } else {
+        _uldsRight = mapped;
+        _isLoadingUldsRight = false;
+      }
+    });
+  }
+
+  void _fetchFlights(bool isLeft, DateTime dt) {
     if (isLeft) {
-      setState(() => _isLoadingLeft = true);
+        _flightSubLeft?.cancel();
+        setState(() => _isLoadingLeft = true);
     } else {
-      setState(() => _isLoadingRight = true);
+        _flightSubRight?.cancel();
+        setState(() => _isLoadingRight = true);
     }
 
     final dateStr = DateFormat('yyyy-MM-dd').format(dt);
 
-    try {
-      final res = await Supabase.instance.client
+    if (isLeft) {
+      _flightSubLeft = Supabase.instance.client
           .from('Flight')
-          .select()
-          .eq('date-arrived', dateStr);
-
-      if (mounted) {
+          .stream(primaryKey: ['id'])
+          .eq('date-arrived', dateStr)
+          .listen((data) {
+        if (!mounted) return;
         setState(() {
-          final pendingFlights = List<Map<String, dynamic>>.from(res);
-
-          if (isLeft) {
-            _flightsLeft = pendingFlights;
-            _isLoadingLeft = false;
-            _selectedFlightIdLeft = null;
-            _uldsLeft.clear();
-          } else {
-            _flightsRight = pendingFlights;
-            _isLoadingRight = false;
-            _selectedFlightIdRight = null;
-            _uldsRight.clear();
+          _flightsLeft = List<Map<String, dynamic>>.from(data);
+          _isLoadingLeft = false;
+          if (_selectedFlightIdLeft != null && !_flightsLeft.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdLeft)) {
+             _selectedFlightIdLeft = null;
+             _uldsLeft.clear();
           }
         });
-      }
-    } catch (e) {
-      debugPrint('Error: $e');
-      if (mounted) {
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingLeft = false);
+      });
+    } else {
+      _flightSubRight = Supabase.instance.client
+          .from('Flight')
+          .stream(primaryKey: ['id'])
+          .eq('date-arrived', dateStr)
+          .listen((data) {
+        if (!mounted) return;
         setState(() {
-          if (isLeft) {
-            _isLoadingLeft = false;
-          } else {
-            _isLoadingRight = false;
+          _flightsRight = List<Map<String, dynamic>>.from(data);
+          _isLoadingRight = false;
+          if (_selectedFlightIdRight != null && !_flightsRight.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdRight)) {
+             _selectedFlightIdRight = null;
+             _uldsRight.clear();
           }
         });
-      }
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingRight = false);
+      });
     }
   }
 
@@ -570,9 +627,9 @@ class _LocationModuleState extends State<LocationModule> {
                                                     ),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 12),
+                                                const SizedBox(width: 8),
                                                 SizedBox(
-                                                  width: 105,
+                                                  width: 115,
                                                   child: Text(
                                                     '${uld['ULD-number'] ?? '-'}',
                                                     style: TextStyle(
@@ -582,9 +639,9 @@ class _LocationModuleState extends State<LocationModule> {
                                                     ),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 12),
+                                                const SizedBox(width: 6),
                                                 Container(
-                                                  width: 75,
+                                                  width: 58,
                                                   padding:
                                                       const EdgeInsets.symmetric(
                                                         horizontal: 8,
@@ -612,9 +669,9 @@ class _LocationModuleState extends State<LocationModule> {
                                                         TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 12),
+                                                const SizedBox(width: 6),
                                                 Container(
-                                                  width: 90,
+                                                  width: 65,
                                                   padding:
                                                       const EdgeInsets.symmetric(
                                                         horizontal: 8,
@@ -705,18 +762,8 @@ class _LocationModuleState extends State<LocationModule> {
                                                   Builder(
                                                     builder: (context) {
                                                       final bool isSaved = _isUldSaved(uld);
-                                                      final bool isChecked = uld['status'] == 'Checked';
-
-                                                      if (!isChecked && !isSaved) {
-                                                        return Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFFd97706).withAlpha(15),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                          ),
-                                                          child: const Text('Pending', style: TextStyle(color: Color(0xFFd97706), fontSize: 12, fontWeight: FontWeight.bold)),
-                                                        );
-                                                      }
+                                                      final bool isChecked = (uld['data-checked'] as Map?)?.isNotEmpty == true;
+                                                      final bool isReceived = (uld['data-received'] as Map?)?.isNotEmpty == true;
 
                                                       if (isSaved) {
                                                         return Container(
@@ -731,7 +778,7 @@ class _LocationModuleState extends State<LocationModule> {
 
                                                       final bool allAwbsLocated = _areAllAwbsLocated(uld);
 
-                                                      if (allAwbsLocated) {
+                                                      if (isChecked && allAwbsLocated) {
                                                         return TextButton(
                                                           style: TextButton.styleFrom(
                                                             backgroundColor: const Color(0xFF6366f1),
@@ -740,13 +787,19 @@ class _LocationModuleState extends State<LocationModule> {
                                                           onPressed: () async {
                                                             setState(() => uld['isSaving'] = true);
                                                             try {
+                                                              final authorName = await _getAuthorName();
+                                                              final payload = {
+                                                                'user': authorName,
+                                                                'time': DateTime.now().toUtc().toIso8601String(),
+                                                                'status': true,
+                                                              };
                                                               await Supabase.instance.client.from('ULD').update({
-                                                                'isSaved': true
+                                                                'data-saved': payload
                                                               }).eq('id', uld['id']);
 
                                                               if (mounted) {
                                                                 setState(() {
-                                                                  uld['isSaved'] = true;
+                                                                  uld['data-saved'] = payload;
                                                                   uld['isSaving'] = false;
                                                                   uld['isExpanded'] = false;
                                                                 });
@@ -764,21 +817,41 @@ class _LocationModuleState extends State<LocationModule> {
                                                         );
                                                       }
 
-                                                      return Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                        decoration: BoxDecoration(
-                                                          color: const Color(0xFF3b82f6).withAlpha(15),
-                                                          borderRadius: BorderRadius.circular(6),
-                                                        ),
-                                                        child: const Text(
-                                                          'ULD ready to save',
-                                                          style: TextStyle(
-                                                            color: Color(0xFF3b82f6),
-                                                            fontSize: 12,
-                                                            fontWeight: FontWeight.bold,
+                                                      if (isChecked) {
+                                                        return Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF3b82f6).withAlpha(15),
+                                                            borderRadius: BorderRadius.circular(6),
                                                           ),
-                                                        ),
-                                                      );
+                                                          child: const Text(
+                                                            'Checked',
+                                                            style: TextStyle(
+                                                              color: Color(0xFF3b82f6),
+                                                              fontSize: 12,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                        );
+                                                      } else if (isReceived) {
+                                                        return Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF8b5cf6).withAlpha(15),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Text('Received', style: TextStyle(color: Color(0xFF8b5cf6), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                        );
+                                                      } else {
+                                                        return Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFFd97706).withAlpha(15),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                          ),
+                                                          child: const Text('Pending', style: TextStyle(color: Color(0xFFd97706), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                        );
+                                                      }
                                                     }
                                                   ),
                                                   const SizedBox(width: 8),
@@ -843,7 +916,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                             FontWeight.bold,
                                                       ),
                                                     ),
-                                                    if (uld['status'] != 'Checked')
+                                                    if ((uld['data-checked'] as Map?)?.isNotEmpty != true)
                                                       InkWell(
                                                         onTap: () async {
                                                           final f = match.isNotEmpty ? match.first : null;
@@ -1047,7 +1120,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                           children: [
                                                             InkWell(
                                                               onTap: () async {
-                                                                if (uld['status'] != 'Checked' && uld['isSaved'] != true) {
+                                                                if ((uld['data-checked'] as Map?)?.isNotEmpty != true && !_isUldSaved(uld)) {
                                                                   ScaffoldMessenger.of(context).showSnackBar(
                                                                     SnackBar(
                                                                       content: Text(appLanguage.value == 'es' ? 'El ULD debe estar en Checked para asignar locaciones' : 'ULD must be Checked to assign locations'),
@@ -1599,7 +1672,7 @@ class _LocationModuleState extends State<LocationModule> {
                               bool allUldsSaved =
                                   currentUlds.isNotEmpty &&
                                   currentUlds.every(
-                                    (u) => u['isSaved'] == true,
+                                    (u) => _isUldSaved(u),
                                   );
 
                               final flightList = isLeft
@@ -1619,7 +1692,7 @@ class _LocationModuleState extends State<LocationModule> {
                                     ? () async {
                                         try {
                                           if (dt != null) {
-                                            final parts = selectedId!.split('-');
+                                            final parts = selectedId.split('-');
                                             if (parts.length >= 2) {
                                               final dateStr = DateFormat(
                                                 'yyyy-MM-dd',
@@ -2169,7 +2242,7 @@ class _LocationModuleState extends State<LocationModule> {
   }
 
   bool _isUldSaved(Map<String, dynamic> uld) {
-    return uld['isSaved'] == true;
+    return (uld['data-saved'] as Map?)?.isNotEmpty == true;
   }
 
   bool _areAllAwbsLocated(Map<String, dynamic> uld) {
@@ -2936,7 +3009,7 @@ class _LocationModuleState extends State<LocationModule> {
               ),
               actionsPadding: const EdgeInsets.all(24),
               actions: [
-                if (uldOverride?['isSaved'] != true)
+                if (uldOverride != null && !_isUldSaved(uldOverride))
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -2976,10 +3049,10 @@ class _LocationModuleState extends State<LocationModule> {
 
                               Map<String, dynamic> locData = {};
                               
-                              final uldNum = uldOverride?['ULD-number']?.toString().toUpperCase() ?? '';
-                              final uldCar = uldOverride?['refCarrier']?.toString() ?? '';
-                              final uldFlt = uldOverride?['refNumber']?.toString() ?? '';
-                              final uldDate = uldOverride?['refDate']?.toString() ?? '';
+                              final uldNum = uldOverride['ULD-number']?.toString().toUpperCase() ?? '';
+                              final uldCar = uldOverride['refCarrier']?.toString() ?? '';
+                              final uldFlt = uldOverride['refNumber']?.toString() ?? '';
+                              final uldDate = uldOverride['refDate']?.toString() ?? '';
 
                               int matchIndex = dlList.indexWhere((d) => d is Map && d['refULD']?.toString().toUpperCase() == uldNum && d['refNumber']?.toString() == uldFlt);
                               if (matchIndex != -1) {

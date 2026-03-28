@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
@@ -43,122 +44,154 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
 
   final Map<dynamic, bool> _savedUldCheckboxState = {};
 
-  Future<void> _fetchUldsForFlight(
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSubLeft;
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSubRight;
+  StreamSubscription<List<Map<String, dynamic>>>? _flightSubLeft;
+  StreamSubscription<List<Map<String, dynamic>>>? _flightSubRight;
+
+  @override
+  void dispose() {
+    _uldSubLeft?.cancel();
+    _uldSubRight?.cancel();
+    _flightSubLeft?.cancel();
+    _flightSubRight?.cancel();
+    super.dispose();
+  }
+
+  void _fetchUldsForFlight(
     bool isLeft,
     Map<String, dynamic> flight,
-  ) async {
+  ) {
     if (isLeft) {
+      _uldSubLeft?.cancel();
       setState(() => _isLoadingUldsLeft = true);
-    } else {
-      setState(() => _isLoadingUldsRight = true);
-    }
-
-    try {
-      final res = await Supabase.instance.client
+      _uldSubLeft = Supabase.instance.client
           .from('ULD')
-          .select()
-          .eq('refCarrier', flight['carrier'])
-          .eq('refNumber', flight['number'])
+          .stream(primaryKey: ['id'])
           .eq('refDate', flight['date-arrived'])
-          .eq('isBreak', true);
-
-      if (mounted) {
-        setState(() {
-          final mapped = List<Map<String, dynamic>>.from(
-            res.map((x) => Map<String, dynamic>.from(x)),
-          );
-          for (var u in mapped) {
-            if (u['id'] != null &&
-                _savedUldCheckboxState.containsKey(u['id'])) {
-              u['selected'] = _savedUldCheckboxState[u['id']];
-            } else {
-              u['selected'] = false;
-            }
-          }
-
-          mapped.sort((a, b) {
-            String aNum = (a['ULD-number'] ?? '').toString();
-            String bNum = (b['ULD-number'] ?? '').toString();
-
-            bool aBulk = aNum.toUpperCase() == 'BULK';
-            bool bBulk = bNum.toUpperCase() == 'BULK';
-            if (aBulk && !bBulk) return -1;
-            if (!aBulk && bBulk) return 1;
-
-            bool aBreak = a['isBreak'] == true;
-            bool bBreak = b['isBreak'] == true;
-            if (aBreak && !bBreak) return -1;
-            if (!aBreak && bBreak) return 1;
-
-            return aNum.compareTo(bNum);
-          });
-
-          if (isLeft) {
-            _uldsLeft = mapped;
-            _isLoadingUldsLeft = false;
-          } else {
-            _uldsRight = mapped;
-            _isLoadingUldsRight = false;
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Error: $e');
-      if (mounted) {
-        setState(() {
-          if (isLeft) {
-            _isLoadingUldsLeft = false;
-          } else {
-            _isLoadingUldsRight = false;
-          }
-        });
-      }
+          .listen((data) {
+        if (!mounted) return;
+        final filtered = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number'] && u['isBreak'] == true).toList();
+        _processUldsData(isLeft, filtered);
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingUldsLeft = false);
+      });
+    } else {
+      _uldSubRight?.cancel();
+      setState(() => _isLoadingUldsRight = true);
+      _uldSubRight = Supabase.instance.client
+          .from('ULD')
+          .stream(primaryKey: ['id'])
+          .eq('refDate', flight['date-arrived'])
+          .listen((data) {
+        if (!mounted) return;
+        final filtered = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number'] && u['isBreak'] == true).toList();
+        _processUldsData(isLeft, filtered);
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingUldsRight = false);
+      });
     }
   }
 
-  Future<void> _fetchFlights(bool isLeft, DateTime dt) async {
+  void _processUldsData(bool isLeft, List<Map<String, dynamic>> data) {
+    final existingUlds = isLeft ? List<Map<String, dynamic>>.from(_uldsLeft) : List<Map<String, dynamic>>.from(_uldsRight);
+    final mapped = List<Map<String, dynamic>>.from(data.map((x) => Map<String, dynamic>.from(x)));
+    
+    for (var i = 0; i < mapped.length; i++) {
+        var newUld = mapped[i];
+        if (newUld['id'] != null && _savedUldCheckboxState.containsKey(newUld['id'])) {
+          newUld['selected'] = _savedUldCheckboxState[newUld['id']];
+        } else {
+          newUld['selected'] = false;
+        }
+        
+        try {
+            final old = existingUlds.firstWhere((e) => e['id'] == newUld['id']);
+            newUld['isExpanded'] = old['isExpanded'];
+            newUld['awbList'] = old['awbList'];
+            newUld['isLoadingAwbs'] = old['isLoadingAwbs'];
+        } catch (_) {}
+    }
+
+    mapped.sort((a, b) {
+        String aNum = (a['ULD-number'] ?? '').toString();
+        String bNum = (b['ULD-number'] ?? '').toString();
+
+        bool aBulk = aNum.toUpperCase() == 'BULK';
+        bool bBulk = bNum.toUpperCase() == 'BULK';
+        if (aBulk && !bBulk) return -1;
+        if (!aBulk && bBulk) return 1;
+
+        bool aBreak = a['isBreak'] == true;
+        bool bBreak = b['isBreak'] == true;
+        if (aBreak && !bBreak) return -1;
+        if (!aBreak && bBreak) return 1;
+
+        return aNum.compareTo(bNum);
+    });
+
+    setState(() {
+      if (isLeft) {
+        _uldsLeft = mapped;
+        _isLoadingUldsLeft = false;
+      } else {
+        _uldsRight = mapped;
+        _isLoadingUldsRight = false;
+      }
+    });
+  }
+
+  void _fetchFlights(bool isLeft, DateTime dt) {
     if (isLeft) {
-      setState(() => _isLoadingLeft = true);
+        _flightSubLeft?.cancel();
+        setState(() => _isLoadingLeft = true);
     } else {
-      setState(() => _isLoadingRight = true);
+        _flightSubRight?.cancel();
+        setState(() => _isLoadingRight = true);
     }
 
     final dateStr = DateFormat('yyyy-MM-dd').format(dt);
 
-    try {
-      final res = await Supabase.instance.client
+    if (isLeft) {
+      _flightSubLeft = Supabase.instance.client
           .from('Flight')
-          .select()
-          .eq('date-arrived', dateStr);
-
-      if (mounted) {
+          .stream(primaryKey: ['id'])
+          .eq('date-arrived', dateStr)
+          .listen((data) {
+        if (!mounted) return;
         setState(() {
-          final pendingFlights = List<Map<String, dynamic>>.from(res);
-
-          if (isLeft) {
-            _flightsLeft = pendingFlights;
-            _isLoadingLeft = false;
-            _selectedFlightIdLeft = null;
-            _uldsLeft.clear();
-          } else {
-            _flightsRight = pendingFlights;
-            _isLoadingRight = false;
-            _selectedFlightIdRight = null;
-            _uldsRight.clear();
+          _flightsLeft = List<Map<String, dynamic>>.from(data);
+          _isLoadingLeft = false;
+          if (_selectedFlightIdLeft != null && !_flightsLeft.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdLeft)) {
+             _selectedFlightIdLeft = null;
+             _uldsLeft.clear();
           }
         });
-      }
-    } catch (e) {
-      debugPrint('Error: $e');
-      if (mounted) {
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingLeft = false);
+      });
+    } else {
+      _flightSubRight = Supabase.instance.client
+          .from('Flight')
+          .stream(primaryKey: ['id'])
+          .eq('date-arrived', dateStr)
+          .listen((data) {
+        if (!mounted) return;
         setState(() {
-          if (isLeft) {
-            _isLoadingLeft = false;
-          } else {
-            _isLoadingRight = false;
+          _flightsRight = List<Map<String, dynamic>>.from(data);
+          _isLoadingRight = false;
+          if (_selectedFlightIdRight != null && !_flightsRight.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdRight)) {
+             _selectedFlightIdRight = null;
+             _uldsRight.clear();
           }
         });
-      }
+      }, onError: (e) {
+        debugPrint('Error: $e');
+        if (mounted) setState(() => _isLoadingRight = false);
+      });
     }
   }
 
@@ -781,7 +814,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                 allAwbChecked = checkedCount == listAwb.length;
                                               }
                                               
-                                              final isCheckedStatus = uld['status'] == 'Checked';
+                                              final isCheckedStatus = (uld['data-checked'] as Map?)?.isNotEmpty == true;
+                                              final isReceivedStatus = (uld['data-received'] as Map?)?.isNotEmpty == true;
                                               final canCheck = !isCheckedStatus && allAwbChecked;
 
                                               return Row(
@@ -893,6 +927,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                           'label': e['label']
                                                         }).toList();
                                                         final cData = {
+                                                          'status': true,
                                                           'user': nameStr, 
                                                           'time': tStr,
                                                           if (finalDiscList.isNotEmpty) 'discrepancies': finalDiscList
@@ -903,16 +938,14 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                         await Supabase.instance.client
                                                           .from('ULD')
                                                           .update({
-                                                            'status': 'Checked',
                                                             'data-checked': cData,
-                                                            'inf-location-requerid': summaryList.isNotEmpty ? summaryList : null,
+                                                            'inf-location-requerid': summaryList.isNotEmpty ? summaryList : [],
                                                           })
                                                           .eq('ULD-number', uld['ULD-number'])
                                                           .eq('refCarrier', uld['refCarrier'])
                                                           .eq('refNumber', uld['refNumber']);
                                                         if (mounted) {
                                                           setState(() {
-                                                            uld['status'] = 'Checked';
                                                             uld['data-checked'] = cData;
                                                             uld['isExpanded'] = false;
                                                           });
@@ -931,12 +964,113 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                             });
                                                           }
                                                         }
-                                                      } catch (_) {}
-                                                    } : null,
+                                                      } catch (e) {
+                                                        debugPrint('Error marking as checked: $e');
+                                                        if (context.mounted) {
+                                                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                                                        }
+                                                      }
+                                                    } : ((isReceivedStatus || isCheckedStatus) ? () {
+                                                      final opData = isCheckedStatus ? uld['data-checked'] : uld['data-received'];
+                                                      final titleOp = isCheckedStatus ? 'Checked Status' : 'Received Status';
+                                                      if (opData != null && opData is Map) {
+                                                        showDialog(
+                                                          context: ctx,
+                                                          builder: (dCtx) => Dialog(
+                                                            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                            child: Container(
+                                                              width: 320,
+                                                              padding: const EdgeInsets.all(24),
+                                                              child: Column(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  Container(
+                                                                    padding: const EdgeInsets.all(12),
+                                                                    decoration: BoxDecoration(
+                                                                      color: isCheckedStatus ? const Color(0xFF10b981).withAlpha(20) : const Color(0xFF3b82f6).withAlpha(20),
+                                                                      shape: BoxShape.circle,
+                                                                    ),
+                                                                    child: Icon(
+                                                                      isCheckedStatus ? Icons.check_circle_outline : Icons.inventory_2_outlined,
+                                                                      color: isCheckedStatus ? const Color(0xFF10b981) : const Color(0xFF3b82f6),
+                                                                      size: 32,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(height: 16),
+                                                                  Text(
+                                                                    titleOp,
+                                                                    style: TextStyle(
+                                                                      color: textP,
+                                                                      fontSize: 18,
+                                                                      fontWeight: FontWeight.bold,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(height: 24),
+                                                                  Container(
+                                                                    padding: const EdgeInsets.all(16),
+                                                                    decoration: BoxDecoration(
+                                                                      color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                                      borderRadius: BorderRadius.circular(12),
+                                                                      border: Border.all(color: borderC),
+                                                                    ),
+                                                                    child: Column(
+                                                                      children: [
+                                                                        Row(
+                                                                          children: [
+                                                                            Icon(Icons.person_outline, size: 18, color: textS),
+                                                                            const SizedBox(width: 12),
+                                                                            Expanded(
+                                                                              child: Text(
+                                                                                '${opData['user'] ?? 'Unknown User'}',
+                                                                                style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600),
+                                                                              ),
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                        const SizedBox(height: 12),
+                                                                        Row(
+                                                                          children: [
+                                                                            Icon(Icons.access_time, size: 18, color: textS),
+                                                                            const SizedBox(width: 12),
+                                                                            Expanded(
+                                                                              child: Text(
+                                                                                opData['time'] != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(opData['time']).toLocal()) : 'Unknown Time',
+                                                                                style: TextStyle(color: textP, fontSize: 13),
+                                                                              ),
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(height: 24),
+                                                                  SizedBox(
+                                                                    width: double.infinity,
+                                                                    child: TextButton(
+                                                                      onPressed: () => Navigator.pop(dCtx),
+                                                                      style: TextButton.styleFrom(
+                                                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                                                        backgroundColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                                                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                                      ),
+                                                                      child: Text(
+                                                                        appLanguage.value == 'es' ? 'Cerrar' : 'Close',
+                                                                        style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+                                                                      ),
+                                                                    ),
+                                                                  )
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                    } : null),
                                                       child: Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                         decoration: BoxDecoration(
-                                                          color: isCheckedStatus ? const Color(0xFF10b981).withAlpha(15) : (canCheck ? const Color(0xFF6366f1) : const Color(0xFFf59e0b).withAlpha(15)),
+                                                          color: isCheckedStatus ? const Color(0xFF10b981).withAlpha(15) : (canCheck ? const Color(0xFF6366f1) : (isReceivedStatus ? const Color(0xFF3b82f6).withAlpha(15) : const Color(0xFFf59e0b).withAlpha(15))),
                                                           borderRadius: BorderRadius.circular(6),
                                                         ),
                                                         child: Row(
@@ -946,9 +1080,9 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                               const SizedBox(width: 4),
                                                             ],
                                                             Text(
-                                                              isCheckedStatus ? 'Checked' : (canCheck ? 'Mark as Checked' : 'Pending'),
+                                                              isCheckedStatus ? 'Checked' : (canCheck ? 'Mark as Checked' : (isReceivedStatus ? 'Received' : 'Pending')),
                                                               style: TextStyle(
-                                                                color: isCheckedStatus ? const Color(0xFF10b981) : (canCheck ? Colors.white : const Color(0xFFd97706)),
+                                                                color: isCheckedStatus ? const Color(0xFF10b981) : (canCheck ? Colors.white : (isReceivedStatus ? const Color(0xFF3b82f6) : const Color(0xFFd97706))),
                                                                 fontSize: 12,
                                                                 fontWeight: FontWeight.bold,
                                                               ),
@@ -1019,7 +1153,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                             FontWeight.bold,
                                                       ),
                                                     ),
-                                                    if (uld['status'] != 'Checked')
+                                                    if ((uld['data-checked'] as Map?)?.isNotEmpty != true)
                                                       InkWell(
                                                         onTap: () async {
                                                           final f = match.isNotEmpty ? match.first : null;
@@ -1151,6 +1285,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
 
                                                         
                                                         bool isChecked = false;
+                                                        String? awbCheckedUser;
+                                                        String? awbCheckedTime;
                                                         bool hasDiscrepancy = false;
                                                         String discrepancyBadge = 'Discrepancy';
                                                         List<dynamic> dcList = [];
@@ -1188,6 +1324,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                                 int diff = (exp - rec).abs();
                                                                 String term = exp > rec ? 'SHORT' : 'OVER';
                                                                 discrepancyBadge = isNotFound ? 'NOT FOUND' : '$diff PCs $term';
+                                                              }
+                                                              if (isChecked) {
+                                                                awbCheckedUser = dc['user']?.toString();
+                                                                awbCheckedTime = dc['time']?.toString();
                                                               }
                                                             }
                                                           }
@@ -1560,23 +1700,72 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                                         ),
                                                                       ),
                                                                     if (isChecked)
-                                                                      Container(
-                                                                        margin: const EdgeInsets.only(left: 8),
-                                                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                                        decoration: BoxDecoration(
-                                                                          color: const Color(0xFF6366f1).withAlpha(30),
-                                                                          borderRadius: BorderRadius.circular(4),
-                                                                          border: Border.all(
-                                                                            color: const Color(0xFF6366f1).withAlpha(50),
+                                                                      GestureDetector(
+                                                                        onTap: () {
+                                                                          showDialog(
+                                                                            context: context,
+                                                                            builder: (dCtx) => Dialog(
+                                                                              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                                              child: Container(
+                                                                                width: 320,
+                                                                                padding: const EdgeInsets.all(24),
+                                                                                child: Column(
+                                                                                  mainAxisSize: MainAxisSize.min,
+                                                                                  children: [
+                                                                                    Container(
+                                                                                      padding: const EdgeInsets.all(12),
+                                                                                      decoration: BoxDecoration(
+                                                                                        color: const Color(0xFF6366f1).withAlpha(20),
+                                                                                        shape: BoxShape.circle,
+                                                                                      ),
+                                                                                      child: const Icon(Icons.check_circle, color: Color(0xFF6366f1), size: 32),
+                                                                                    ),
+                                                                                    const SizedBox(height: 16),
+                                                                                    Text('AWB Checked Status', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                                                    const SizedBox(height: 24),
+                                                                                    Container(
+                                                                                      padding: const EdgeInsets.all(16),
+                                                                                      decoration: BoxDecoration(
+                                                                                        color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                                                        borderRadius: BorderRadius.circular(12),
+                                                                                        border: Border.all(color: borderC),
+                                                                                      ),
+                                                                                      child: Column(
+                                                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                                                        children: [
+                                                                                          Row(children: [Icon(Icons.person_outline, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(awbCheckedUser ?? 'Unknown User', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600)))]),
+                                                                                          const SizedBox(height: 12),
+                                                                                          Row(children: [Icon(Icons.access_time, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(awbCheckedTime != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(awbCheckedTime).toLocal()) : 'Unknown Time', style: TextStyle(color: textP, fontSize: 13)))]),
+                                                                                        ],
+                                                                                      ),
+                                                                                    ),
+                                                                                    const SizedBox(height: 24),
+                                                                                    SizedBox(width: double.infinity, height: 44, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.pop(dCtx), child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)))),
+                                                                                  ],
+                                                                                ),
+                                                                              ),
+                                                                            ),
+                                                                          );
+                                                                        },
+                                                                        child: Container(
+                                                                          margin: const EdgeInsets.only(left: 8),
+                                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                          decoration: BoxDecoration(
+                                                                            color: const Color(0xFF6366f1).withAlpha(30),
+                                                                            borderRadius: BorderRadius.circular(4),
+                                                                            border: Border.all(
+                                                                              color: const Color(0xFF6366f1).withAlpha(50),
+                                                                            ),
                                                                           ),
-                                                                        ),
-                                                                        child: Row(
-                                                                          mainAxisSize: MainAxisSize.min,
-                                                                          children: const [
-                                                                            Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
-                                                                            SizedBox(width: 4),
-                                                                            Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                                          ],
+                                                                          child: Row(
+                                                                            mainAxisSize: MainAxisSize.min,
+                                                                            children: const [
+                                                                              Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
+                                                                              SizedBox(width: 4),
+                                                                              Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                                            ],
+                                                                          ),
                                                                         ),
                                                                       ),
                                                                   ],
@@ -1627,36 +1816,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                     ),
                                   ),
                                 ),
-                              if (uld['data-checked'] != null)
-                                Positioned(
-                                  top: -8,
-                                  right: 12,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: dark ? const Color(0xFF1e293b) : Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFF10b981).withAlpha(100)),
-                                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.check_circle, size: 12, color: Color(0xFF10b981)),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${uld['data-checked']?['user']?.toString() ?? 'User'} • ${DateFormat('MMM dd, h:mm a').format(DateTime.parse(uld['data-checked']?['time'] ?? DateTime.now().toIso8601String()).toLocal())}',
-                                          style: TextStyle(
-                                            color: dark ? Colors.white70 : Colors.black87,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(),
+                                const SizedBox(),
                             ],
                           );
                         },
@@ -1687,7 +1847,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                 _buildTotalStat(
                                   'Checked',
                                   (isLeft ? _uldsLeft : _uldsRight)
-                                      .where((u) => u['status'] == 'Checked')
+                                      .where((u) => (u['data-checked'] as Map?)?.isNotEmpty == true)
                                       .length,
                                   (isLeft ? _uldsLeft : _uldsRight).length,
                                   const Color(0xFF10b981),
@@ -1695,7 +1855,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                   _buildTotalStat(
                                     'Priority',
                                     (isLeft ? _uldsLeft : _uldsRight)
-                                        .where((u) => u['isPriority'] == true && u['status'] == 'Checked')
+                                        .where((u) => u['isPriority'] == true && (u['data-checked'] as Map?)?.isNotEmpty == true)
                                         .length,
                                     (isLeft ? _uldsLeft : _uldsRight)
                                         .where((u) => u['isPriority'] == true)
@@ -1729,7 +1889,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               bool allUldsChecked =
                                   currentUlds.isNotEmpty &&
                                   currentUlds.every(
-                                    (u) => u['status'] == 'Checked',
+                                    (u) => (u['data-checked'] as Map?)?.isNotEmpty == true,
                                   );
 
                               final flightList = isLeft
@@ -1913,8 +2073,6 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                           firstTruckTime,
                                                       'last-truck':
                                                           lastTruckTime,
-                                                      'time-truck-arrived':
-                                                          truckArrivedJson,
                                                     })
                                                     .eq('carrier', parts[0])
                                                     .eq('number', parts[1])
@@ -1932,8 +2090,6 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                       firstTruckTime;
                                                   flightList[currentFlightIdx]['last-truck'] =
                                                       lastTruckTime;
-                                                  flightList[currentFlightIdx]['time-truck-arrived'] =
-                                                      truckArrivedJson;
                                                 }
                                               } catch (dbErr) {
                                                 debugPrint(
@@ -2905,6 +3061,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                 itemBuilder: (c, i) {
                                   final awb = list[i];
                                   bool isChecked = false;
+                                  String? awbCheckedUser;
+                                  String? awbCheckedTime;
                                   bool hasDiscrepancy = false;
                                   String discrepancyBadge = 'Discrepancy';
                                   List<dynamic> dcList = [];
@@ -2935,11 +3093,17 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                         if (hasInput) isChecked = true;
                                         if (dc['discrepancy'] != null && dc['discrepancy']['confirmed'] == true) {
                                           hasDiscrepancy = true;
+                                          bool isNotFound = dc['discrepancy']['notFound'] == true;
+                                          if (isNotFound) isChecked = true;
                                           int exp = dc['discrepancy']['expected'] as int? ?? 0;
                                           int rec = dc['discrepancy']['received'] as int? ?? 0;
                                           int diff = (exp - rec).abs();
                                           String term = exp > rec ? 'SHORT' : 'OVER';
-                                          discrepancyBadge = '$diff PCs $term';
+                                          discrepancyBadge = isNotFound ? 'NOT FOUND' : '$diff PCs $term';
+                                        }
+                                        if (isChecked) {
+                                          awbCheckedUser = dc['user']?.toString();
+                                          awbCheckedTime = dc['time']?.toString();
                                         }
                                       }
                                     }
@@ -3005,25 +3169,74 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                             ),
                                           ),
                                         if (isChecked)
-                                          Container(
-                                            margin: const EdgeInsets.only(left: 8),
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF6366f1).withAlpha(30),
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: const Color(0xFF6366f1).withAlpha(50),
+                                          GestureDetector(
+                                            onTap: () {
+                                              showDialog(
+                                                context: c,
+                                                builder: (dCtx) => Dialog(
+                                                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                  child: Container(
+                                                    width: 320,
+                                                    padding: const EdgeInsets.all(24),
+                                                    child: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Container(
+                                                          padding: const EdgeInsets.all(12),
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(0xFF6366f1).withAlpha(20),
+                                                            shape: BoxShape.circle,
+                                                          ),
+                                                          child: const Icon(Icons.check_circle, color: Color(0xFF6366f1), size: 32),
+                                                        ),
+                                                        const SizedBox(height: 16),
+                                                        Text('AWB Checked Status', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                        const SizedBox(height: 24),
+                                                        Container(
+                                                          padding: const EdgeInsets.all(16),
+                                                          decoration: BoxDecoration(
+                                                            color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            border: Border.all(color: borderC),
+                                                          ),
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Row(children: [Icon(Icons.person_outline, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(awbCheckedUser ?? 'Unknown User', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600)))]),
+                                                              const SizedBox(height: 12),
+                                                              Row(children: [Icon(Icons.access_time, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(awbCheckedTime != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(awbCheckedTime).toLocal()) : 'Unknown Time', style: TextStyle(color: textP, fontSize: 13)))]),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(height: 24),
+                                                        SizedBox(width: double.infinity, height: 44, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), onPressed: () => Navigator.pop(dCtx), child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)))),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: const EdgeInsets.only(left: 8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF6366f1).withAlpha(30),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: const Color(0xFF6366f1).withAlpha(50),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: const [
+                                                  Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
+                                                  SizedBox(width: 4),
+                                                  Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ],
                                               ),
                                             ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: const [
-                                                Icon(Icons.check_circle, size: 10, color: Color(0xFF6366f1)),
-                                                SizedBox(width: 4),
-                                                Text('Checked', style: TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
-                                              ],
-                                            ),
-                                        ),
+                                          ),
                                       ],
                                     ),
                                   );
@@ -3296,8 +3509,9 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
     };
     List<String> selectedLocations = [];
     final otherLocationCtrl = TextEditingController();
+    final bool isUldChecked = (uldOverride?['data-checked'] as Map?)?.isNotEmpty == true;
     bool isLoading = true;
-    bool isEditMode = true;
+    bool isEditMode = !isUldChecked;
     Map<dynamic, dynamic>? initialData;
     bool isNotFound = false;
 
@@ -4105,7 +4319,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
               ),
               actionsPadding: const EdgeInsets.all(24),
               actions: [
-                if (uldOverride?['status'] != 'Checked')
+                if (!isUldChecked)
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -4204,6 +4418,23 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
 
                             setDialogState(() => isSaving = true);
                             try {
+                              String userFullName = 'Unknown User';
+                              final uUser = Supabase.instance.client.auth.currentUser;
+                              if (uUser != null) {
+                                userFullName = uUser.email?.split('@')[0] ?? 'Unknown User';
+                                try {
+                                  final userRow = await Supabase.instance.client
+                                      .from('Users')
+                                      .select('full-name')
+                                      .eq('id', uUser.id)
+                                      .maybeSingle();
+                                  if (userRow != null && userRow['full-name'] != null) {
+                                    userFullName = userRow['full-name'];
+                                  }
+                                } catch (_) {}
+                              }
+                              final timeStr = DateTime.now().toUtc().toIso8601String();
+
                               final existing = await Supabase.instance.client
                                   .from('AWB')
                                   .select('data-coordinator')
@@ -4269,6 +4500,8 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               coordData['refCarrier'] = uldCar;
                               coordData['refNumber'] = uldFlt;
                               coordData['refDate'] = uldDate;
+                              coordData['user'] = userFullName;
+                              coordData['time'] = timeStr;
 
                               if (matchIndex != -1) {
                                 existingDcList[matchIndex] = coordData;
