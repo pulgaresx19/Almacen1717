@@ -41,6 +41,9 @@ class _SystemModuleState extends State<SystemModule> {
   bool _showReceivedOverlayLeft = false;
   bool _showReceivedOverlayRight = false;
 
+  Map<String, dynamic>? _lastReceivedUldLeft;
+  Map<String, dynamic>? _lastReceivedUldRight;
+
   Future<String> _getAuthorName() async {
     String userName = Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
     try {
@@ -295,25 +298,6 @@ class _SystemModuleState extends State<SystemModule> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.singlePanelMode
-                            ? (appLanguage.value == 'es'
-                                  ? 'Módulo central del sistema.'
-                                  : 'Central system module.')
-                            : (isLeft
-                                  ? (appLanguage.value == 'es'
-                                        ? 'Cruza operaciones y referencia maestra desde este panel.'
-                                        : 'Cross-check operations and master reference from this panel.')
-                                  : (appLanguage.value == 'es'
-                                        ? 'Compara resultados y auditorías en este panel secundario.'
-                                        : 'Compare results and audits in this secondary panel.')),
-                        style: TextStyle(
-                          color: textS,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
                     ],
                   ),
                   ElevatedButton.icon(
@@ -431,6 +415,7 @@ class _SystemModuleState extends State<SystemModule> {
                               setState(() {
                                 if (isLeft) {
                                   _selectedFlightIdLeft = v ? chipId : null;
+                                  _lastReceivedUldLeft = null;
                                   if (v) {
                                     _fetchUldsForFlight(true, f);
                                   } else {
@@ -438,6 +423,7 @@ class _SystemModuleState extends State<SystemModule> {
                                   }
                                 } else {
                                   _selectedFlightIdRight = v ? chipId : null;
+                                  _lastReceivedUldRight = null;
                                   if (v) {
                                     _fetchUldsForFlight(false, f);
                                   } else {
@@ -451,15 +437,66 @@ class _SystemModuleState extends State<SystemModule> {
                 ),
                 if (selectedId != null) ...[
                   const SizedBox(height: 32),
-                  Text(
-                    appLanguage.value == 'es'
-                        ? 'ULDs del vuelo'
-                        : 'Flight ULDs',
-                    style: TextStyle(
-                      color: textS,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        appLanguage.value == 'es'
+                            ? 'ULDs del vuelo'
+                            : 'Flight ULDs',
+                        style: TextStyle(
+                          color: textS,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (!isFlightReceived && 
+                          (isLeft ? _lastReceivedUldLeft != null : _lastReceivedUldRight != null))
+                        Builder(
+                          builder: (context) {
+                            final uld = isLeft ? _lastReceivedUldLeft! : _lastReceivedUldRight!;
+                            final bool isBreak = uld['isBreak'] == true;
+                            final String uldNum = uld['ULD-number']?.toString() ?? '-';
+                            final Color statusColor = isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444);
+                            final String statusText = isBreak ? 'Break' : 'No Break';
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: statusColor.withAlpha(15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: statusColor.withAlpha(40)),
+                              ),
+                              child: RichText(
+                                text: TextSpan(
+                                  text: 'Last ULD: ',
+                                  style: TextStyle(
+                                    color: textP,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: uldNum,
+                                      style: TextStyle(
+                                        color: textP,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: ' [$statusText]',
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   if (isLeft ? _isLoadingUldsLeft : _isLoadingUldsRight)
@@ -484,6 +521,27 @@ class _SystemModuleState extends State<SystemModule> {
                         itemCount: (isLeft ? _uldsLeft : _uldsRight).length,
                         itemBuilder: (context, index) {
                           final uld = (isLeft ? _uldsLeft : _uldsRight)[index];
+                          String? indTime;
+                          String? receivedUser;
+                          if (uld['data-received'] != null && uld['data-received'] is Map) {
+                            indTime = uld['data-received']['time'];
+                            receivedUser = uld['data-received']['user'];
+                          }
+                          String toAmPmFormat(String t) {
+                             if (t.isEmpty) return t;
+                             try {
+                               if (t.contains('T')) {
+                                 final dt = DateTime.parse(t).toLocal();
+                                 int h = dt.hour;
+                                 int m = dt.minute;
+                                 bool pm = h >= 12;
+                                 int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+                                 return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
+                               }
+                             } catch (_) {}
+                             return t;
+                          }
+
                           return Stack(
                             clipBehavior: Clip.none,
                             children: [
@@ -720,6 +778,44 @@ class _SystemModuleState extends State<SystemModule> {
                                     const SizedBox(width: 12),
                                     Row(
                                       children: [
+                                        if (indTime != null) ...[
+                                          IconButton(
+                                            icon: const Icon(Icons.info_outline, color: Color(0xFF6366f1), size: 20),
+                                            tooltip: appLanguage.value == 'es' ? 'Info Recepción' : 'Receipt Info',
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) {
+                                                  return AlertDialog(
+                                                    backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                    title: Text(
+                                                      appLanguage.value == 'es' ? 'Detalles de Recepción' : 'Receipt Details',
+                                                      style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+                                                    ),
+                                                    content: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text('${appLanguage.value == 'es' ? 'Usuario' : 'User'}: ${receivedUser ?? '-'}', style: TextStyle(color: textP, fontSize: 14)),
+                                                        const SizedBox(height: 8),
+                                                        Text('${appLanguage.value == 'es' ? 'Hora y Fecha' : 'Date & Time'}: ${toAmPmFormat(indTime!)}', style: TextStyle(color: textP, fontSize: 14)),
+                                                      ],
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () => Navigator.of(context).pop(),
+                                                        child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: const TextStyle(color: Color(0xFF6366f1))),
+                                                      ),
+                                                    ],
+                                                  );
+                                                }
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
                                         Container(
                                           width: 75,
                                           alignment: Alignment.center,
@@ -796,6 +892,12 @@ class _SystemModuleState extends State<SystemModule> {
                                                         };
                                                         uld['data-received'] = payload;
 
+                                                        if (isLeft) {
+                                                          _lastReceivedUldLeft = uld;
+                                                        } else {
+                                                          _lastReceivedUldRight = uld;
+                                                        }
+
                                                         if (idx != -1) {
                                                           if (currentFlightList[idx]['local-first-truck'] == null) {
                                                             currentFlightList[idx]['local-first-truck'] = truckTime;
@@ -812,6 +914,12 @@ class _SystemModuleState extends State<SystemModule> {
                                                         });
                                                       } else {
                                                         uld['data-received'] = {};
+
+                                                        if (isLeft && _lastReceivedUldLeft?['id'] == uld['id']) {
+                                                          _lastReceivedUldLeft = null;
+                                                        } else if (!isLeft && _lastReceivedUldRight?['id'] == uld['id']) {
+                                                          _lastReceivedUldRight = null;
+                                                        }
 
                                                         if (idx != -1 && currentFlightList[idx]['local-truck-arrived'] != null) {
                                                           String uldKey = uld['ULD-number']?.toString() ?? 'Unknown';
@@ -857,90 +965,7 @@ class _SystemModuleState extends State<SystemModule> {
                                     ),
                                   ),
                                 ),
-                              Builder(
-                                builder: (ctx) {
-                                  String? indTime;
-                                  if (uld['data-received'] != null && uld['data-received'] is Map) {
-                                    indTime = uld['data-received']['time'];
-                                  }
-
-                                  if (indTime == null) return const SizedBox();
-
-                                  String toAmPmUld(String t) {
-                                    try {
-                                      if (t.contains('T')) {
-                                        final dt = DateTime.parse(t).toLocal();
-                                        int h = dt.hour;
-                                        int m = dt.minute;
-                                        bool pm = h >= 12;
-                                        int h12 = h > 12
-                                            ? h - 12
-                                            : (h == 0 ? 12 : h);
-                                        return '${dt.day}/${dt.month} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-                                      }
-                                      final pts = t.split(':');
-                                      if (pts.length >= 2) {
-                                        int h = int.parse(pts[0]);
-                                        int m = int.parse(pts[1]);
-                                        bool pm = h >= 12;
-                                        int h12 = h > 12
-                                            ? h - 12
-                                            : (h == 0 ? 12 : h);
-                                        return '$h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-                                      }
-                                    } catch (_) {}
-                                    return t;
-                                  }
-
-                                  return Positioned(
-                                    top: -10,
-                                    right: 18,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: dark
-                                            ? const Color(0xFF1e293b)
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: const Color(
-                                            0xFF10b981,
-                                          ).withAlpha(100),
-                                        ),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Colors.black12,
-                                            blurRadius: 2,
-                                            offset: Offset(0, 1),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.check_circle,
-                                            color: Color(0xFF10b981),
-                                            size: 11,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            toAmPmUld(indTime),
-                                            style: const TextStyle(
-                                              color: Color(0xFF10b981),
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                              // Replaced Builder containing pill by inline info icon
                             ],
                           );
                         },

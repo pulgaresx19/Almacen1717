@@ -903,6 +903,117 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                     ),
                                                     const SizedBox(width: 12),
                                                   ],
+                                                  if (isReceivedStatus) ...[
+                                                    InkWell(
+                                                      onTap: () {
+                                                        final opData = uld['data-received'];
+                                                        if (opData != null && opData is Map) {
+                                                          showDialog(
+                                                            context: ctx,
+                                                            builder: (dCtx) => Dialog(
+                                                              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                              child: Container(
+                                                                width: 320,
+                                                                padding: const EdgeInsets.all(24),
+                                                                child: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(12),
+                                                                      decoration: BoxDecoration(
+                                                                        color: const Color(0xFF3b82f6).withAlpha(20),
+                                                                        shape: BoxShape.circle,
+                                                                      ),
+                                                                      child: const Icon(
+                                                                        Icons.inventory_2_outlined,
+                                                                        color: Color(0xFF3b82f6),
+                                                                        size: 32,
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 16),
+                                                                    Text(
+                                                                      'Received Status',
+                                                                      style: TextStyle(
+                                                                        color: textP,
+                                                                        fontSize: 18,
+                                                                        fontWeight: FontWeight.bold,
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 24),
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(16),
+                                                                      decoration: BoxDecoration(
+                                                                        color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                                        borderRadius: BorderRadius.circular(12),
+                                                                        border: Border.all(color: borderC),
+                                                                      ),
+                                                                      child: Column(
+                                                                        children: [
+                                                                          Row(
+                                                                            children: [
+                                                                              Icon(Icons.person_outline, size: 18, color: textS),
+                                                                              const SizedBox(width: 12),
+                                                                              Expanded(
+                                                                                child: Text(
+                                                                                  '${opData['user'] ?? 'Unknown User'}',
+                                                                                  style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600),
+                                                                                ),
+                                                                              ),
+                                                                            ],
+                                                                          ),
+                                                                          const SizedBox(height: 12),
+                                                                          Row(
+                                                                            children: [
+                                                                              Icon(Icons.access_time, size: 18, color: textS),
+                                                                              const SizedBox(width: 12),
+                                                                              Expanded(
+                                                                                child: Text(
+                                                                                  opData['time'] != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(opData['time']).toLocal()) : 'Unknown Time',
+                                                                                  style: TextStyle(color: textP, fontSize: 13),
+                                                                                ),
+                                                                              ),
+                                                                            ],
+                                                                          ),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 24),
+                                                                    SizedBox(
+                                                                      width: double.infinity,
+                                                                      child: TextButton(
+                                                                        onPressed: () => Navigator.pop(dCtx),
+                                                                        style: TextButton.styleFrom(
+                                                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                                                          backgroundColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                                        ),
+                                                                        child: Text(
+                                                                          appLanguage.value == 'es' ? 'Cerrar' : 'Close',
+                                                                          style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+                                                                        ),
+                                                                      ),
+                                                                    )
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }
+                                                      },
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(8),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFF3b82f6).withAlpha(15),
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          border: Border.all(color: const Color(0xFF3b82f6).withAlpha(40)),
+                                                        ),
+                                                        child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF3b82f6), size: 14),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                  ],
                                                   InkWell(
                                                     onTap: canCheck ? () async {
                                                       try {
@@ -970,9 +1081,9 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
                                                         }
                                                       }
-                                                    } : ((isReceivedStatus || isCheckedStatus) ? () {
-                                                      final opData = isCheckedStatus ? uld['data-checked'] : uld['data-received'];
-                                                      final titleOp = isCheckedStatus ? 'Checked Status' : 'Received Status';
+                                                    } : (isCheckedStatus ? () {
+                                                      final opData = uld['data-checked'];
+                                                      final titleOp = 'Checked Status';
                                                       if (opData != null && opData is Map) {
                                                         showDialog(
                                                           context: ctx,
@@ -1080,7 +1191,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                               const SizedBox(width: 4),
                                                             ],
                                                             Text(
-                                                              isCheckedStatus ? 'Checked' : (canCheck ? 'Mark as Checked' : (isReceivedStatus ? 'Received' : 'Pending')),
+                                                              isCheckedStatus ? 'Checked' : (canCheck ? 'Mark as Checked' : (isReceivedStatus ? 'ULD Ready to Check' : 'Pending')),
                                                               style: TextStyle(
                                                                 color: isCheckedStatus ? const Color(0xFF10b981) : (canCheck ? Colors.white : (isReceivedStatus ? const Color(0xFF3b82f6) : const Color(0xFFd97706))),
                                                                 fontSize: 12,

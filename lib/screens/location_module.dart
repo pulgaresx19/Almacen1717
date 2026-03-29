@@ -639,9 +639,9 @@ class _LocationModuleState extends State<LocationModule> {
                                                     ),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 6),
+                                                const SizedBox(width: 12),
                                                 Container(
-                                                  width: 58,
+                                                  width: 75,
                                                   padding:
                                                       const EdgeInsets.symmetric(
                                                         horizontal: 8,
@@ -669,9 +669,9 @@ class _LocationModuleState extends State<LocationModule> {
                                                         TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                const SizedBox(width: 6),
+                                                const SizedBox(width: 12),
                                                 Container(
-                                                  width: 65,
+                                                  width: 90,
                                                   padding:
                                                       const EdgeInsets.symmetric(
                                                         horizontal: 8,
@@ -758,6 +758,146 @@ class _LocationModuleState extends State<LocationModule> {
                                             builder: (ctx) {
                                               return Row(
                                                 children: [
+                                                  if ((uld['data-received'] as Map?)?.isNotEmpty == true) ...[
+                                                    InkWell(
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      onTap: () {
+                                                        final opData = uld['data-received'];
+                                                        if (opData != null && opData is Map) {
+                                                          showDialog(
+                                                            context: ctx,
+                                                            builder: (dCtx) => Dialog(
+                                                              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                              child: Container(
+                                                                width: 320,
+                                                                padding: const EdgeInsets.all(24),
+                                                                child: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(12),
+                                                                      decoration: BoxDecoration(
+                                                                        color: const Color(0xFF3b82f6).withAlpha(20),
+                                                                        shape: BoxShape.circle,
+                                                                      ),
+                                                                      child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF3b82f6), size: 32),
+                                                                    ),
+                                                                    const SizedBox(height: 16),
+                                                                    Text('Received Status', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                                    const SizedBox(height: 24),
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(16),
+                                                                      decoration: BoxDecoration(
+                                                                        color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                                        borderRadius: BorderRadius.circular(12),
+                                                                        border: Border.all(color: borderC),
+                                                                      ),
+                                                                      child: Column(
+                                                                        children: [
+                                                                          Row(children: [Icon(Icons.person_outline, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text('${opData['user'] ?? 'Unknown User'}', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600)))]),
+                                                                          const SizedBox(height: 12),
+                                                                          Row(children: [Icon(Icons.access_time, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(opData['time'] != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(opData['time']).toLocal()) : 'Unknown Time', style: TextStyle(color: textP, fontSize: 13)))]),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 24),
+                                                                    SizedBox(
+                                                                      width: double.infinity,
+                                                                      child: TextButton(
+                                                                        onPressed: () => Navigator.pop(dCtx),
+                                                                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                                                        child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                                                      ),
+                                                                    )
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }
+                                                      },
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFF3b82f6).withAlpha(15),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF3b82f6), size: 14),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                  if ((uld['data-checked'] as Map?)?.isNotEmpty == true) ...[
+                                                    InkWell(
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      onTap: () {
+                                                        final opData = uld['data-checked'];
+                                                        if (opData != null && opData is Map) {
+                                                          showDialog(
+                                                            context: ctx,
+                                                            builder: (dCtx) => Dialog(
+                                                              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                              child: Container(
+                                                                width: 320,
+                                                                padding: const EdgeInsets.all(24),
+                                                                child: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(12),
+                                                                      decoration: BoxDecoration(
+                                                                        color: const Color(0xFF10b981).withAlpha(20),
+                                                                        shape: BoxShape.circle,
+                                                                      ),
+                                                                      child: const Icon(Icons.check_circle_outline, color: Color(0xFF10b981), size: 32),
+                                                                    ),
+                                                                    const SizedBox(height: 16),
+                                                                    Text('Checked Status', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                                    const SizedBox(height: 24),
+                                                                    Container(
+                                                                      padding: const EdgeInsets.all(16),
+                                                                      decoration: BoxDecoration(
+                                                                        color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                                        borderRadius: BorderRadius.circular(12),
+                                                                        border: Border.all(color: borderC),
+                                                                      ),
+                                                                      child: Column(
+                                                                        children: [
+                                                                          Row(children: [Icon(Icons.person_outline, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text('${opData['user'] ?? 'Unknown User'}', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600)))]),
+                                                                          const SizedBox(height: 12),
+                                                                          Row(children: [Icon(Icons.access_time, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(opData['time'] != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(opData['time']).toLocal()) : 'Unknown Time', style: TextStyle(color: textP, fontSize: 13)))]),
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    const SizedBox(height: 24),
+                                                                    SizedBox(
+                                                                      width: double.infinity,
+                                                                      child: TextButton(
+                                                                        onPressed: () => Navigator.pop(dCtx),
+                                                                        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                                                        child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                                                      ),
+                                                                    )
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }
+                                                      },
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFF10b981).withAlpha(15),
+                                                          borderRadius: BorderRadius.circular(6),
+                                                        ),
+                                                        child: const Icon(Icons.check_circle_outline, color: Color(0xFF10b981), size: 14),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
 
                                                   Builder(
                                                     builder: (context) {
@@ -766,13 +906,72 @@ class _LocationModuleState extends State<LocationModule> {
                                                       final bool isReceived = (uld['data-received'] as Map?)?.isNotEmpty == true;
 
                                                       if (isSaved) {
-                                                        return Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                          decoration: BoxDecoration(
-                                                            color: const Color(0xFF10b981).withAlpha(15),
-                                                            borderRadius: BorderRadius.circular(6),
+                                                        return InkWell(
+                                                          borderRadius: BorderRadius.circular(6),
+                                                          onTap: () {
+                                                            final opData = uld['data-saved'];
+                                                            if (opData != null && opData is Map) {
+                                                              showDialog(
+                                                                context: context,
+                                                                builder: (dCtx) => Dialog(
+                                                                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                                  child: Container(
+                                                                    width: 320,
+                                                                    padding: const EdgeInsets.all(24),
+                                                                    child: Column(
+                                                                      mainAxisSize: MainAxisSize.min,
+                                                                      children: [
+                                                                        Container(
+                                                                          padding: const EdgeInsets.all(12),
+                                                                          decoration: BoxDecoration(
+                                                                            color: const Color(0xFF10b981).withAlpha(20),
+                                                                            shape: BoxShape.circle,
+                                                                          ),
+                                                                          child: const Icon(Icons.download_done, color: Color(0xFF10b981), size: 32),
+                                                                        ),
+                                                                        const SizedBox(height: 16),
+                                                                        Text('Saved Status', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                                        const SizedBox(height: 24),
+                                                                        Container(
+                                                                          padding: const EdgeInsets.all(16),
+                                                                          decoration: BoxDecoration(
+                                                                            color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                                                            borderRadius: BorderRadius.circular(12),
+                                                                            border: Border.all(color: borderC),
+                                                                          ),
+                                                                          child: Column(
+                                                                            children: [
+                                                                              Row(children: [Icon(Icons.person_outline, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text('${opData['user'] ?? 'Unknown User'}', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w600)))]),
+                                                                              const SizedBox(height: 12),
+                                                                              Row(children: [Icon(Icons.access_time, size: 18, color: textS), const SizedBox(width: 12), Expanded(child: Text(opData['time'] != null ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(opData['time']).toLocal()) : 'Unknown Time', style: TextStyle(color: textP, fontSize: 13)))]),
+                                                                            ],
+                                                                          ),
+                                                                        ),
+                                                                        const SizedBox(height: 24),
+                                                                        SizedBox(
+                                                                          width: double.infinity,
+                                                                          child: TextButton(
+                                                                            onPressed: () => Navigator.pop(dCtx),
+                                                                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), backgroundColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                                                            child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                                                          ),
+                                                                        )
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            }
+                                                          },
+                                                          child: Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFF10b981).withAlpha(15),
+                                                              borderRadius: BorderRadius.circular(6),
+                                                            ),
+                                                            child: const Text('Saved', style: TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold)),
                                                           ),
-                                                          child: const Text('Saved', style: TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold)),
                                                         );
                                                       }
 
@@ -813,7 +1012,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                           },
                                                           child: uld['isSaving'] == true
                                                               ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                                              : const Text('Mark ULD as Ready', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+                                                              : const Text('Mark ULD as Saved', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
                                                         );
                                                       }
 
@@ -825,7 +1024,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                             borderRadius: BorderRadius.circular(6),
                                                           ),
                                                           child: const Text(
-                                                            'Checked',
+                                                            'ULD Ready to Save',
                                                             style: TextStyle(
                                                               color: Color(0xFF3b82f6),
                                                               fontSize: 12,
@@ -1108,11 +1307,13 @@ class _LocationModuleState extends State<LocationModule> {
                                                         } else if (awb['data-location'] is Map) {
                                                           dlList = [awb['data-location']];
                                                         }
+                                                        Map<String, dynamic>? locMeta;
                                                         for (var dl in dlList) {
                                                           if (dl is Map && dl['refULD']?.toString().toUpperCase() == uldNum &&
                                                               dl['refCarrier']?.toString() == uldCarrier &&
                                                               dl['refNumber']?.toString() == uldFlight) {
                                                             isSaved = true;
+                                                            locMeta = Map<String, dynamic>.from(dl);
                                                           }
                                                         }
 
@@ -1508,6 +1709,16 @@ class _LocationModuleState extends State<LocationModule> {
                                                                                   ),
                                                                                 ],
                                                                               ),
+                                                                              actionsPadding: const EdgeInsets.only(right: 8, bottom: 8),
+                                                                              actions: [
+                                                                                TextButton(
+                                                                                  onPressed: () => Navigator.pop(ctx),
+                                                                                  style: TextButton.styleFrom(
+                                                                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                                                  ),
+                                                                                  child: const Text('OK', style: TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold)),
+                                                                                ),
+                                                                              ],
                                                                             ),
                                                                           );
                                                                         },
@@ -1532,23 +1743,80 @@ class _LocationModuleState extends State<LocationModule> {
                                                                         ),
                                                                       ),
                                                                       if (isSaved)
-                                                                        Container(
-                                                                          margin: const EdgeInsets.only(left: 8),
-                                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                                          decoration: BoxDecoration(
-                                                                            color: const Color(0xFF3b82f6).withAlpha(30),
-                                                                            borderRadius: BorderRadius.circular(4),
-                                                                            border: Border.all(
-                                                                              color: const Color(0xFF3b82f6).withAlpha(50),
+                                                                        GestureDetector(
+                                                                          onTap: () {
+                                                                            showDialog(
+                                                                              context: context,
+                                                                              builder: (ctx) => AlertDialog(
+                                                                                backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                                                contentPadding: const EdgeInsets.all(24),
+                                                                                content: Column(
+                                                                                  mainAxisSize: MainAxisSize.min,
+                                                                                  children: [
+                                                                                    Container(
+                                                                                      padding: const EdgeInsets.all(12),
+                                                                                      decoration: BoxDecoration(
+                                                                                        color: const Color(0xFF3b82f6).withAlpha(30),
+                                                                                        shape: BoxShape.circle,
+                                                                                      ),
+                                                                                      child: const Icon(Icons.save, color: Color(0xFF3b82f6), size: 28),
+                                                                                    ),
+                                                                                    const SizedBox(height: 12),
+                                                                                    Text(
+                                                                                      locMeta?['user']?.toString() ?? 'System',
+                                                                                      textAlign: TextAlign.center,
+                                                                                      style: TextStyle(
+                                                                                        color: dark ? Colors.white : Colors.black87,
+                                                                                        fontSize: 16,
+                                                                                        fontWeight: FontWeight.bold,
+                                                                                      ),
+                                                                                    ),
+                                                                                    const SizedBox(height: 4),
+                                                                                    Text(
+                                                                                      locMeta?['time'] != null
+                                                                                          ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(locMeta!['time']).toLocal())
+                                                                                          : '-',
+                                                                                      textAlign: TextAlign.center,
+                                                                                      style: TextStyle(
+                                                                                        color: textS,
+                                                                                        fontSize: 12,
+                                                                                        fontWeight: FontWeight.w500,
+                                                                                      ),
+                                                                                    ),
+                                                                                  ],
+                                                                                ),
+                                                                                actionsPadding: const EdgeInsets.only(right: 8, bottom: 8),
+                                                                                actions: [
+                                                                                  TextButton(
+                                                                                    onPressed: () => Navigator.pop(ctx),
+                                                                                    style: TextButton.styleFrom(
+                                                                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                                                    ),
+                                                                                    child: const Text('OK', style: TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold)),
+                                                                                  ),
+                                                                                ],
+                                                                              ),
+                                                                            );
+                                                                          },
+                                                                          child: Container(
+                                                                            margin: const EdgeInsets.only(left: 8),
+                                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                            decoration: BoxDecoration(
+                                                                              color: const Color(0xFF3b82f6).withAlpha(30),
+                                                                              borderRadius: BorderRadius.circular(4),
+                                                                              border: Border.all(
+                                                                                color: const Color(0xFF3b82f6).withAlpha(50),
+                                                                              ),
                                                                             ),
-                                                                          ),
-                                                                          child: Row(
-                                                                            mainAxisSize: MainAxisSize.min,
-                                                                            children: const [
-                                                                              Icon(Icons.save, size: 10, color: Color(0xFF3b82f6)),
-                                                                              SizedBox(width: 4),
-                                                                              Text('Saved', style: TextStyle(color: Color(0xFF3b82f6), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                                            ],
+                                                                            child: Row(
+                                                                              mainAxisSize: MainAxisSize.min,
+                                                                              children: const [
+                                                                                Icon(Icons.save, size: 10, color: Color(0xFF3b82f6)),
+                                                                                SizedBox(width: 4),
+                                                                                Text('Saved', style: TextStyle(color: Color(0xFF3b82f6), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                                              ],
+                                                                            ),
                                                                           ),
                                                                         ),
                                                                   ],
@@ -1931,11 +2199,13 @@ class _LocationModuleState extends State<LocationModule> {
                                   } else if (awb['data-location'] is Map) {
                                     dlList = [awb['data-location']];
                                   }
+                                  Map<String, dynamic>? locMeta;
                                   for (var dl in dlList) {
                                     if (dl is Map && dl['refULD']?.toString().toUpperCase() == uldNum &&
                                         dl['refCarrier']?.toString() == uldCarrier &&
                                         dl['refNumber']?.toString() == uldFlight) {
                                       isSaved = true;
+                                      locMeta = Map<String, dynamic>.from(dl);
                                     }
                                   }
 
@@ -2019,23 +2289,80 @@ class _LocationModuleState extends State<LocationModule> {
                                             ),
                                         ),
                                         if (isSaved)
-                                          Container(
-                                            margin: const EdgeInsets.only(left: 8),
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF3b82f6).withAlpha(30),
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: const Color(0xFF3b82f6).withAlpha(50),
+                                          GestureDetector(
+                                            onTap: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (ctx) => AlertDialog(
+                                                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                  contentPadding: const EdgeInsets.all(24),
+                                                  content: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Container(
+                                                        padding: const EdgeInsets.all(12),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFF3b82f6).withAlpha(30),
+                                                          shape: BoxShape.circle,
+                                                        ),
+                                                        child: const Icon(Icons.save, color: Color(0xFF3b82f6), size: 28),
+                                                      ),
+                                                      const SizedBox(height: 12),
+                                                      Text(
+                                                        locMeta?['user']?.toString() ?? 'System',
+                                                        textAlign: TextAlign.center,
+                                                        style: TextStyle(
+                                                          color: dark ? Colors.white : Colors.black87,
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        locMeta?['time'] != null
+                                                            ? DateFormat('MMM dd, yyyy • h:mm a').format(DateTime.parse(locMeta!['time']).toLocal())
+                                                            : '-',
+                                                        textAlign: TextAlign.center,
+                                                        style: TextStyle(
+                                                          color: textS,
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  actionsPadding: const EdgeInsets.only(right: 8, bottom: 8),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(ctx),
+                                                      style: TextButton.styleFrom(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                      ),
+                                                      child: const Text('OK', style: TextStyle(color: Color(0xFF3b82f6), fontWeight: FontWeight.bold)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                            child: Container(
+                                              margin: const EdgeInsets.only(left: 8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF3b82f6).withAlpha(30),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: const Color(0xFF3b82f6).withAlpha(50),
+                                                ),
                                               ),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: const [
-                                                Icon(Icons.save, size: 10, color: Color(0xFF3b82f6)),
-                                                SizedBox(width: 4),
-                                                Text('Saved', style: TextStyle(color: Color(0xFF3b82f6), fontSize: 10, fontWeight: FontWeight.bold)),
-                                              ],
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: const [
+                                                  Icon(Icons.save, size: 10, color: Color(0xFF3b82f6)),
+                                                  SizedBox(width: 4),
+                                                  Text('Saved', style: TextStyle(color: Color(0xFF3b82f6), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
                                             ),
                                           ),
                                       ],
@@ -3032,6 +3359,7 @@ class _LocationModuleState extends State<LocationModule> {
                             : () async {
                             setDialogState(() => isSaving = true);
                             try {
+                              final authorName = await _getAuthorName();
                               final existing = await Supabase.instance.client
                                   .from('AWB')
                                   .select('data-location')
@@ -3065,6 +3393,8 @@ class _LocationModuleState extends State<LocationModule> {
                               locData['refNumber'] = uldFlt;
                               locData['refDate'] = uldDate;
                               locData['updatedAt'] = DateTime.now().toIso8601String();
+                              locData['user'] = authorName;
+                              locData['time'] = DateTime.now().toUtc().toIso8601String();
 
                               if (matchIndex != -1) {
                                 dlList[matchIndex] = locData;
