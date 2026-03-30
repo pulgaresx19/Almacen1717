@@ -5,7 +5,8 @@
             "name": "Flutter",
             "request": "launch",
             "type": "dart",
-            "program": "lib/main.dart"
+            "program": "lib/main.dart",
+            "deviceId": "edge"
         }
     ]
 }

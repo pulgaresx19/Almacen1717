@@ -181,18 +181,27 @@ class _DriverModuleState extends State<DriverModule> {
     Color bg = const Color(0xFF334155);
     Color fg = const Color(0xFFcbd5e1);
     
-    if (status.toLowerCase().contains('waiting')) {
-       bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
-    } else if (status.toLowerCase().contains('process')) {
-       bg = const Color(0xFF1e40af).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (status.toLowerCase().contains('completed') || status.toLowerCase().contains('delivered')) {
+    final s = status.toLowerCase();
+    if (s.contains('waiting') || s.contains('espera')) {
+      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
+    } else if (s.contains('process')) {
+      bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
+    } else if (s.contains('completed') || s.contains('delivered')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(status, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600)),
+      width: 100,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        status.toUpperCase(), 
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
+      ),
     );
   }
 }

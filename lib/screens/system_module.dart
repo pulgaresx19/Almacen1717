@@ -45,6 +45,51 @@ class _SystemModuleState extends State<SystemModule> {
   Map<String, dynamic>? _lastReceivedUldLeft;
   Map<String, dynamic>? _lastReceivedUldRight;
 
+  Map<String, dynamic>? _globalSearchResult;
+  bool _isGlobalSearching = false;
+
+  Future<void> _performGlobalSearch() async {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _isGlobalSearching = true;
+      _globalSearchResult = null;
+    });
+
+    try {
+      final resList = await Supabase.instance.client
+          .from('ULD')
+          .select()
+          .ilike('ULD-number', '%$query%')
+          .limit(10);
+
+      if (mounted) {
+        setState(() {
+          _isGlobalSearching = false;
+          if (resList.isNotEmpty) {
+            _globalSearchResult = {'list': resList};
+          } else {
+            _globalSearchResult = {
+              'error': true,
+              'message': appLanguage.value == 'es' ? 'No se encontró el ULD solicitado.' : 'Requested ULD not found.'
+            };
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isGlobalSearching = false;
+          _globalSearchResult = {
+            'error': true,
+            'message': 'Error: $e'
+          };
+        });
+      }
+    }
+  }
+
   Future<String> _getAuthorName() async {
     String userName = Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
     try {
@@ -909,8 +954,10 @@ class _SystemModuleState extends State<SystemModule> {
                                                           currentFlightList[idx]['local-truck-arrived'][uldKey] = truckTime;
                                                         }
 
+                                                        uld['status'] = 'Received';
                                                         Supabase.instance.client.from('ULD').update({
-                                                          'data-received': payload
+                                                          'data-received': payload,
+                                                          'status': 'Received'
                                                         }).eq('id', uld['id']).catchError((e) {
                                                           debugPrint('data-received Update Err: $e');
                                                         });
@@ -928,8 +975,10 @@ class _SystemModuleState extends State<SystemModule> {
                                                           (currentFlightList[idx]['local-truck-arrived'] as Map).remove(uldKey);
                                                         }
 
+                                                        uld['status'] = 'Waiting';
                                                         Supabase.instance.client.from('ULD').update({
-                                                          'data-received': {}
+                                                          'data-received': {},
+                                                          'status': 'Waiting'
                                                         }).eq('id', uld['id']).catchError((e) {
                                                           debugPrint('data-received Reset Err: $e');
                                                         });
@@ -1560,7 +1609,9 @@ class _SystemModuleState extends State<SystemModule> {
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
-        return Column(
+        return Stack(
+          children: [
+            Column(
           children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -1580,24 +1631,66 @@ class _SystemModuleState extends State<SystemModule> {
                 ),
                 const Spacer(),
                 Container(
-                  width: 300,
-                  height: 40,
+                  width: 320,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(21),
                     border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
                   ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13),
-                    onChanged: (v) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
-                      hintStyle: TextStyle(color: (dark ? Colors.white : const Color(0xFF111827)).withAlpha(76), fontSize: 13),
-                      prefixIcon: Icon(Icons.search_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 16),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13),
+                          onChanged: (v) => setState(() {}),
+                          onSubmitted: (v) {
+                            if (v.trim().isNotEmpty) _performGlobalSearch();
+                          },
+                          decoration: InputDecoration(
+                            hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
+                            hintStyle: TextStyle(color: (dark ? Colors.white : const Color(0xFF111827)).withAlpha(76), fontSize: 13),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          ),
+                        ),
+                      ),
+                      if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16),
+                          color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: _searchController.text.trim().isEmpty ? null : _performGlobalSearch,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          margin: const EdgeInsets.only(right: 5),
+                          decoration: BoxDecoration(
+                            color: _searchController.text.trim().isEmpty 
+                                ? (dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6))
+                                : const Color(0xFF6366f1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.search_rounded, 
+                            size: 16, 
+                            color: _searchController.text.trim().isEmpty 
+                                ? (dark ? Colors.white30 : Colors.black26) 
+                                : Colors.white
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1646,8 +1739,83 @@ class _SystemModuleState extends State<SystemModule> {
               ),
             ),
           ],
-        );
-      },
+        ),
+        if (_isGlobalSearching || _globalSearchResult != null)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withAlpha(dark ? 120 : 60),
+              child: Center(
+                child: _isGlobalSearching 
+                  ? const CircularProgressIndicator(color: Color(0xFF6366f1))
+                  : Container(
+                     constraints: const BoxConstraints(maxWidth: 500, maxHeight: 400),
+                     padding: const EdgeInsets.all(32),
+                     decoration: BoxDecoration(
+                       color: dark ? const Color(0xFF1e293b) : Colors.white,
+                       borderRadius: BorderRadius.circular(16),
+                       boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                     ),
+                     child: Column(
+                       mainAxisSize: MainAxisSize.min,
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+                         Text(
+                           appLanguage.value == 'es' ? 'Resultado de Búsqueda' : 'Search Result',
+                           style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 20, fontWeight: FontWeight.bold),
+                         ),
+                         const SizedBox(height: 16),
+                         if (_globalSearchResult!['error'] == true)
+                           Text(
+                             _globalSearchResult!['message'],
+                             style: const TextStyle(color: Colors.redAccent, fontSize: 16),
+                           )
+                         else if (_globalSearchResult!['list'] != null)
+                           Flexible(
+                             child: ListView.separated(
+                               shrinkWrap: true,
+                               itemCount: (_globalSearchResult!['list'] as List).length,
+                               separatorBuilder: (_, _) => Divider(color: dark ? Colors.white24 : Colors.black12),
+                               itemBuilder: (context, idx) {
+                                 final uItem = (_globalSearchResult!['list'] as List)[idx];
+                                 bool isReceived = uItem['data-received'] != null && (uItem['data-received'] as Map).isNotEmpty;
+                                 final txtColor = dark ? Colors.white : const Color(0xFF111827);
+                                 final subColor = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+                                 return ListTile(
+                                   contentPadding: EdgeInsets.zero,
+                                   title: Text('ULD: ${uItem['ULD-number'] ?? 'Unknown'}', style: TextStyle(color: txtColor, fontWeight: FontWeight.bold)),
+                                   subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const SizedBox(height: 4),
+                                        Text('Flight: ${uItem['refCarrier'] ?? ''} ${uItem['refNumber'] ?? ''} | Date: ${uItem['refDate'] ?? '-'}', style: TextStyle(color: subColor, fontSize: 12)),
+                                        Text('PCs: ${uItem['pieces'] ?? '-'} | Weight: ${uItem['weight'] ?? '-'} kg', style: TextStyle(color: subColor, fontSize: 12)),
+                                      ],
+                                   ),
+                                   trailing: isReceived 
+                                        ? const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 20)
+                                        : const Icon(Icons.access_time, color: Color(0xFFf59e0b), size: 20),
+                                 );
+                               },
+                             ),
+                           ),
+                         const SizedBox(height: 24),
+                         Align(
+                           alignment: Alignment.centerRight,
+                           child: TextButton(
+                             onPressed: () => setState(() => _globalSearchResult = null),
+                             child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
+                           ),
+                         ),
+                       ],
+                     ),
+                  ),
+              ),
+            ),
+          ),
+      ],
     );
+  },
+  );
   }
 }

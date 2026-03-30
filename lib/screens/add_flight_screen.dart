@@ -1,3 +1,6 @@
+
+
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -493,6 +496,13 @@ class AddFlightScreenState extends State<AddFlightScreen> {
         Map<String, Map<String, dynamic>> mergedAwbs = {};
 
         for (var uld in _flightLocalUlds) {
+          List awbs = uld['awbs'];
+          final dataUld = awbs.map((a) => {
+            'awb_number': a['awb_number'],
+            'pieces': a['pieces'],
+            'total': a['total'],
+          }).toList();
+
           uldPayloads.add({
             'ULD-number': uld['uldNumber'],
             'refCarrier': fCarrier,
@@ -503,10 +513,10 @@ class AddFlightScreenState extends State<AddFlightScreen> {
             'isPriority': uld['priority'],
             'isBreak': uld['break'],
             'status': 'Waiting',
+            'data-ULD': dataUld,
             'created_at': DateTime.now().toIso8601String(),
           });
 
-          List awbs = uld['awbs'];
           for (var awb in awbs) {
             final num = awb['awb_number'];
             if (!mergedAwbs.containsKey(num)) {
@@ -1120,44 +1130,30 @@ class AddFlightScreenState extends State<AddFlightScreen> {
           : const SizedBox.shrink(),
         ), // end of Expanded
         // Bottom Pinned Action Bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0f172a),
-            border: Border(top: BorderSide(color: Colors.white.withAlpha(15))),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 10, offset: const Offset(0, -4)),
-            ]
-          ),
-          child: Container(
-            width: double.infinity,
-            height: 56,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8b5cf6), Color(0xFF6366f1)], // Purple to Indigo
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6366f1).withAlpha(80),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            ),
-            child: ElevatedButton.icon(
-              onPressed: _isSaving ? null : _saveEverything,
-              icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.check_circle_outline_rounded, size: 22, color: Colors.white),
-              label: _isSaving 
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)) 
-                  : const Text('GUARDAR ESTRUCTURA DEL VUELO', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        const SizedBox(height: 16),
+
+        Padding(
+          padding: const EdgeInsets.only(right: 24.0, bottom: 24.0),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366f1),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                ),
+                onPressed: _isSaving ? null : _saveEverything,
+                icon: _isSaving 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.check_rounded),
+                label: Text(
+                  _isSaving ? 'Processing...' : 'Save Flight', 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
+                ),
               ),
             ),
           ),

@@ -37,6 +37,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
   void initState() {
     super.initState();
     _typeCtrl.text = 'Walk-in';
+    _timeCtrl.text = 'NOW';
     _fetchAwbs();
   }
 
@@ -90,39 +91,175 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     super.dispose();
   }
 
+  void _showMissingFieldAlert(String fieldName) {
+    showDialog(
+      context: context,
+      builder: (alertCtx) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.redAccent.withAlpha(50)),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Action Required',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFFcbd5e1),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFef4444),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () => Navigator.pop(alertCtx),
+                child: const Text(
+                  'UNDERSTOOD',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _submitPayload() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_truckCompanyCtrl.text.trim().isEmpty) {
+      _showMissingFieldAlert('Truck Company');
+      return;
+    }
+    if (_driverCtrl.text.trim().isEmpty) {
+      _showMissingFieldAlert('Driver');
+      return;
+    }
+    if (_idPickupCtrl.text.trim().isEmpty) {
+      _showMissingFieldAlert('ID Pickup');
+      return;
+    }
 
     if (_selectedAwbs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(appLanguage.value == 'es' ? 'Debe seleccionar al menos un AWB' : 'Must select at least one AWB'), backgroundColor: Colors.redAccent),
-      );
+      _showMissingFieldAlert('Air Waybills (AWBs)');
       return;
+    }
+
+    String finalTime = _timeCtrl.text.trim();
+    if (_typeCtrl.text == 'Appointment') {
+      if (finalTime.isEmpty || finalTime == 'NOW') {
+        _showMissingFieldAlert('Time');
+        return;
+      }
+    } else {
+      if (finalTime.isEmpty || finalTime == 'NOW') {
+        final now = DateTime.now();
+        finalTime = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      }
     }
 
     setState(() => _isLoading = true);
     
+    String doorText = _doorCtrl.text.trim();
+    if (doorText.isEmpty) doorText = 'PENDING';
+
     try {
+      final nowForDate = DateTime.now();
+      int hours = 0;
+      int minutes = 0;
+      if (finalTime.contains(':')) {
+        final parts = finalTime.split(':');
+        hours = int.tryParse(parts[0]) ?? 0;
+        minutes = int.tryParse(parts[1]) ?? 0;
+      }
+      final timeDeliverDate = DateTime(nowForDate.year, nowForDate.month, nowForDate.day, hours, minutes);
+
       final payload = {
         'truck-company': _truckCompanyCtrl.text.trim(),
         'driver': _driverCtrl.text.trim(),
-        'door': _doorCtrl.text.trim(),
+        'door': doorText,
         'id-pickup': _idPickupCtrl.text.trim(),
         'type': _typeCtrl.text.trim(),
         'status': 'Waiting',
-        'time': _timeCtrl.text.trim(),
+        'time-deliver': timeDeliverDate.toUtc().toIso8601String(),
         'remarks': _remarksCtrl.text.trim(),
         'isPriority': _isPriority,
-        'list-pickup': _selectedAwbs,
+        'list-pickup': _selectedAwbs.map((e) => e['AWB-number']?.toString() ?? '').toList(),
       };
 
       await Supabase.instance.client.from('Delivers').insert(payload);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(appLanguage.value == 'es' ? 'Entrega creada exitosamente' : 'Delivery created successfully'), backgroundColor: Colors.green),
+        await showDialog(
+          context: context,
+          barrierColor: Colors.black45,
+          barrierDismissible: false,
+          builder: (ctx) {
+            Future.delayed(const Duration(seconds: 2), () {
+              if (ctx.mounted) Navigator.pop(ctx);
+            });
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              backgroundColor: const Color(0xFF1e293b),
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF10b981),
+                      size: 64,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      appLanguage.value == 'es' ? 'Entrega creada exitosamente' : 'Delivery created successfully',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
-        if (widget.onPop != null) widget.onPop!(true);
+        if (mounted && widget.onPop != null) widget.onPop!(true);
       }
     } catch (e) {
       if (mounted) {
@@ -209,7 +346,6 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
           borderSide: BorderSide(color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), width: 1.5),
         ),
       ),
-      validator: (val) => val == null || val.trim().isEmpty ? 'Requerido / Required' : null,
     );
   }
 
@@ -244,6 +380,11 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         if (val != null) {
           setState(() {
              _typeCtrl.text = val;
+             if (val == 'Appointment') {
+               if (_timeCtrl.text == 'NOW') _timeCtrl.clear();
+             } else {
+               if (_timeCtrl.text.isEmpty) _timeCtrl.text = 'NOW';
+             }
           });
         }
       },
@@ -415,7 +556,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
         final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
 
-        return Column(
+        final content = Column(
           children: [
             Expanded(
               child: Form(
@@ -562,7 +703,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                         const SizedBox(height: 16),
                         Expanded(
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Expanded(
                                 flex: 5,
@@ -610,7 +751,23 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
             ),
           ),
         ],
-      );
+        );
+
+        if (widget.onPop == null) {
+          return Scaffold(
+            backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
+            appBar: AppBar(
+              title: Text(appLanguage.value == 'es' ? 'Añadir Nueva Entrega' : 'Add New Deliver', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
+              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+              elevation: 0,
+              iconTheme: IconThemeData(color: textP),
+              bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),
+            ),
+            body: Padding(padding: const EdgeInsets.all(24), child: content),
+          );
+        }
+
+        return content;
       },
     );
   }

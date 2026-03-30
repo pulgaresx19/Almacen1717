@@ -298,7 +298,7 @@ class _FlightModuleState extends State<FlightModule> {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: 400,
+              width: 480,
               height: double.infinity,
               decoration: BoxDecoration(
                 color: dark ? const Color(0xFF0f172a) : Colors.white,
@@ -350,16 +350,37 @@ class _FlightModuleState extends State<FlightModule> {
     Color bg = const Color(0xFF334155);
     Color fg = const Color(0xFFcbd5e1);
     
-    if (status.toLowerCase() == 'pending') {
-      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
-    } else if (status.toLowerCase() == 'ready') {
-      bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
+    switch (status.toLowerCase()) {
+      case 'waiting':
+        bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
+        break;
+      case 'received':
+        bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
+        break;
+      case 'checked':
+        bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
+        break;
+      case 'ready':
+      case 'saved':
+        bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
+        break;
+      case 'pending':
+        bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
+        break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(status, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600)),
+      width: 100,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        status, 
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
+      ),
     );
   }
 }
@@ -451,21 +472,36 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
     });
   }
 
-  Widget _buildInfoRow(String label, String value, Color colorL, Color colorV) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+  Widget _buildInfoCard(String label, String value, Color colorL, Color colorV, {IconData? icon}) {
+    final borderC = widget.dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+    final bgCard = widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 130, child: Text(label, style: TextStyle(color: colorL, fontSize: 13))),
-          Expanded(child: Text(value, style: TextStyle(color: colorV, fontSize: 14, fontWeight: FontWeight.w500))),
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: colorL, size: 14),
+                const SizedBox(width: 6),
+              ],
+              Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(value, style: TextStyle(color: colorV, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
         ],
       ),
     );
   }
 
-  Widget _buildEditableRow(String label, String key, Color colorL, Color colorP, {bool isTime = false, bool isStatus = false}) {
+  Widget _buildEditableCard(String label, String key, Color colorL, Color colorP, {bool isTime = false, bool isStatus = false, IconData? icon}) {
     final isEditingThisField = _editingKeys.contains(key);
+    final borderC = widget.dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+    final bgCard = widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB);
 
     if (!isEditingThisField) {
       String displayValue = '${_editedFlight[key] ?? '-'}';
@@ -475,12 +511,12 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
             try {
               if (ts.contains('T') || ts.contains('-')) {
                 final dt = DateTime.parse(ts).toLocal();
-                ts = DateFormat('hh:mm a').format(dt).toUpperCase();
+                ts = DateFormat('hh:mma').format(dt).toUpperCase();
               } else {
                 final parts = ts.trim().split(':');
                 if (parts.length >= 2) {
                    final dt = DateTime(2000, 1, 1, int.parse(parts[0]), int.parse(parts[1]));
-                   ts = DateFormat('hh:mm a').format(dt).toUpperCase();
+                   ts = DateFormat('hh:mma').format(dt).toUpperCase();
                 }
               }
             } catch (_) {}
@@ -488,31 +524,42 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
         displayValue = ts;
       }
       
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(width: 130, child: Text(label, style: TextStyle(color: colorL, fontSize: 13))),
-            Expanded(child: Text(displayValue, style: TextStyle(color: colorP, fontSize: 14, fontWeight: FontWeight.w500))),
-            const SizedBox(width: 8),
-            if (_isEditing)
-              IconButton(
-                icon: Icon(Icons.edit_rounded, color: colorL, size: 16),
-                onPressed: () {
-                  setState(() => _editingKeys.add(key));
-                },
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                padding: EdgeInsets.zero,
-                tooltip: appLanguage.value == 'es' ? 'Editar' : 'Edit',
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: colorL, size: 14),
+                        const SizedBox(width: 4),
+                      ],
+                      Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                    ],
+                  ),
+                ),
+                if (_isEditing)
+                  InkWell(
+                    onTap: () => setState(() => _editingKeys.add(key)),
+                    child: Icon(Icons.edit_rounded, color: colorP, size: 14),
+                  )
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(displayValue, style: TextStyle(color: colorP, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
           ],
         ),
       );
     }
     
     Widget editor;
-    final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+    final inputBorderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
     
     if (isTime) {
       editor = InkWell(
@@ -536,9 +583,10 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
           }
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
-          child: Text('${_editedFlight[key] ?? '__:__ --'}', style: TextStyle(color: colorP, fontSize: 13)),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+          child: Text('${_editedFlight[key] ?? '--:--'}', style: TextStyle(color: colorP, fontSize: 12), textAlign: TextAlign.center),
         ),
       );
     } else if (isStatus) {
@@ -547,95 +595,93 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
         currentVal = 'Waiting';
       }
       editor = Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
+        height: 32,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             value: currentVal,
             dropdownColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
             isExpanded: true,
-            style: TextStyle(color: colorP, fontSize: 13),
+            style: TextStyle(color: colorP, fontSize: 12),
             items: const [
               DropdownMenuItem(value: 'Waiting', child: Text('Waiting')),
               DropdownMenuItem(value: 'Pending', child: Text('Pending')),
               DropdownMenuItem(value: 'Ready', child: Text('Ready'))
             ],
             onChanged: (v) {
-              if (v != null) {
-                setState(() => _editedFlight[key] = v);
-              }
+              if (v != null) setState(() => _editedFlight[key] = v);
             },
           ),
         ),
       );
     } else {
       editor = SizedBox(
-        height: 36,
+        height: 32,
         child: TextField(
-          style: TextStyle(color: colorP, fontSize: 13),
+          style: TextStyle(color: colorP, fontSize: 12),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
             fillColor: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
             filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
           ),
           controller: TextEditingController(text: _editedFlight[key]?.toString() ?? '')..selection = TextSelection.collapsed(offset: (_editedFlight[key]?.toString() ?? '').length),
-          onChanged: (v) {
-            _editedFlight[key] = v;
-          },
+          onChanged: (v) => _editedFlight[key] = v,
         ),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 130, child: Text(label, style: TextStyle(color: colorL, fontSize: 13))),
-          Expanded(child: editor),
-          if (isEditingThisField) ...[
-            const SizedBox(width: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.save_rounded, color: Color(0xFF6366f1), size: 18),
-                onPressed: () {
-                  _saveField(key, _editedFlight[key]);
-                  setState(() => _editingKeys.remove(key));
-                },
-                tooltip: appLanguage.value == 'es' ? 'Guardar' : 'Save',
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                padding: EdgeInsets.zero,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Container(
-              decoration: BoxDecoration(
-                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
-                onPressed: () {
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: colorL, size: 14),
+                const SizedBox(width: 4),
+              ],
+              Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          editor,
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              InkWell(
+                onTap: () {
                   setState(() {
                     _editedFlight[key] = widget.flight[key];
                     _editingKeys.remove(key);
                   });
                 },
-                tooltip: appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                padding: EdgeInsets.zero,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(6)),
+                  child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
+                )
               ),
-            ),
-          ]
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () {
+                  _saveField(key, _editedFlight[key]);
+                  setState(() => _editingKeys.remove(key));
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(20), borderRadius: BorderRadius.circular(6)),
+                  child: const Icon(Icons.check_rounded, color: Color(0xFF6366f1), size: 16),
+                )
+              ),
+            ]
+          )
         ],
       ),
     );
@@ -733,24 +779,36 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow(appLanguage.value == 'es' ? 'Aerolínea / No.' : 'Carrier / No.', '${f['carrier']} ${f['number']}', textS, textP),
-                Builder(builder: (context) {
-                   String dStr = f['date-arrived']?.toString() ?? '-';
-                   try {
-                     if (dStr.isNotEmpty && dStr != '-') {
-                       dStr = DateFormat('MM/dd/yyyy').format(DateTime.parse(dStr));
-                     }
-                   } catch (_) {}
-                   return _buildInfoRow(appLanguage.value == 'es' ? 'Fecha Llegada' : 'Arrive Date', dStr, textS, textP);
+                LayoutBuilder(builder: (context, constraints) {
+                  final wFull = constraints.maxWidth;
+                  final wHalf = (wFull - 8) / 2;
+                  final wThird = (wFull - 16) / 3;
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Aerolínea / No.' : 'Carrier/No', '${f['carrier']} ${f['number']}', textS, textP, icon: Icons.flight_takeoff_outlined)),
+                      SizedBox(width: wHalf, child: Builder(builder: (context) {
+                         String dStr = f['date-arrived']?.toString() ?? '-';
+                         try {
+                           if (dStr.isNotEmpty && dStr != '-') {
+                             dStr = DateFormat('MM/dd/yy').format(DateTime.parse(dStr));
+                           }
+                         } catch (_) {}
+                         return _buildInfoCard(appLanguage.value == 'es' ? 'Fecha Llegada' : 'Arrive Date', dStr, textS, textP, icon: Icons.calendar_today_outlined);
+                      })),
+                      SizedBox(width: wHalf, child: _buildInfoCard('Break / No Break', '${f['cant-break'] ?? 0} / ${f['cant-noBreak'] ?? 0}', textS, textP, icon: Icons.inventory_2_outlined)),
+                      SizedBox(width: wHalf, child: _buildEditableCard(appLanguage.value == 'es' ? 'Estado' : 'Status', 'status', textS, textP, isStatus: true, icon: Icons.info_outline)),
+                      SizedBox(width: wThird, child: _buildEditableCard(appLanguage.value == 'es' ? 'Llegada' : 'Arrive', 'time-arrived', textS, textP, isTime: true, icon: Icons.schedule)),
+                      SizedBox(width: wThird, child: _buildEditableCard(appLanguage.value == 'es' ? 'Inicio Brk' : 'Start Brk', 'start-break', textS, textP, isTime: true, icon: Icons.play_circle_outline)),
+                      SizedBox(width: wThird, child: _buildEditableCard(appLanguage.value == 'es' ? 'Fin Brk' : 'End Brk', 'end-break', textS, textP, isTime: true, icon: Icons.stop_circle_outlined)),
+                      SizedBox(width: wHalf, child: _buildEditableCard(appLanguage.value == 'es' ? '1er Camión' : 'First Truck', 'first-truck', textS, textP, isTime: true, icon: Icons.local_shipping_outlined)),
+                      SizedBox(width: wHalf, child: _buildEditableCard(appLanguage.value == 'es' ? 'Último Camión' : 'Last Truck', 'last-truck', textS, textP, isTime: true, icon: Icons.local_shipping)),
+                      SizedBox(width: wFull, child: _buildEditableCard(appLanguage.value == 'es' ? 'Observaciones' : 'Remarks', 'remarks', textS, textP, icon: Icons.notes)),
+                    ]
+                  );
                 }),
-                _buildInfoRow('Break / No Break', '${f['cant-break'] ?? 0} / ${f['cant-noBreak'] ?? 0}', textS, textP),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Hora Llegada' : 'Arrive Time', 'time-arrived', textS, textP, isTime: true),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Inicio Desarme' : 'Start Break', 'start-break', textS, textP, isTime: true),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Fin Desarme' : 'End Break', 'end-break', textS, textP, isTime: true),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Primer Camión' : 'First Truck', 'first-truck', textS, textP, isTime: true),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Último Camión' : 'Last Truck', 'last-truck', textS, textP, isTime: true),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Estado' : 'Status', 'status', textS, textP, isStatus: true),
-                _buildEditableRow(appLanguage.value == 'es' ? 'Observaciones' : 'Remarks', 'remarks', textS, textP),
                 
                 const SizedBox(height: 32),
                 Text(appLanguage.value == 'es' ? 'ULDs del Vuelo' : 'ULDs in Flight', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -772,8 +830,8 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                           margin: const EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
                             color: isSelected ? const Color(0xFF6366f1).withAlpha(30) : bgCard,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: isSelected ? const Color(0xFF6366f1) : Colors.transparent),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isSelected ? const Color(0xFF6366f1) : (widget.dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB))),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -141,7 +141,7 @@ class _AwbModuleState extends State<AwbModule> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: Supabase.instance.client.from('AWB').select().order('created_at', ascending: false),
+                future: Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
@@ -168,6 +168,7 @@ class _AwbModuleState extends State<AwbModule> {
                           constraints: BoxConstraints(minWidth: constraints.maxWidth),
                           child: SingleChildScrollView(
                             child: DataTable(
+                              showCheckboxColumn: false,
                               headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
                         dataRowColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.hovered) ? (dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6)) : Colors.transparent),
                         dataTextStyle: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13),
@@ -175,31 +176,75 @@ class _AwbModuleState extends State<AwbModule> {
                         columns: const [
                           DataColumn(label: Text('#')),
                           DataColumn(label: Text('AWB Number')),
-                          DataColumn(label: Text('Total Pcs/Wgt')),
+                          DataColumn(label: Text('Pieces Received')),
+                          DataColumn(label: Text('Pieces Expected')),
+                          DataColumn(label: Text('Total Pieces')),
+                          DataColumn(label: Text('Delivered Pieces')),
+                          DataColumn(label: Text('Remaining Pieces')),
+                          DataColumn(label: Text('Total Weight')),
                           DataColumn(label: Text('Status')),
                         ],
                         rows: List.generate(awbs.length, (index) {
                           final u = awbs[index];
                           
-                          // Parse some json data safely
-                          var pieces = '-';
-                          var weight = '-';
-                          var status = 'Received';
-                          
-                          try {
-                            if (u['data-AWB'] != null) {
-                              var dataAwb = u['data-AWB'] as Map<String, dynamic>;
-                               if (dataAwb.containsKey('pieces')) pieces = dataAwb['pieces'].toString();
-                               if (dataAwb.containsKey('weight')) weight = dataAwb['weight'].toString();
-                               if (dataAwb.containsKey('status')) status = dataAwb['status'].toString();
+                          int expectedPieces = 0;
+                          double totalWeight = 0.0;
+                          if (u['data-AWB'] is List) {
+                            for (var item in u['data-AWB']) {
+                               expectedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+                               totalWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
                             }
-                          } catch (_) {}
+                          } else if (u['data-AWB'] is Map) {
+                               expectedPieces += int.tryParse(u['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
+                               totalWeight += double.tryParse(u['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
+                          }
+
+                          int receivedPieces = 0;
+                          if (u['data-coordinator'] != null) {
+                            List dcList = [];
+                            if (u['data-coordinator'] is List) {
+                              dcList = u['data-coordinator'] as List;
+                            } else if (u['data-coordinator'] is Map && u['data-coordinator'].isNotEmpty) {
+                              dcList = [u['data-coordinator']];
+                            }
+                            
+                            for (var item in dcList) {
+                               if (item is Map) {
+                                  if (item.containsKey('breakdown') && item['breakdown'] is Map) {
+                                     Map breakdown = item['breakdown'];
+                                     if (breakdown['AGI Skid'] is List) {
+                                        for (var val in breakdown['AGI Skid']) {
+                                           receivedPieces += int.tryParse(val.toString()) ?? 0;
+                                        }
+                                     }
+                                     for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
+                                        receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
+                                     }
+                                  } else {
+                                     receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+                                  }
+                               }
+                            }
+                          }
+                          
+                          String status = 'Pending';
+                          if (receivedPieces > 0 && receivedPieces < expectedPieces) {
+                            status = 'In Progress';
+                          } else if (receivedPieces >= expectedPieces && expectedPieces > 0) {
+                            status = 'Ready';
+                          }
 
                           return DataRow(
+                            onSelectChanged: (_) => _showAwbDrawer(context, u, dark, receivedPieces, expectedPieces, status),
                             cells: [
                               DataCell(Text('${index + 1}')),
                               DataCell(Text(u['AWB-number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
-                              DataCell(Text('$pieces pcs / $weight kg')),
+                              DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w500))),
+                              DataCell(Text(expectedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w500))),
+                              DataCell(Text(u['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
+                              const DataCell(Text('-')), // To update with Pieces Delivered
+                              const DataCell(Text('-')), // To update with Remaining Pieces
+                              DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(_buildStatusBadge(status)),
                             ],
                           );
@@ -221,20 +266,393 @@ class _AwbModuleState extends State<AwbModule> {
     );
   }
 
+  void _showAwbDrawer(BuildContext context, Map<String, dynamic> u, bool dark, int receivedPieces, int expectedPieces, String status) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (ctx, anim1, anim2) {
+        final borderC = dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+        final bg = dark ? const Color(0xFF0f172a) : Colors.white;
+        final bgCard = dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB);
+        final textP = dark ? Colors.white : const Color(0xFF111827);
+        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
+
+        final Set<int> expandedCards = {};
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setStateBuilder) {
+            List<Widget> buildCombinedAuditItems() {
+              List awbList = [];
+              if (u['data-AWB'] is List) {
+                awbList = u['data-AWB'];
+              } else if (u['data-AWB'] is Map) {
+                awbList = [u['data-AWB']];
+              }
+
+              List dcList = [];
+              if (u['data-coordinator'] is List) {
+                dcList = u['data-coordinator'];
+              } else if (u['data-coordinator'] is Map && (u['data-coordinator'] as Map).isNotEmpty) {
+                dcList = [u['data-coordinator']];
+              }
+
+              List locList = [];
+              if (u['data-location'] is List) {
+                locList = u['data-location'];
+              } else if (u['data-location'] is Map && (u['data-location'] as Map).isNotEmpty) {
+                locList = [u['data-location']];
+              }
+
+              if (awbList.isEmpty) return [Text('No flight data available.', style: TextStyle(color: textS))];
+              
+              return awbList.asMap().entries.map((entry) {
+                final int idx = entry.key;
+                final e = entry.value;
+                final isBreak = e['isBreak'] == true;
+                final uldNum = e['refULD']?.toString() ?? '';
+                final uldDcData = dcList.where((dc) => dc['refULD']?.toString() == uldNum || dcList.length == 1).toList();
+                final isExpanded = expandedCards.contains(idx);
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Collapsible Header Area
+                      InkWell(
+                        onTap: () {
+                           setStateBuilder(() {
+                              if (isExpanded) {
+                                expandedCards.remove(idx);
+                              } else {
+                                expandedCards.add(idx);
+                              }
+                           });
+                        },
+                        borderRadius: isExpanded ? const BorderRadius.vertical(top: Radius.circular(12)) : BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Text('ULD: ${e['refULD'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 16)),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isBreak ? const Color(0xFF10b981).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: isBreak ? const Color(0xFF10b981).withAlpha(50) : const Color(0xFFef4444).withAlpha(50)),
+                                ),
+                                child: Text(isBreak ? 'BREAK' : 'NO BREAK', style: TextStyle(color: isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: textS),
+                            ]
+                          )
+                        )
+                      ),
+                      
+                      // Expanded Content Area
+                      if (isExpanded)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(padding: EdgeInsets.only(bottom: 12), child: Divider(height: 1)),
+                              // --- FLIGHT INFO ---
+                              Row(
+                                children: [
+                                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Flight', style: TextStyle(color: textS, fontSize: 12)),
+                                      Text('${e['refCarrier'] ?? ''} ${e['refNumber'] ?? ''}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                   ])),
+                                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Date', style: TextStyle(color: textS, fontSize: 12)),
+                                      Text('${e['refDate'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                   ])),
+                                ]
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Pieces', style: TextStyle(color: textS, fontSize: 12)),
+                                      Text('${e['pieces'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                   ])),
+                                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Weight', style: TextStyle(color: textS, fontSize: 12)),
+                                      Text('${e['weight'] ?? '-'} kg', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                   ])),
+                                ]
+                              ),
+                              if (e['remarks'] != null && e['remarks'].toString().isNotEmpty) ...[
+                                 const SizedBox(height: 12),
+                                 Text('Remarks: ${e['remarks']}', style: TextStyle(color: textS, fontSize: 12, fontStyle: FontStyle.italic)),
+                              ],
+
+                              // --- NO BREAK MAPPED AWBs ---
+                              if (!isBreak && uldNum.isNotEmpty)
+                                FutureBuilder<List<dynamic>>(
+                                  future: Supabase.instance.client.from('ULD').select('data-ULD').eq('ULD-number', uldNum).maybeSingle().then((res) => (res?['data-ULD'] as List<dynamic>?) ?? []),
+                                  builder: (ctx, snapshot) {
+                                    if (snapshot.connectionState == ConnectionState.waiting) {
+                                      return const Padding(padding: EdgeInsets.only(top: 12), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))));
+                                    }
+                                    final listData = snapshot.data ?? [];
+                                    if (listData.isEmpty) return const SizedBox.shrink();
+
+                                    return Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                                        Row(children: [
+                                          Icon(Icons.inventory_2_outlined, size: 16, color: textP),
+                                          const SizedBox(width: 8),
+                                          Text('Mapped AWBs in ULD', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                        ]),
+                                        const SizedBox(height: 12),
+                                        ...listData.map((d) {
+                                           return Container(
+                                             margin: const EdgeInsets.only(bottom: 6),
+                                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                             decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(6)),
+                                             child: Row(
+                                               children: [
+                                                 Expanded(flex: 2, child: Text(d['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13))),
+                                                 Expanded(flex: 1, child: Text('Pieces: ${d['pieces'] ?? '-'}', style: TextStyle(color: textS, fontSize: 12))),
+                                                 Expanded(flex: 1, child: Text('Total: ${d['total'] ?? '-'}', style: TextStyle(color: textS, fontSize: 12))),
+                                               ]
+                                             )
+                                           );
+                                        }),
+                                      ]
+                                    );
+                                  }
+                                ),
+
+                              // --- COORDINATOR AUDIT ---
+                              if (uldDcData.isNotEmpty) ...[
+                                 const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                                 Row(children: [
+                                    Icon(Icons.assignment_turned_in_outlined, size: 16, color: textP),
+                                    const SizedBox(width: 8),
+                                    Text('Coordinator Audit', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                 ]),
+                                 const SizedBox(height: 12),
+                                 ...uldDcData.map((dc) {
+                                    Map bd = (dc['breakdown'] is Map) ? dc['breakdown'] as Map : {};
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8)),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                             children: [
+                                                Icon(Icons.person_outline, size: 14, color: textS),
+                                                const SizedBox(width: 6),
+                                                Text(dc['user']?.toString() ?? 'Unknown', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13)),
+                                                const Spacer(),
+                                                Icon(Icons.access_time, size: 14, color: textS),
+                                                const SizedBox(width: 6),
+                                                Text(dc['time'] != null ? DateTime.tryParse(dc['time'])?.toLocal().toString().split('.').first ?? '-' : '-', style: TextStyle(color: textS, fontSize: 12)),
+                                             ]
+                                          ),
+                                          if (bd.isNotEmpty) ...[
+                                             const SizedBox(height: 10),
+                                             Wrap(
+                                               spacing: 6,
+                                               runSpacing: 6,
+                                               children: bd.entries.map((entry) {
+                                                 if (entry.value is List && (entry.value as List).isEmpty) return const SizedBox.shrink();
+                                                 if (entry.value is num && entry.value == 0) return const SizedBox.shrink();
+                                                 return Container(
+                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                   decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
+                                                   child: Text('${entry.key}: ${entry.value is List ? entry.value.join(', ') : entry.value}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
+                                                 );
+                                               }).toList(),
+                                             ),
+                                          ]
+                                        ]
+                                      )
+                                    );
+                                 }),
+                              ],
+
+                              // --- LOCATION AUDIT ---
+                              if (locList.isNotEmpty && awbList.last == e) ...[
+                                 const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                                 Row(children: [
+                                    Icon(Icons.location_on_outlined, size: 16, color: textP),
+                                    const SizedBox(width: 8),
+                                    Text('Location Audit', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                 ]),
+                                 const SizedBox(height: 12),
+                                 ...locList.map((loc) {
+                                    Map itemLocs = (loc['itemLocations'] is Map) ? loc['itemLocations'] as Map : {};
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8)),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                             children: [
+                                                Icon(Icons.person_outline, size: 14, color: textS),
+                                                const SizedBox(width: 6),
+                                                Text(loc['user']?.toString() ?? 'Unknown', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13)),
+                                                const Spacer(),
+                                                Icon(Icons.access_time, size: 14, color: textS),
+                                                const SizedBox(width: 6),
+                                                Text(loc['time'] != null ? DateTime.tryParse(loc['time'])?.toLocal().toString().split('.').first ?? '-' : '-', style: TextStyle(color: textS, fontSize: 12)),
+                                             ]
+                                          ),
+                                          if (itemLocs.isNotEmpty) ...[
+                                             const SizedBox(height: 10),
+                                             Wrap(
+                                               spacing: 6,
+                                               runSpacing: 6,
+                                               children: itemLocs.entries.map((entry) {
+                                                 if (entry.value == null || entry.value.toString().isEmpty) return const SizedBox.shrink();
+                                                 return Container(
+                                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                   decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF10b981).withAlpha(50))),
+                                                   child: Text('${entry.key} ➔ ${entry.value}', style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
+                                                 );
+                                               }).toList(),
+                                             ),
+                                          ]
+                                        ]
+                                      )
+                                    );
+                                 }),
+                              ]
+                            ]
+                          )
+                        )
+                    ]
+                  )
+                );
+              }).toList();
+            }
+
+            return Align(
+              alignment: Alignment.centerRight,
+              child: Material(
+                color: bg,
+                elevation: 16,
+                child: SizedBox(
+                  width: 520, // slightly wider to fit everything beautifully
+                  height: double.infinity,
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('AWB Traceability', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 4),
+                                Text(u['AWB-number']?.toString() ?? 'N/A', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close_rounded, color: textP),
+                              onPressed: () => Navigator.pop(ctx),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.all(24),
+                          children: [
+                            // Totals Summary
+                            Text('Pieces Summary', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                              child: Column(
+                                children: [
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Root Total:', style: TextStyle(color: textS)), Text(u['total']?.toString() ?? '-', style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Expected (Manifest):', style: TextStyle(color: textS)), Text(expectedPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Received (Coordinator):', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Calculated Status:', style: TextStyle(color: textS)), _buildStatusBadge(status)]),
+                                ]
+                              )
+                            ),
+                            const SizedBox(height: 32),
+                            
+                            Text('ULD Traceability Flow', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+                            ...buildCombinedAuditItems(),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            );
+          }
+        );
+      },
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+          child: child,
+        );
+      }
+    );
+  }
+
   Widget _buildStatusBadge(String status) {
     Color bg = const Color(0xFF334155);
     Color fg = const Color(0xFFcbd5e1);
     
-    if (status.toLowerCase().contains('pending')) {
-      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
-    } else if (status.toLowerCase().contains('ready')) {
+    final s = status.toLowerCase();
+    if (s.contains('waiting')) {
+      bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
+    } else if (s.contains('received')) {
+      bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
+    } else if (s.contains('checked')) {
+      bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
+    } else if (s.contains('ready') || s.contains('saved')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
+    } else if (s.contains('pending')) {
+      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Text(status, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600)),
+      width: 100,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        status, 
+        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
+      ),
     );
   }
 }
