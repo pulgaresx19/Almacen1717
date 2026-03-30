@@ -18,6 +18,7 @@ class SystemModule extends StatefulWidget {
 }
 
 class _SystemModuleState extends State<SystemModule> {
+  final _searchController = TextEditingController();
   DateTime? _dateLeft;
   DateTime? _dateRight;
 
@@ -70,6 +71,7 @@ class _SystemModuleState extends State<SystemModule> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _uldSubLeft?.cancel();
     _uldSubRight?.cancel();
     _flightSubLeft?.cancel();
@@ -1558,31 +1560,92 @@ class _SystemModuleState extends State<SystemModule> {
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: dark ? const Color(0xFF0f172a).withAlpha(100) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: dark
-                  ? Colors.white.withAlpha(25)
-                  : const Color(0xFFE5E7EB),
-            ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: widget.singlePanelMode
-                ? [Expanded(child: _buildPanel(true, dark))]
-                : [
-                    Expanded(child: _buildPanel(true, dark)),
-                    Container(
-                      width: 1,
-                      color: dark
-                          ? Colors.white.withAlpha(25)
-                          : const Color(0xFFE5E7EB),
+        return Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('System', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 32, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text(
+                      appLanguage.value == 'es' 
+                        ? 'Módulo dedicado a la recepción de ULDs y paletas correspondientes a cada vuelo.' 
+                        : 'Module dedicated to receiving ULDs and pallets corresponding to each flight.', 
+                      style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13)
                     ),
-                    Expanded(child: _buildPanel(false, dark)),
                   ],
-          ),
+                ),
+                const Spacer(),
+                Container(
+                  width: 300,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13),
+                    onChanged: (v) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
+                      hintStyle: TextStyle(color: (dark ? Colors.white : const Color(0xFF111827)).withAlpha(76), fontSize: 13),
+                      prefixIcon: Icon(Icons.search_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 16),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () {
+                    setState(() {});
+                    if (_dateLeft != null) _fetchFlights(true, _dateLeft!);
+                    if (_dateRight != null) _fetchFlights(false, _dateRight!);
+                  },
+                  icon: Icon(Icons.refresh_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 18),
+                  tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
+                  style: IconButton.styleFrom(
+                    backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF0f172a).withAlpha(100) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: dark
+                        ? Colors.white.withAlpha(25)
+                        : const Color(0xFFE5E7EB),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: widget.singlePanelMode
+                      ? [Expanded(child: _buildPanel(true, dark))]
+                      : [
+                          Expanded(child: _buildPanel(true, dark)),
+                          Container(
+                            width: 1,
+                            color: dark
+                                ? Colors.white.withAlpha(25)
+                                : const Color(0xFFE5E7EB),
+                          ),
+                          Expanded(child: _buildPanel(false, dark)),
+                        ],
+                ),
+              ),
+            ),
+          ],
         );
       },
     );

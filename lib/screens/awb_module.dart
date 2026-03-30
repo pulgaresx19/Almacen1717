@@ -12,6 +12,7 @@ class AwbModule extends StatefulWidget {
 
 class _AwbModuleState extends State<AwbModule> {
   final _searchController = TextEditingController();
+  bool _showAddForm = false;
 
   @override
   void dispose() {
@@ -40,78 +41,103 @@ class _AwbModuleState extends State<AwbModule> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(appLanguage.value == 'es' ? 'Guías Aéreas' : 'Air Waybills (AWB)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(appLanguage.value == 'es' ? 'Administración y desglose de guías aéreas.' : 'Management and breakdown of Air Waybills.', style: TextStyle(color: textS, fontSize: 13)),
+                    if (_showAddForm)
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => setState(() => _showAddForm = false),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
+                          ),
+                          const SizedBox(width: 8),
+                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo AWB' : 'Add New AWB', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                        ],
+                      )
+                    else
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(appLanguage.value == 'es' ? 'Guías Aéreas' : 'Air Waybills (AWB)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(appLanguage.value == 'es' ? 'Administración y desglose de guías aéreas.' : 'Management and breakdown of Air Waybills.', style: TextStyle(color: textS, fontSize: 13)),
+                        ],
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                
+                if (!_showAddForm) ...[
+                  // Search Box
+                  Container(
+                    width: 300,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: borderCard),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      style: TextStyle(color: textP, fontSize: 13),
+                      onChanged: (v) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
+                        hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                        prefixIcon: Icon(Icons.search_rounded, color: iconColor, size: 16),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // Add AWB Button
+                  ElevatedButton.icon(
+                    onPressed: () => setState(() => _showAddForm = true),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366f1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Refresh Button
+                  IconButton(
+                    onPressed: () => setState(() {}),
+                    icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
+                    tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
+                    style: IconButton.styleFrom(
+                      backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
+                      padding: const EdgeInsets.all(12),
+                    ),
+                  ),
+                ],
               ],
             ),
-            const Spacer(),
+            const SizedBox(height: 30),
             
-            // Search Box
-            Container(
-              width: 300,
-              height: 40,
-              decoration: BoxDecoration(
-                color: bgCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: borderCard),
-              ),
-              child: TextField(
-                controller: _searchController,
-                style: TextStyle(color: textP, fontSize: 13),
-                onChanged: (v) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
-                  hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
-                  prefixIcon: Icon(Icons.search_rounded, color: iconColor, size: 16),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            if (_showAddForm)
+              Expanded(
+                child: AddAwbScreen(
+                  onPop: (didAdd) {
+                    setState(() {
+                      _showAddForm = false;
+                    });
+                  },
                 ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            
-            // Add AWB Button
-            ElevatedButton.icon(
-              onPressed: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AddAwbScreen()),
-                );
-                if (result == true) setState(() {}); 
-              },
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6366f1),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // Refresh Button
-            IconButton(
-              onPressed: () => setState(() {}),
-              icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-              tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-              style: IconButton.styleFrom(
-                backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                padding: const EdgeInsets.all(12),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 30),
-        
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderCard),
-            ),
+              )
+            else
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderCard),
+                  ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: FutureBuilder<List<Map<String, dynamic>>>(

@@ -6,6 +6,7 @@ import 'screens/flight_module.dart';
 import 'screens/dashboard_view_module.dart';
 import 'screens/uld_module.dart';
 import 'screens/awb_module.dart';
+import 'screens/delivers_module.dart';
 import 'screens/driver_module.dart';
 import 'screens/other_modules.dart';
 
@@ -392,6 +393,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'Flight',
     'ULD',
     'AWB',
+    'Delivers',
     'Users',
     'System',
     'Coordinator',
@@ -513,9 +515,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 3,
                               ),
                               _buildNavItem(
+                                Icons.airport_shuttle_rounded,
+                                'Delivers',
+                                4,
+                              ),
+                              _buildNavItem(
                                 Icons.people_alt_rounded,
                                 'Users',
-                                4,
+                                5,
                               ),
                               Padding(
                                 padding: const EdgeInsets.only(
@@ -537,22 +544,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               _buildNavItem(
                                 Icons.settings_system_daydream_rounded,
                                 'System',
-                                5,
+                                6,
                               ),
                               _buildNavItem(
                                 Icons.support_agent_rounded,
                                 'Coordinator',
-                                6,
+                                7,
                               ),
                               _buildNavItem(
                                 Icons.location_on_rounded,
                                 'Location',
-                                7,
+                                8,
                               ),
                               _buildNavItem(
                                 Icons.local_shipping_rounded,
                                 'Driver',
-                                8,
+                                9,
                               ),
                             ],
                           ),
@@ -727,13 +734,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_selectedIndex == 1) return const FlightModule();
     if (_selectedIndex == 2) return const UldModule();
     if (_selectedIndex == 3) return const AwbModule();
-    if (_selectedIndex == 4) return const UsersModule();
-    if (_selectedIndex == 5) return const SystemModule();
-    if (_selectedIndex == 6) {
+    if (_selectedIndex == 4) return const DeliversModule();
+    if (_selectedIndex == 5) return const UsersModule();
+    if (_selectedIndex == 6) return const SystemModule();
+    if (_selectedIndex == 7) {
       return const CoordinatorModule(singlePanelMode: true);
     }
-    if (_selectedIndex == 7) return const LocationModule();
-    if (_selectedIndex == 8) return const DriverModule();
+    if (_selectedIndex == 8) return const LocationModule();
+    if (_selectedIndex == 9) return const DriverModule();
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -767,14 +775,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 3:
         return Icons.description_rounded;
       case 4:
-        return Icons.people_alt_rounded;
+        return Icons.airport_shuttle_rounded;
       case 5:
-        return Icons.settings_system_daydream_rounded;
+        return Icons.people_alt_rounded;
       case 6:
-        return Icons.support_agent_rounded;
+        return Icons.settings_system_daydream_rounded;
       case 7:
-        return Icons.location_on_rounded;
+        return Icons.support_agent_rounded;
       case 8:
+        return Icons.location_on_rounded;
+      case 9:
         return Icons.local_shipping_rounded;
       default:
         return Icons.dashboard_rounded;

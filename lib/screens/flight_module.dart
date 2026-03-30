@@ -14,6 +14,7 @@ class FlightModule extends StatefulWidget {
 class _FlightModuleState extends State<FlightModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
+  final GlobalKey<AddFlightScreenState> _addFlightKey = GlobalKey<AddFlightScreenState>();
 
   @override
   void dispose() {
@@ -39,11 +40,31 @@ class _FlightModuleState extends State<FlightModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_showAddForm)
-                      Text(appLanguage.value == 'es' ? 'Añadir Nuevo Vuelo' : 'Add New Flight', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700))
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () async {
+                              if (_addFlightKey.currentState != null) {
+                                final canPop = await _addFlightKey.currentState!.handleBackRequest();
+                                if (canPop) {
+                                  setState(() => _showAddForm = false);
+                                }
+                              } else {
+                                setState(() => _showAddForm = false);
+                              }
+                            },
+                            icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
+                            padding: const EdgeInsets.only(right: 8),
+                            constraints: const BoxConstraints(),
+                          ),
+                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo Vuelo' : 'Add New Flight', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                        ],
+                      )
                     else
                       Text(appLanguage.value == 'es' ? 'Vuelos' : 'Flight Documents', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
@@ -125,6 +146,7 @@ class _FlightModuleState extends State<FlightModule> {
               borderRadius: BorderRadius.circular(16),
               child: _showAddForm
                   ? AddFlightScreen(
+                      key: _addFlightKey,
                       isInline: true,
                       onPop: (bool isSaved) {
                         setState(() {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../main.dart' show isDarkMode;
 
 class AddFlightScreen extends StatefulWidget {
   final Function(bool)? onPop;
@@ -9,10 +10,10 @@ class AddFlightScreen extends StatefulWidget {
   const AddFlightScreen({super.key, this.onPop, this.isInline = false});
 
   @override
-  State<AddFlightScreen> createState() => _AddFlightScreenState();
+  State<AddFlightScreen> createState() => AddFlightScreenState();
 }
 
-class _AddFlightScreenState extends State<AddFlightScreen> {
+class AddFlightScreenState extends State<AddFlightScreen> {
   // Flight Controllers
   final _carrierCtrl = TextEditingController();
   final _numberCtrl = TextEditingController();
@@ -103,6 +104,49 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     }
   }
 
+  void _showRequiredFieldError(BuildContext ctx, String fieldName) {
+    showDialog(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(color: const Color(0xFFef4444).withAlpha(100), width: 2),
+        ),
+        title: const Column(
+          children: [
+            Icon(Icons.error_outline_rounded, color: Color(0xFFef4444), size: 60),
+            SizedBox(height: 16),
+            Text('Action Required', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+          ],
+        ),
+        content: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFef4444),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              shadowColor: const Color(0xFFef4444).withAlpha(100),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
+            ),
+            onPressed: () => Navigator.pop(c),
+            child: const Text('UNDERSTOOD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          )
+        ],
+      )
+    );
+  }
+
   @override
   void dispose() {
     _carrierCtrl.dispose();
@@ -122,7 +166,7 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
   void _addLocalUld() {
     final String newUld = _uldNumberCtrl.text.trim().toUpperCase();
     if (newUld.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ULD Number required to add to local list.')));
+      _showRequiredFieldError(context, 'ULD Number');
       return;
     }
 
@@ -304,9 +348,21 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1)),
               onPressed: () {
                 final newAwb = awbNumCtrl.text.trim().toUpperCase();
-                if (newAwb.isNotEmpty && totalCtrl.text.isNotEmpty) {
-                  final existingAwbs = _flightLocalUlds[uldIndex]['awbs'] as List;
-                  if (existingAwbs.any((a) => a['awb_number'] == newAwb)) {
+                if (newAwb.isEmpty) {
+                  _showRequiredFieldError(ctx, 'AWB Number');
+                  return;
+                }
+                if (piecesCtrl.text.trim().isEmpty || piecesCtrl.text.trim() == '0') {
+                  _showRequiredFieldError(ctx, 'Pieces');
+                  return;
+                }
+                if (totalCtrl.text.trim().isEmpty || totalCtrl.text.trim() == '0') {
+                  _showRequiredFieldError(ctx, 'Total');
+                  return;
+                }
+                
+                final existingAwbs = _flightLocalUlds[uldIndex]['awbs'] as List;
+                if (existingAwbs.any((a) => a['awb_number'] == newAwb)) {
                     showDialog(
                       context: ctx,
                       builder: (c) => AlertDialog(
@@ -348,7 +404,6 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
                     }
                   });
                   Navigator.pop(ctx);
-                }
               },
               child: const Text('Add AWB', style: TextStyle(color: Colors.white)),
             ),
@@ -361,8 +416,16 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
   }
 
   Future<void> _saveEverything() async {
-    if (_carrierCtrl.text.isEmpty || _numberCtrl.text.isEmpty || _dateCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Carrier, Number y Date son obligatorios')));
+    if (_carrierCtrl.text.isEmpty) {
+      _showRequiredFieldError(context, 'Carrier');
+      return;
+    }
+    if (_numberCtrl.text.isEmpty) {
+      _showRequiredFieldError(context, 'Number');
+      return;
+    }
+    if (_dateCtrl.text.isEmpty) {
+      _showRequiredFieldError(context, 'Date Arrived');
       return;
     }
 
@@ -556,36 +619,114 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
     }
   }
 
+  Future<bool> _onBackPressed() async {
+    bool hasData = _carrierCtrl.text.isNotEmpty || 
+                   _numberCtrl.text.isNotEmpty || 
+                   _dateCtrl.text.isNotEmpty || 
+                   _flightLocalUlds.isNotEmpty || 
+                   _uldNumberCtrl.text.isNotEmpty;
+
+    if (!hasData) {
+      if (widget.onPop != null) {
+        widget.onPop!(false);
+        return false;
+      }
+      return true;
+    }
+
+    final bool? shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 32),
+            SizedBox(width: 12),
+            Expanded(child: Text('Discard Data?', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: const Text(
+          'Any unsaved data entered for the flight, ULDs, and AWBs will be permanently lost.\n\nDo you want to discard your changes and continue?',
+          style: TextStyle(color: Color(0xFFcbd5e1), height: 1.4, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Stay', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFef4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldPop == true) {
+      if (widget.onPop != null) {
+        widget.onPop!(false);
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> handleBackRequest() async {
+    final canPop = await _onBackPressed();
+    if (canPop && widget.onPop == null) {
+      if (mounted) Navigator.pop(context);
+    }
+    return canPop;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.isInline) {
-      return _buildFormContent();
-    }
-    
-    return Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
-      appBar: AppBar(
-        title: const Text('Add New Flight Process'),
-        backgroundColor: const Color(0xFF1e293b),
-        elevation: 0,
-      ),
-      body: _buildFormContent(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final bool shouldPop = await _onBackPressed();
+        if (shouldPop && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: widget.isInline 
+        ? _buildFormContent()
+        : Scaffold(
+            backgroundColor: const Color(0xFF0f172a),
+            appBar: AppBar(
+              title: const Text('Add New Flight Process'),
+              backgroundColor: const Color(0xFF1e293b),
+              elevation: 0,
+            ),
+            body: _buildFormContent(),
+          ),
     );
   }
 
   Widget _buildFormContent() {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              const Text('Flight Details', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (context, dark, child) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 24.0, bottom: 8.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+
+                    const Text('Flight Details', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
         
         // Linear Wrap replicating flex-wrap: wrap
         LayoutBuilder(
@@ -726,14 +867,21 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
           }
         ),
         
-        const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
         
         // Native table replica format for ULDs inside flight
-        if (_flightLocalUlds.isNotEmpty)
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(5), 
+        const SizedBox(height: 8),
+        Expanded(
+          child: _flightLocalUlds.isNotEmpty
+          ? SingleChildScrollView(
+              padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 24.0),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(5), 
               borderRadius: BorderRadius.circular(8), 
               border: Border.all(color: Colors.white.withAlpha(25)),
             ),
@@ -968,58 +1116,55 @@ class _AddFlightScreenState extends State<AddFlightScreen> {
               }).toList(),
             ),
           ),
-        
-                ],
-              ),
-            ),
-          ),
-        ),
+          ) // end of SingleChildScrollView
+          : const SizedBox.shrink(),
+        ), // end of Expanded
         // Bottom Pinned Action Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           decoration: BoxDecoration(
             color: const Color(0xFF0f172a),
-            border: Border(top: BorderSide(color: Colors.white.withAlpha(25))),
+            border: Border(top: BorderSide(color: Colors.white.withAlpha(15))),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 10, offset: const Offset(0, -4)),
+            ]
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () {
-                    if (widget.onPop != null) {
-                      widget.onPop!(false);
-                    } else {
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF94a3b8),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('CANCELAR', style: TextStyle(fontSize: 14)),
-                ),
+          child: Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8b5cf6), Color(0xFF6366f1)], // Purple to Indigo
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _saveEverything,
-                  icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.save_rounded),
-                  label: _isSaving 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                      : const Text('GUARDAR VUELO + ULDs + AWBs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366f1),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366f1).withAlpha(80),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            ),
+            child: ElevatedButton.icon(
+              onPressed: _isSaving ? null : _saveEverything,
+              icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.check_circle_outline_rounded, size: 22, color: Colors.white),
+              label: _isSaving 
+                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)) 
+                  : const Text('GUARDAR ESTRUCTURA DEL VUELO', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 1.2, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-            ],
+            ),
           ),
         ),
       ],
+    );
+      },
     );
   }
 

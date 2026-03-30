@@ -19,6 +19,7 @@ class LocationModule extends StatefulWidget {
 }
 
 class _LocationModuleState extends State<LocationModule> {
+  final _searchController = TextEditingController();
   // Local storage for discrepancy reports, saving AWB, ULD, diff and notes.
   List<Map<String, dynamic>> localDiscrepancyReports = [];
 
@@ -41,6 +42,9 @@ class _LocationModuleState extends State<LocationModule> {
   List<Map<String, dynamic>> _uldsRight = [];
   bool _isLoadingUldsLeft = false;
   bool _isLoadingUldsRight = false;
+
+  int _totalBreakUldsLeft = 0;
+  int _totalBreakUldsRight = 0;
 
   Future<String> _getAuthorName() async {
     String userName = Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
@@ -66,6 +70,7 @@ class _LocationModuleState extends State<LocationModule> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _uldSubLeft?.cancel();
     _uldSubRight?.cancel();
     _flightSubLeft?.cancel();
@@ -86,12 +91,13 @@ class _LocationModuleState extends State<LocationModule> {
           .eq('refDate', flight['date-arrived'])
           .listen((data) {
         if (!mounted) return;
-        final filtered = data.where((u) {
+        
+        final allBreak = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number'] && u['isBreak'] == true).toList();
+        _totalBreakUldsLeft = allBreak.length;
+
+        final filtered = allBreak.where((u) {
           final isChecked = (u['data-checked'] as Map?)?.isNotEmpty == true;
-          return u['refCarrier'] == flight['carrier'] &&
-              u['refNumber'] == flight['number'] &&
-              u['isBreak'] == true &&
-              isChecked;
+          return isChecked;
         }).toList();
         _processUldsData(isLeft, filtered);
       }, onError: (e) {
@@ -107,12 +113,13 @@ class _LocationModuleState extends State<LocationModule> {
           .eq('refDate', flight['date-arrived'])
           .listen((data) {
         if (!mounted) return;
-        final filtered = data.where((u) {
+        
+        final allBreak = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number'] && u['isBreak'] == true).toList();
+        _totalBreakUldsRight = allBreak.length;
+
+        final filtered = allBreak.where((u) {
           final isChecked = (u['data-checked'] as Map?)?.isNotEmpty == true;
-          return u['refCarrier'] == flight['carrier'] &&
-              u['refNumber'] == flight['number'] &&
-              u['isBreak'] == true &&
-              isChecked;
+          return isChecked;
         }).toList();
         _processUldsData(isLeft, filtered);
       }, onError: (e) {
@@ -280,34 +287,10 @@ class _LocationModuleState extends State<LocationModule> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        appLanguage.value == 'es'
-                            ? 'Localización'
-                            : 'Location',
-                        style: TextStyle(
-                          color: textP,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        appLanguage.value == 'es'
-                            ? 'Módulo para añadir ubicación a los AWBs correspondientes'
-                            : 'Module for adding locations to the corresponding AWBs',
-                        style: TextStyle(
-                          color: textS,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
+                  // The title has been extracted to the outer layout
+
                   ElevatedButton.icon(
                     onPressed: () => _pickDate(context, isLeft),
                     icon: const Icon(Icons.calendar_today_rounded, size: 16),
@@ -1900,7 +1883,7 @@ class _LocationModuleState extends State<LocationModule> {
                                   (isLeft ? _uldsLeft : _uldsRight)
                                       .where((u) => _isUldSaved(u))
                                       .length,
-                                  (isLeft ? _uldsLeft : _uldsRight).length,
+                                  isLeft ? _totalBreakUldsLeft : _totalBreakUldsRight,
                                   const Color(0xFF10b981),
                                 ),
                                   _buildTotalStat(
@@ -4118,20 +4101,84 @@ class _LocationModuleState extends State<LocationModule> {
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: dark ? const Color(0xFF0f172a).withAlpha(100) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: dark
-                  ? Colors.white.withAlpha(25)
-                  : const Color(0xFFE5E7EB),
+        return Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appLanguage.value == 'es' ? 'Localización' : 'Location',
+                      style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 32, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      appLanguage.value == 'es'
+                          ? 'Módulo para añadir ubicación a las paletas y mercancías correspondientes.'
+                          : 'Module for assigning locations to the corresponding pallets and goods.',
+                      style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Container(
+                  width: 300,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13),
+                    onChanged: (v) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
+                      hintStyle: TextStyle(color: (dark ? Colors.white : const Color(0xFF111827)).withAlpha(76), fontSize: 13),
+                      prefixIcon: Icon(Icons.search_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 16),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                IconButton(
+                  onPressed: () {
+                    setState(() {});
+                    if (_dateLeft != null) _fetchFlights(true, _dateLeft!);
+                    if (_dateRight != null) _fetchFlights(false, _dateRight!);
+                  },
+                  icon: Icon(Icons.refresh_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 18),
+                  tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
+                  style: IconButton.styleFrom(
+                    backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [Expanded(child: _buildPanel(true, dark))],
-          ),
+            const SizedBox(height: 30),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF0f172a).withAlpha(100) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: dark
+                        ? Colors.white.withAlpha(25)
+                        : const Color(0xFFE5E7EB),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [Expanded(child: _buildPanel(true, dark))],
+                ),
+              ),
+            ),
+          ],
         );
       },
     );

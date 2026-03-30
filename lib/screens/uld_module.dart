@@ -162,8 +162,8 @@ class _UldModuleState extends State<UldModule> {
                           DataColumn(label: Text('Weight')),
                           DataColumn(label: Text('Priority')),
                           DataColumn(label: Text('Break')),
-                          DataColumn(label: Text('Status')),
                           DataColumn(label: Text('Remarks')),
+                          DataColumn(label: Text('Status')),
                         ],
                         rows: List.generate(ulds.length, (index) {
                           final u = ulds[index];
@@ -175,8 +175,8 @@ class _UldModuleState extends State<UldModule> {
                               DataCell(Text('${u['weight']?.toString() ?? '0'} kg')),
                               DataCell(Text(u['isPriority'] == true ? 'Yes' : 'No', style: TextStyle(color: u['isPriority'] == true ? Colors.redAccent : const Color(0xFFcbd5e1)))),
                               DataCell(Text(u['isBreak'] == true ? 'Yes' : 'No')),
-                              DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Received')),
                               DataCell(Text(u['remarks']?.toString() ?? '-')),
+                              DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Received')),
                             ],
                           );
                         }),

@@ -70,19 +70,7 @@ class _DriverModuleState extends State<DriverModule> {
             ),
             const SizedBox(width: 16),
             
-            // Add Delivery Button
-            ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: Text(appLanguage.value == 'es' ? 'Añadir Entrega' : 'Add Delivery', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10b981),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-            ),
-            const SizedBox(width: 8),
+
 
             // Refresh Button
             IconButton(
