@@ -226,8 +226,8 @@ class _UldModuleState extends State<UldModule> {
                                           );
                                           if (confirm != true) return;
                                           try {
-                                            await Future.wait(_selectedReadyUlds.map((num) => 
-                                              Supabase.instance.client.from('ULD').delete().eq('ULD-number', num)
+                                            await Future.wait(_selectedReadyUlds.map((uldNumber) => 
+                                              Supabase.instance.client.from('ULD').delete().eq('ULD-number', uldNumber)
                                             ));
                                             if (context.mounted) {
                                               showDialog(
