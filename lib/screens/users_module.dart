@@ -190,6 +190,7 @@ class _UsersModuleState extends State<UsersModule> {
                               fontSize: 12,
                             ),
                             dividerThickness: 1,
+                            showCheckboxColumn: false,
                             columns: const [
                               DataColumn(label: Text('Member Name')),
                               DataColumn(label: Text('Email')),
@@ -203,6 +204,7 @@ class _UsersModuleState extends State<UsersModule> {
                               final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
                               
                               return DataRow(
+                                onSelectChanged: (_) => _showUserDrawer(context, u, dark),
                                 cells: [
                                   DataCell(
                                     Row(
@@ -264,6 +266,145 @@ class _UsersModuleState extends State<UsersModule> {
       ],
     );
      }
+    );
+  }
+
+  void _showUserDrawer(BuildContext context, Map<String, dynamic> user, bool dark) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 480,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: dark ? const Color(0xFF0f172a) : Colors.white,
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
+              ),
+              child: UserDrawerDetails(user: user, dark: dark),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic)),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+class UserDrawerDetails extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final bool dark;
+
+  const UserDrawerDetails({super.key, required this.user, required this.dark});
+
+  Widget _buildInfoCard(String label, String value, Color colorL, Color colorV, Color borderC, Color bgCard, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: colorL, size: 14),
+                const SizedBox(width: 6),
+              ],
+              Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(value, style: TextStyle(color: colorV, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+    final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
+    final borderC = dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+    
+    final name = user['full-name'] ?? 'Unknown';
+    final initial = name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?';
+
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.only(top: 24, bottom: 16, left: 24, right: 16),
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF1e293b) : const Color(0xFFf8fafc),
+            border: Border(bottom: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)))
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(appLanguage.value == 'es' ? 'Detalles de Usuario' : 'User Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+              IconButton(icon: Icon(Icons.close, color: textS), onPressed: () => Navigator.pop(context)),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: const Color(0xFF6366f1).withAlpha(40),
+                      child: Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 24, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('${user['email'] ?? '-'}', style: TextStyle(color: textS, fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                LayoutBuilder(builder: (context, constraints) {
+                  final wFull = constraints.maxWidth;
+                  final wHalf = (wFull - 8) / 2;
+
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Edificio' : 'Building', '${user['building'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.business_rounded)),
+                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Posición' : 'Position', '${user['position'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.badge_rounded)),
+                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Teléfono' : 'Phone', '${user['phone-number'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.phone_rounded)),
+                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Turno' : 'Shift', '${user['shift'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.access_time_rounded)),
+                    ]
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
