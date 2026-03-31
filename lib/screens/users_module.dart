@@ -282,7 +282,7 @@ class _UsersModuleState extends State<UsersModule> {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: 480,
+              width: 520,
               height: double.infinity,
               decoration: BoxDecoration(
                 color: dark ? const Color(0xFF0f172a) : Colors.white,
@@ -309,10 +309,9 @@ class UserDrawerDetails extends StatelessWidget {
 
   const UserDrawerDetails({super.key, required this.user, required this.dark});
 
-  Widget _buildInfoCard(String label, String value, Color colorL, Color colorV, Color borderC, Color bgCard, {IconData? icon}) {
+  Widget _buildInfoCard(String label, String value, Color colorL, Color colorV, {IconData? icon}) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -320,12 +319,12 @@ class UserDrawerDetails extends StatelessWidget {
             children: [
               if (icon != null) ...[
                 Icon(icon, color: colorL, size: 14),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
               ],
-              Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+              Text(label, style: TextStyle(color: colorL, fontSize: 11)),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(value, style: TextStyle(color: colorV, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
         ],
       ),
@@ -337,7 +336,7 @@ class UserDrawerDetails extends StatelessWidget {
     final textP = dark ? Colors.white : const Color(0xFF111827);
     final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
-    final borderC = dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+    final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
     
     final name = user['full-name'] ?? 'Unknown';
     final initial = name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?';
@@ -345,63 +344,74 @@ class UserDrawerDetails extends StatelessWidget {
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.only(top: 24, bottom: 16, left: 24, right: 16),
-          decoration: BoxDecoration(
-            color: dark ? const Color(0xFF1e293b) : const Color(0xFFf8fafc),
-            border: Border(bottom: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)))
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(appLanguage.value == 'es' ? 'Detalles de Usuario' : 'User Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-              IconButton(icon: Icon(Icons.close, color: textS), onPressed: () => Navigator.pop(context)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(appLanguage.value == 'es' ? 'Perfil de Usuario' : 'User Profile', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: const Color(0xFF6366f1).withAlpha(40),
+                        child: Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(name, style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+              IconButton(icon: Icon(Icons.close_rounded, color: textP), onPressed: () => Navigator.pop(context)),
             ],
           ),
         ),
         Expanded(
-          child: SingleChildScrollView(
+          child: ListView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: const Color(0xFF6366f1).withAlpha(40),
-                      child: Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 24, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name, style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text('${user['email'] ?? '-'}', style: TextStyle(color: textS, fontSize: 14)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                LayoutBuilder(builder: (context, constraints) {
-                  final wFull = constraints.maxWidth;
-                  final wHalf = (wFull - 8) / 2;
-
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Edificio' : 'Building', '${user['building'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.business_rounded)),
-                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Posición' : 'Position', '${user['position'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.badge_rounded)),
-                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Teléfono' : 'Phone', '${user['phone-number'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.phone_rounded)),
-                      SizedBox(width: wHalf, child: _buildInfoCard(appLanguage.value == 'es' ? 'Turno' : 'Shift', '${user['shift'] ?? '-'}', textS, textP, borderC, bgCard, icon: Icons.access_time_rounded)),
-                    ]
-                  );
-                }),
-              ],
-            ),
+                    Row(children: [Icon(Icons.contact_mail_outlined, size: 16, color: textP), const SizedBox(width: 8), Text(appLanguage.value == 'es' ? 'Información de Contacto' : 'Contact Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(child: _buildInfoCard('Email', '${user['email'] ?? '-'}', textS, textP, icon: Icons.email_outlined)),
+                      Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Teléfono' : 'Phone', '${user['phone-number'] ?? '-'}', textS, textP, icon: Icons.phone_outlined)),
+                    ]),
+                  ]
+                )
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [Icon(Icons.settings_outlined, size: 16, color: textP), const SizedBox(width: 8), Text(appLanguage.value == 'es' ? 'Detalles Operativos' : 'Operational Details', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Edificio' : 'Building', '${user['building'] ?? '-'}', textS, textP, icon: Icons.business_rounded)),
+                      Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Turno' : 'Shift', '${user['shift'] ?? '-'}', textS, textP, icon: Icons.access_time_rounded)),
+                    ]),
+                    const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
+                    Row(children: [
+                      Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Posición' : 'Position', '${user['position'] ?? '-'}', textS, textP, icon: Icons.badge_rounded)),
+                    ]),
+                  ]
+                )
+              ),
+            ],
           ),
         ),
       ],

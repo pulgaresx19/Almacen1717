@@ -23,6 +23,8 @@ class AddFlightScreenState extends State<AddFlightScreen> {
   final _dateCtrl = TextEditingController();
   final _timeCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+  final _delayedDateCtrl = TextEditingController();
+  final _delayedTimeCtrl = TextEditingController();
   
   // Break Counters
   int _cBreak = 0;
@@ -107,6 +109,38 @@ class AddFlightScreenState extends State<AddFlightScreen> {
     }
   }
 
+  Future<void> _selectDelayedDate() async {
+    DateTime initD = DateTime.now();
+    if (_delayedDateCtrl.text.isNotEmpty) {
+      try { initD = DateFormat('MM/dd/yyyy').parse(_delayedDateCtrl.text); } catch (_) {}
+    }
+    
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initD,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+      builder: (context, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: Color(0xFF6366f1), surface: Color(0xFF1e293b))), child: child!),
+    );
+    if (picked != null) {
+      setState(() => _delayedDateCtrl.text = DateFormat('MM/dd/yyyy').format(picked));
+    }
+  }
+
+  Future<void> _selectDelayedTime() async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) => Theme(data: ThemeData.dark().copyWith(colorScheme: const ColorScheme.dark(primary: Color(0xFF6366f1), surface: Color(0xFF1e293b))), child: child!),
+    );
+    if (picked != null) {
+      setState(() {
+        final dt = DateTime(2000, 1, 1, picked.hour, picked.minute);
+        _delayedTimeCtrl.text = DateFormat('hh:mm a').format(dt).toUpperCase();
+      });
+    }
+  }
+
   void _showRequiredFieldError(BuildContext ctx, String fieldName) {
     showDialog(
       context: ctx,
@@ -157,6 +191,8 @@ class AddFlightScreenState extends State<AddFlightScreen> {
     _dateCtrl.dispose();
     _timeCtrl.dispose();
     _remarksCtrl.dispose();
+    _delayedDateCtrl.dispose();
+    _delayedTimeCtrl.dispose();
     _breakCtrl.dispose();
     _noBreakCtrl.dispose();
     _uldNumberCtrl.dispose();
@@ -312,7 +348,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                 ),
                 const SizedBox(height: 12),
                 const SizedBox(height: 12),
-                _buildTextField('Remarks', remCtrl, 'Notas...'),
+                _buildTextField('Remarks', remCtrl, 'Additional remarks...'),
                 const SizedBox(height: 12),
                 Stack(
                   alignment: Alignment.bottomRight,
@@ -476,6 +512,16 @@ class AddFlightScreenState extends State<AddFlightScreen> {
       if (fTime.isNotEmpty) {
         try { fTime = DateFormat('HH:mm').format(DateFormat('hh:mm a').parse(_timeCtrl.text)); } catch (_) {}
       }
+
+      String fDelayedDate = _delayedDateCtrl.text;
+      if (fDelayedDate.isNotEmpty) {
+        try { fDelayedDate = DateFormat('yyyy-MM-dd').format(DateFormat('MM/dd/yyyy').parse(_delayedDateCtrl.text)); } catch (_) {}
+      }
+      
+      String fDelayedTime = _delayedTimeCtrl.text;
+      if (fDelayedTime.isNotEmpty) {
+        try { fDelayedTime = DateFormat('HH:mm').format(DateFormat('hh:mm a').parse(_delayedTimeCtrl.text)); } catch (_) {}
+      }
       
       final flightPayload = {
         'carrier': fCarrier,
@@ -488,6 +534,15 @@ class AddFlightScreenState extends State<AddFlightScreen> {
         'status': _status,
         'created_at': DateTime.now().toIso8601String(),
       };
+
+      if (_status == 'Delayed' && fDelayedDate.isNotEmpty && fDelayedTime.isNotEmpty) {
+         try {
+           final dDate = DateFormat('yyyy-MM-dd').parse(fDelayedDate);
+           final dTime = DateFormat('HH:mm').parse(fDelayedTime);
+           final dt = DateTime(dDate.year, dDate.month, dDate.day, dTime.hour, dTime.minute);
+           flightPayload['time-delayed'] = dt.toUtc().toIso8601String();
+         } catch (_) {}
+      }
 
       await supabase.from('Flight').insert([flightPayload]);
       
@@ -782,8 +837,12 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                 ))),
                 SizedBox(width: 130, child: _buildTextField('Date Arrived', _dateCtrl, '__/__/____', readOnly: true, onTap: _selectDate, suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70))),
                 SizedBox(width: 120, child: _buildTextField('Time Arrived', _timeCtrl, '__:__ --', readOnly: true, onTap: _selectTime, suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
-                SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Notas adicionales...')),
+                SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...')),
                 SizedBox(width: 100, child: _buildDropdown('Status')),
+                if (_status == 'Delayed') ...[
+                   SizedBox(width: 130, child: _buildTextField('Delayed Date', _delayedDateCtrl, '__/__/____', readOnly: true, onTap: _selectDelayedDate, suffixIcon: const Icon(Icons.event_busy, size: 16, color: Color(0xFFfdba74)))),
+                   SizedBox(width: 120, child: _buildTextField('Delayed Time', _delayedTimeCtrl, '__:__ --', readOnly: true, onTap: _selectDelayedTime, suffixIcon: const Icon(Icons.timer_off, size: 16, color: Color(0xFFfdba74)))),
+                ],
               ]
             );
           }
@@ -836,7 +895,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                     }
                   )
                 ))),
-                SizedBox(width: uldRWidth, child: _buildTextField('Remarks', _uldRemarksCtrl, 'Notas del ULD...')),
+                SizedBox(width: uldRWidth, child: _buildTextField('Remarks', _uldRemarksCtrl, 'ULD remarks...')),
                 SizedBox(
                   width: 65,
                   child: Column(
@@ -1236,7 +1295,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
               dropdownColor: const Color(0xFF1e293b),
               style: const TextStyle(color: Colors.white, fontSize: 12),
               icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFcbd5e1), size: 20),
-              items: ['Waiting', 'Received', 'Pending', 'Checked', 'Ready', 'Canceled']
+              items: ['Waiting', 'Received', 'Pending', 'Checked', 'Ready', 'Delayed', 'Canceled']
                   .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
               onChanged: (v) { if (v != null) setState(() => _status = v); },
             ),

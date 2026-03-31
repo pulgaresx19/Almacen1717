@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddUldScreen extends StatefulWidget {
@@ -21,6 +22,10 @@ class _AddUldScreenState extends State<AddUldScreen> {
   bool _isPriority = false;
   bool _isBreak = false;
   bool _isSaving = false;
+
+  bool _isFlightChk = true;
+  bool _isPiecesChk = true;
+  bool _isWeightChk = true;
 
   List<Map<String, dynamic>> _flights = [];
   final List<Map<String, dynamic>> _localUlds = [];
@@ -169,19 +174,52 @@ class _AddUldScreenState extends State<AddUldScreen> {
                   
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      double rWidth = constraints.maxWidth - 664; // 110+200+70+70+65+65+100 + 84gaps = 764.
+                      double rWidth = constraints.maxWidth - 916; 
                       if (rWidth < 180) rWidth = 180;
                       return Wrap(
                         spacing: 12,
                         runSpacing: 12,
                         crossAxisAlignment: WrapCrossAlignment.end,
                         children: [
-                          SizedBox(width: 110, child: _buildTextField('ULD Number', _uldNumberCtrl, 'AKE123...', maxLen: 10)),
-                          SizedBox(width: 200, child: _buildFlightDropdown()),
-                          SizedBox(width: 70, child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true)),
-                          SizedBox(width: 70, child: _buildTextField('Weight', _weightCtrl, '0.0', isNum: true)),
+                          SizedBox(width: 130, child: _buildTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true)),
+                          SizedBox(width: 200, child: _buildFlightDropdown(
+                            titleTrailing: SizedBox(
+                              width: 20, height: 20,
+                              child: Checkbox(
+                                value: _isFlightChk,
+                                activeColor: const Color(0xFF6366f1),
+                                side: const BorderSide(color: Color(0xFF94a3b8)),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (v) => setState(() => _isFlightChk = v ?? true),
+                              )
+                            )
+                          )),
+                          SizedBox(width: 70, child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true,
+                            titleTrailing: SizedBox(
+                              width: 20, height: 20,
+                              child: Checkbox(
+                                value: _isPiecesChk,
+                                activeColor: const Color(0xFF6366f1),
+                                side: const BorderSide(color: Color(0xFF94a3b8)),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (v) => setState(() => _isPiecesChk = v ?? true),
+                              )
+                            )
+                          )),
+                          SizedBox(width: 70, child: _buildTextField('Weight', _weightCtrl, '0.0', isNum: true,
+                            titleTrailing: SizedBox(
+                              width: 20, height: 20,
+                              child: Checkbox(
+                                value: _isWeightChk,
+                                activeColor: const Color(0xFF6366f1),
+                                side: const BorderSide(color: Color(0xFF94a3b8)),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                onChanged: (v) => setState(() => _isWeightChk = v ?? true),
+                              )
+                            )
+                          )),
+                          SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...')),
                           SizedBox(width: 100, child: _buildSimpleDropdown('Status', _status, ['Waiting', 'Received', 'Pending', 'Checked', 'Saved', 'Ready'], (v) => setState(() => _status = v!))),
-                          SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Notas adicionales...')),
                           SizedBox(
                             width: 65,
                             child: Column(
@@ -270,65 +308,58 @@ class _AddUldScreenState extends State<AddUldScreen> {
           ),
         ),
         // Bottom Pinned Action Bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0f172a),
-            border: Border(top: BorderSide(color: Colors.white.withAlpha(25))),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () {
-                    if (widget.onPop != null) {
-                      widget.onPop!(false);
-                    } else {
-                      Navigator.pop(context);
-                    }
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF94a3b8),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('CANCELAR', style: TextStyle(fontSize: 14)),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(right: 24.0, bottom: 24.0),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366f1),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                ),
+                onPressed: _isSaving ? null : _saveAllUlds,
+                icon: _isSaving 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.check_rounded),
+                label: Text(
+                  _isSaving ? 'Processing...' : 'Save ULDs', 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: _isSaving ? null : _saveAllUlds,
-                  icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.save_rounded),
-                  label: _isSaving 
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
-                      : const Text('GUARDAR TODOS LOS ULDs', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366f1),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, int? maxLen, bool disabled = false}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, int? maxLen, bool disabled = false, Widget? titleTrailing, bool isUpperCase = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+            titleTrailing ?? const SizedBox.shrink(),
+          ],
+        ),
         const SizedBox(height: 6),
         TextField(
           controller: ctrl,
           enabled: !disabled,
           keyboardType: isNum ? TextInputType.number : TextInputType.text,
           maxLength: maxLen,
+          textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
+          inputFormatters: [
+            if (isUpperCase) TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection)),
+          ],
           style: TextStyle(color: disabled ? Colors.white.withAlpha(120) : Colors.white, fontSize: 12),
           decoration: InputDecoration(
             hintText: hint,
@@ -371,11 +402,17 @@ class _AddUldScreenState extends State<AddUldScreen> {
     );
   }
 
-  Widget _buildFlightDropdown() {
+  Widget _buildFlightDropdown({Widget? titleTrailing}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Reference Flight', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(child: Text('Reference Flight', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
+            titleTrailing ?? const SizedBox.shrink(),
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),

@@ -230,15 +230,34 @@ class _LocationModuleState extends State<LocationModule> {
 
     final dateStr = DateFormat('yyyy-MM-dd').format(dt);
 
+    final validDates = <String>[];
+    for (int i = -15; i <= 15; i++) {
+      validDates.add(DateFormat('yyyy-MM-dd').format(dt.add(Duration(days: i))));
+    }
+
     if (isLeft) {
       _flightSubLeft = Supabase.instance.client
           .from('Flight')
           .stream(primaryKey: ['id'])
-          .eq('date-arrived', dateStr)
+          .inFilter('date-arrived', validDates)
           .listen((data) {
         if (!mounted) return;
+        
+        final validList = <Map<String, dynamic>>[];
+        for (var f in data) {
+           bool isDel = f['status']?.toString().toLowerCase() == 'delayed';
+           if (isDel && f['time-delayed'] != null && f['time-delayed'].toString().isNotEmpty) {
+             try {
+                final localDt = DateTime.parse(f['time-delayed'].toString()).toLocal();
+                if (DateFormat('yyyy-MM-dd').format(localDt) == dateStr) validList.add(f);
+             } catch (_) {}
+           } else {
+             if (f['date-arrived'] == dateStr) validList.add(f);
+           }
+        }
+        
         setState(() {
-          _flightsLeft = List<Map<String, dynamic>>.from(data);
+          _flightsLeft = validList;
           _isLoadingLeft = false;
           if (_selectedFlightIdLeft != null && !_flightsLeft.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdLeft)) {
              _selectedFlightIdLeft = null;
@@ -253,11 +272,25 @@ class _LocationModuleState extends State<LocationModule> {
       _flightSubRight = Supabase.instance.client
           .from('Flight')
           .stream(primaryKey: ['id'])
-          .eq('date-arrived', dateStr)
+          .inFilter('date-arrived', validDates)
           .listen((data) {
         if (!mounted) return;
+        
+        final validList = <Map<String, dynamic>>[];
+        for (var f in data) {
+           bool isDel = f['status']?.toString().toLowerCase() == 'delayed';
+           if (isDel && f['time-delayed'] != null && f['time-delayed'].toString().isNotEmpty) {
+             try {
+                final localDt = DateTime.parse(f['time-delayed'].toString()).toLocal();
+                if (DateFormat('yyyy-MM-dd').format(localDt) == dateStr) validList.add(f);
+             } catch (_) {}
+           } else {
+             if (f['date-arrived'] == dateStr) validList.add(f);
+           }
+        }
+
         setState(() {
-          _flightsRight = List<Map<String, dynamic>>.from(data);
+          _flightsRight = validList;
           _isLoadingRight = false;
           if (_selectedFlightIdRight != null && !_flightsRight.any((f) => '${f['carrier']}-${f['number']}' == _selectedFlightIdRight)) {
              _selectedFlightIdRight = null;

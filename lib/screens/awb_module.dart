@@ -274,11 +274,11 @@ class _AwbModuleState extends State<AwbModule> {
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        final borderC = dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
         final bg = dark ? const Color(0xFF0f172a) : Colors.white;
-        final bgCard = dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB);
+        final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
         final textP = dark ? Colors.white : const Color(0xFF111827);
-        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
+        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
 
         final Set<int> expandedCards = {};
 

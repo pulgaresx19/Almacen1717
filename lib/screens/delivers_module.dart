@@ -279,11 +279,11 @@ class _DeliversModuleState extends State<DeliversModule> {
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        final borderC = dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
         final bg = dark ? const Color(0xFF0f172a) : Colors.white;
-        final bgCard = dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB);
+        final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
         final textP = dark ? Colors.white : const Color(0xFF111827);
-        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
+        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
 
         List<dynamic> awbs = [];
         if (u['list-pickup'] != null && u['list-pickup'] is List) {
@@ -298,7 +298,7 @@ class _DeliversModuleState extends State<DeliversModule> {
             color: bg,
             elevation: 16,
             child: SizedBox(
-              width: 480,
+              width: 520,
               height: double.infinity,
               child: Column(
                 children: [
@@ -306,25 +306,34 @@ class _DeliversModuleState extends State<DeliversModule> {
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.local_shipping_outlined, color: textP, size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Deliver Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(u['truck-company']?.toString() ?? 'Unknown Company', style: TextStyle(color: textS, fontSize: 13)),
-                            ],
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Deliver Details', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.local_shipping_outlined, color: textP, size: 24),
+                                const SizedBox(width: 8),
+                                Text(u['truck-company']?.toString() ?? 'Unknown Company', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                              ]
+                            )
+                          ],
                         ),
-                        _buildStatusBadge(u['status']?.toString() ?? 'Waiting'),
-                        const SizedBox(width: 12),
-                        IconButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          icon: Icon(Icons.close, color: textS),
-                          splashRadius: 24,
-                        ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _buildStatusBadge(u['status']?.toString() ?? 'Waiting'),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              icon: Icon(Icons.close_rounded, color: textP),
+                            ),
+                          ],
+                        )
                       ],
                     ),
                   ),
@@ -334,26 +343,48 @@ class _DeliversModuleState extends State<DeliversModule> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Driver Information', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w700)),
+                          Container(
+                             padding: const EdgeInsets.all(16),
+                             decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                             child: Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                  Row(children: [Icon(Icons.badge_outlined, size: 16, color: textP), const SizedBox(width: 8), Text('Driver Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(child: _buildInfoCard('Driver Name', u['driver']?.toString() ?? '-', Icons.person_outline, textP, textS)),
+                                      Expanded(child: _buildInfoCard('ID Pickup', u['id-pickup']?.toString() ?? '-', Icons.badge_outlined, textP, textS)),
+                                    ],
+                                  ),
+                               ]
+                             )
+                          ),
+                          
                           const SizedBox(height: 16),
-                          _buildInfoCard('Driver Name', u['driver']?.toString() ?? '-', Icons.person_outline, borderC, bgCard, textP, textS),
-                          const SizedBox(height: 12),
-                          _buildInfoCard('ID Pickup', u['id-pickup']?.toString() ?? '-', Icons.badge_outlined, borderC, bgCard, textP, textS),
                           
-                          const SizedBox(height: 32),
-                          
-                          Text('Delivery Details', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 16),
-                          _buildInfoCard('Type', u['type']?.toString() ?? '-', Icons.local_shipping_outlined, borderC, bgCard, textP, textS),
-                          const SizedBox(height: 12),
-                          _buildInfoCard('Door', u['door']?.toString() ?? '-', Icons.door_front_door_outlined, borderC, bgCard, textP, textS),
-                          const SizedBox(height: 12),
-                          _buildInfoCard('Priority', u['isPriority'] == true ? 'High Priority' : 'Normal', Icons.star_outline, borderC, bgCard, textP, textS, iconColor: u['isPriority'] == true ? Colors.orange : null),
-                          
-                          if (u['remarks'] != null && u['remarks'].toString().isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            _buildInfoCard('Remarks', u['remarks'].toString(), Icons.notes, borderC, bgCard, textP, textS),
-                          ],
+                          Container(
+                             padding: const EdgeInsets.all(16),
+                             decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                             child: Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                  Row(children: [Icon(Icons.local_shipping_outlined, size: 16, color: textP), const SizedBox(width: 8), Text('Delivery Details', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(child: _buildInfoCard('Type', u['type']?.toString() ?? '-', Icons.local_shipping_outlined, textP, textS)),
+                                      Expanded(child: _buildInfoCard('Door', u['door']?.toString() ?? '-', Icons.door_front_door_outlined, textP, textS)),
+                                      Expanded(child: _buildInfoCard('Priority', u['isPriority'] == true ? 'High Priority' : 'Normal', Icons.star_outline, textP, textS, iconColor: u['isPriority'] == true ? Colors.orange : null)),
+                                    ],
+                                  ),
+                                  if (u['remarks'] != null && u['remarks'].toString().isNotEmpty) ...[
+                                    const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                    _buildInfoCard('Remarks', u['remarks'].toString(), Icons.notes, textP, textS),
+                                  ],
+                               ]
+                             )
+                          ),
                           
                           const SizedBox(height: 32),
                           
@@ -403,17 +434,22 @@ class _DeliversModuleState extends State<DeliversModule> {
     );
   }
 
-  Widget _buildInfoCard(String label, String val, IconData icon, Color borderC, Color bgCard, Color textP, Color textS, {Color? iconColor}) {
+  Widget _buildInfoCard(String label, String val, IconData icon, Color textP, Color textS, {Color? iconColor}) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
-      child: Row(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor ?? textS, size: 20),
-          const SizedBox(width: 12),
-          Text('$label:', style: TextStyle(color: textS, fontSize: 13)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(val, style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.w500))),
+          Row(
+            children: [
+              Icon(icon, color: iconColor ?? textS, size: 14),
+              const SizedBox(width: 6),
+              Expanded(child: Text(label, style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(val, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
         ],
       ),
     );

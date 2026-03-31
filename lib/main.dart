@@ -111,14 +111,7 @@ class _LoginScreenState extends State<LoginScreen>
       );
 
       if (response.user != null) {
-        scaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green.shade600,
-            content: Text(
-              '✅ ¡Sesión iniciada! Bienvenido ${response.user!.email}',
-            ),
-          ),
-        );
+
 
         // Navigation to Dashboard!
         if (mounted) {

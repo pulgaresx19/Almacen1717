@@ -59,7 +59,19 @@ class _UldModuleState extends State<UldModule> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (_showAddForm)
-                      Text(appLanguage.value == 'es' ? 'Añadir Nuevo ULD' : 'Add New ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700))
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              setState(() => _showAddForm = false);
+                            },
+                            icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
+                            padding: const EdgeInsets.only(right: 8),
+                            constraints: const BoxConstraints(),
+                          ),
+                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo ULD' : 'Add New ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                        ],
+                      )
                     else
                       Text(appLanguage.value == 'es' ? 'Contenedores' : 'Unit Load Devices (ULD)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
@@ -445,143 +457,468 @@ class _UldModuleState extends State<UldModule> {
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        final borderC = dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
         final bg = dark ? const Color(0xFF0f172a) : Colors.white;
-        final bgCard = dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB);
+        final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
         final textP = dark ? Colors.white : const Color(0xFF111827);
-        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
+        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
 
         List dataUld = [];
         if (u['data-ULD'] is List) dataUld = u['data-ULD'];
 
-        return Align(
-          alignment: Alignment.centerRight,
-          child: Material(
-            color: bg,
-            elevation: 16,
-            child: SizedBox(
-              width: 480,
-              height: double.infinity,
-              child: Column(
-                children: [
-                   Container(
-                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                     decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
-                     child: Row(
-                       children: [
-                         Icon(Icons.inventory_2_rounded, color: textP, size: 24),
-                         const SizedBox(width: 12),
-                         Expanded(
+        Set<String> editingKeys = {};
+
+        return StatefulBuilder(
+          builder: (ctxModal, setModalState) {
+
+            Widget buildEditable(String label, String key, {bool isBool = false, String trueText = '', String falseText = '', bool isNum = false}) {
+               dynamic val = u[key];
+               final bool isEditing = editingKeys.contains(key);
+
+               if (!isEditing) {
+                  String displayStr = '';
+                  Color valColor = textP;
+
+                  if (isBool) {
+                     displayStr = val == true ? trueText : falseText;
+                     if (key == 'isBreak') {
+                        valColor = val == true ? const Color(0xFF10b981) : const Color(0xFFef4444);
+                     } else if (key == 'isPriority') {
+                        valColor = val == true ? Colors.redAccent : textP;
+                     }
+                  } else {
+                     displayStr = '${val ?? '0'}';
+                     if (key == 'weight') displayStr += ' kg';
+                  }
+
+                  return Container(
+                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                     child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                           Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                 Text(label, style: TextStyle(color: textS, fontSize: 11)),
+                                 InkWell(
+                                    onTap: () => setModalState(() => editingKeys.add(key)),
+                                    child: const Padding(
+                                      padding: EdgeInsets.only(left: 8),
+                                      child: Icon(Icons.edit_rounded, color: Color(0xFF94a3b8), size: 12),
+                                    ),
+                                 )
+                              ],
+                           ),
+                           const SizedBox(height: 6),
+                           Text(displayStr, style: TextStyle(color: valColor, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                        ]
+                     )
+                  );
+               }
+
+               final inputBorderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+               Widget editor;
+               final ctrl = TextEditingController(text: val?.toString() ?? '')..selection = TextSelection.collapsed(offset: (val?.toString() ?? '').length);
+
+               if (isBool) {
+                  editor = Container(
+                     height: 32,
+                     width: double.infinity,
+                     padding: const EdgeInsets.symmetric(horizontal: 8),
+                     decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+                     child: DropdownButtonHideUnderline(
+                        child: DropdownButton<bool>(
+                           value: val == true,
+                           dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                           isExpanded: true,
+                           style: TextStyle(color: textP, fontSize: 12),
+                           items: [
+                              DropdownMenuItem(value: true, child: Text(trueText)),
+                              DropdownMenuItem(value: false, child: Text(falseText)),
+                           ],
+                           onChanged: (v) async {
+                              if (v != null) {
+                                  try {
+                                     await Supabase.instance.client.from('ULD').update({key: v}).eq('id', u['id']);
+                                     setModalState(() {
+                                        u[key] = v;
+                                        editingKeys.remove(key);
+                                     });
+                                     if (mounted) setState(() {});
+                                  } catch (e) {
+                                     debugPrint('Error updating bool $key: $e');
+                                  }
+                              }
+                           },
+                        ),
+                     ),
+                  );
+               } else {
+                  editor = SizedBox(
+                     height: 32,
+                     child: TextField(
+                        controller: ctrl,
+                        keyboardType: isNum ? TextInputType.number : TextInputType.text,
+                        style: TextStyle(color: textP, fontSize: 12),
+                        decoration: InputDecoration(
+                           contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                           fillColor: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                           filled: true,
+                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
+                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
+                        ),
+                        onSubmitted: (newVal) async {
+                           try {
+                              dynamic parsedVal = newVal;
+                              if (isNum) parsedVal = int.tryParse(newVal) ?? 0;
+                              await Supabase.instance.client.from('ULD').update({key: parsedVal}).eq('id', u['id']);
+                              setModalState(() {
+                                 u[key] = parsedVal;
+                                 editingKeys.remove(key);
+                              });
+                              if (mounted) setState(() {});
+                           } catch (e) {
+                              debugPrint('Error: $e');
+                           }
+                        },
+                     ),
+                  );
+               }
+
+               return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                        Text(label, style: TextStyle(color: textS, fontSize: 11)),
+                        const SizedBox(height: 8),
+                        editor,
+                        if (!isBool) ...[
+                           const SizedBox(height: 8),
+                           Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                 InkWell(
+                                    onTap: () => setModalState(() => editingKeys.remove(key)),
+                                    child: Container(
+                                       padding: const EdgeInsets.all(4),
+                                       decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(6)),
+                                       child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
+                                    )
+                                 ),
+                                 const SizedBox(width: 8),
+                                 InkWell(
+                                    onTap: () async {
+                                       try {
+                                          dynamic parsedVal = ctrl.text;
+                                          if (isNum) parsedVal = int.tryParse(ctrl.text) ?? 0;
+                                          await Supabase.instance.client.from('ULD').update({key: parsedVal}).eq('id', u['id']);
+                                          setModalState(() {
+                                             u[key] = parsedVal;
+                                             editingKeys.remove(key);
+                                          });
+                                          if (mounted) setState(() {});
+                                       } catch (e) {
+                                          debugPrint('Error: $e');
+                                       }
+                                    },
+                                    child: Container(
+                                       padding: const EdgeInsets.all(4),
+                                       decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(20), borderRadius: BorderRadius.circular(6)),
+                                       child: const Icon(Icons.check_rounded, color: Color(0xFF6366f1), size: 16),
+                                    )
+                                 ),
+                              ]
+                           )
+                        ]
+                     ]
+                  )
+               );
+            }
+
+            return Align(
+              alignment: Alignment.centerRight,
+              child: Material(
+                color: bg,
+                elevation: 16,
+                child: SizedBox(
+                  width: 520,
+                  height: double.infinity,
+                  child: Column(
+                    children: [
+                       Container(
+                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
+                         child: Row(
+                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                             Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                 Text('ULD Details', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
+                                 const SizedBox(height: 4),
+                                 Row(
+                                   children: [
+                                     Icon(Icons.inventory_2_rounded, color: textP, size: 24),
+                                     const SizedBox(width: 8),
+                                     Text('${u['ULD-number'] ?? '-'}', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                                   ]
+                                 )
+                               ],
+                             ),
+                             Row(
+                               crossAxisAlignment: CrossAxisAlignment.center,
+                               children: [
+                                 IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: textP)),
+                               ],
+                             )
+                           ],
+                         ),
+                       ),
+                       Expanded(
+                         child: SingleChildScrollView(
+                           padding: const EdgeInsets.all(24),
                            child: Column(
                              crossAxisAlignment: CrossAxisAlignment.start,
                              children: [
-                               Text('ULD Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                               Text('${u['ULD-number'] ?? '-'}', style: TextStyle(color: textS, fontSize: 13)),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                       Row(
+                                         children: [
+                                            Icon(Icons.flight_takeoff, size: 16, color: textP),
+                                            const SizedBox(width: 8),
+                                            Text('Flight Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                         ]
+                                       ),
+                                       const SizedBox(height: 12),
+                                       Row(children: [
+                                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                           Text('Flight', style: TextStyle(color: textS, fontSize: 12)),
+                                           Text('${u['refCarrier'] ?? ''} ${u['refNumber'] ?? ''}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                         ])),
+                                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                           Text('Date', style: TextStyle(color: textS, fontSize: 12)),
+                                           Text('${u['refDate'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                         ])),
+                                       ]),
+                                       const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                                       Row(children: [
+                                         Expanded(child: buildEditable('Pieces', 'pieces', isNum: true)),
+                                         Expanded(child: buildEditable('Weight', 'weight', isNum: true)),
+                                       ]),
+                                       const SizedBox(height: 12),
+                                       Row(children: [
+                                         Expanded(child: buildEditable('Type', 'isBreak', isBool: true, trueText: 'BREAK', falseText: 'NO BREAK')),
+                                         Expanded(child: buildEditable('Priority', 'isPriority', isBool: true, trueText: 'Priority', falseText: 'Normal')),
+                                       ])
+                                    ]
+                                  )
+                                ),
+
+                                if (dataUld.isNotEmpty) ...[
+                                   const SizedBox(height: 24),
+                                   Text('Assigned AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                   const SizedBox(height: 12),
+                                   ...dataUld.map((awb) {
+                                      return Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
+                                        child: Row(
+                                          children: [
+                                             const Icon(Icons.description_rounded, color: Color(0xFF6366f1), size: 14),
+                                             const SizedBox(width: 8),
+                                             Expanded(
+                                               child: Row(
+                                                  children: [
+                                                     Text(awb['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w500)),
+                                                     const SizedBox(width: 12),
+                                                     Flexible(child: Text('Pieces: ${awb['pieces'] ?? 0}  |  Total: ${awb['total'] ?? 0}  |  Weight: ${awb['weight'] ?? 0} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                  ],
+                                               )
+                                             ),
+                                             InkWell(
+                                               onTap: () {
+                                                 showDialog(
+                                                   context: ctxModal,
+                                                   builder: (ctxD) => AlertDialog(
+                                                     backgroundColor: bg,
+                                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                                     title: Text('AWB Information', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                     content: FutureBuilder<Map<String, dynamic>?>(
+                                                       future: Supabase.instance.client.from('AWB').select().eq('AWB-number', awb['awb_number']).maybeSingle(),
+                                                       builder: (ctx, snap) {
+                                                         Widget buildInfoCard(String title, String value, IconData icon) {
+                                                           return Container(
+                                                             padding: const EdgeInsets.all(12),
+                                                             decoration: BoxDecoration(
+                                                               color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                                                               borderRadius: BorderRadius.circular(8),
+                                                               border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
+                                                             ),
+                                                             child: Row(
+                                                               children: [
+                                                                 Icon(icon, size: 16, color: textS),
+                                                                 const SizedBox(width: 8),
+                                                                 Expanded(
+                                                                   child: Column(
+                                                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                                                     children: [
+                                                                       Text(title, style: TextStyle(color: textS, fontSize: 11)),
+                                                                       Text(value, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                                                     ]
+                                                                   )
+                                                                 ),
+                                                               ]
+                                                             )
+                                                           );
+                                                         }
+
+                                                         if (snap.connectionState == ConnectionState.waiting) {
+                                                           return const SizedBox(width: 450, height: 150, child: Center(child: CircularProgressIndicator()));
+                                                         }
+                                                         
+                                                         final dbAwb = snap.data ?? {};
+                                                         List dataAwbArray = (dbAwb['data-AWB'] is List) ? dbAwb['data-AWB'] : [];
+                                                         
+                                                         Map<String, dynamic>? specificData;
+                                                         try {
+                                                            specificData = dataAwbArray.firstWhere((e) => e['refULD']?.toString() == u['ULD-number']?.toString());
+                                                         } catch(_) {}
+
+                                                         final String remarks = specificData?['remarks']?.toString() ?? awb['remarks']?.toString() ?? '';
+                                                         
+                                                         List<String> finalHawbs = [];
+                                                         final hRaw = specificData?['house_number'] ?? specificData?['house'] ?? awb['house_number'] ?? awb['house'];
+                                                         if (hRaw != null) {
+                                                            if (hRaw is List) {
+                                                              finalHawbs = hRaw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+                                                            } else if (hRaw is String) {
+                                                              finalHawbs = hRaw.toString().split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                                                            }
+                                                         }
+
+                                                         return SizedBox(
+                                                           width: 450,
+                                                           child: SingleChildScrollView(
+                                                             child: Column(
+                                                               mainAxisSize: MainAxisSize.min,
+                                                               crossAxisAlignment: CrossAxisAlignment.start,
+                                                               children: [
+                                                                 Container(
+                                                                   padding: const EdgeInsets.all(12),
+                                                                   decoration: BoxDecoration(
+                                                                     color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
+                                                                     borderRadius: BorderRadius.circular(10),
+                                                                     border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                                                                   ),
+                                                                   child: Row(
+                                                                     children: [
+                                                                       const Icon(Icons.flight_takeoff_rounded, color: Color(0xFF6366f1), size: 20),
+                                                                       const SizedBox(width: 12),
+                                                                       Column(
+                                                                         crossAxisAlignment: CrossAxisAlignment.start,
+                                                                         children: [
+                                                                           Text('AWB Number', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                                                           Text(awb['awb_number']?.toString() ?? '-', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                                         ]
+                                                                       ),
+                                                                     ]
+                                                                   )
+                                                                 ),
+                                                                 const SizedBox(height: 16),
+                                                                 Row(
+                                                                   children: [
+                                                                      Expanded(child: buildInfoCard('Pieces', '${awb['pieces'] ?? 0}', Icons.extension_outlined)),
+                                                                      const SizedBox(width: 12),
+                                                                      Expanded(child: buildInfoCard('Total Pcs', '${awb['total'] ?? 0}', Icons.all_inbox_outlined)),
+                                                                      const SizedBox(width: 12),
+                                                                      Expanded(child: buildInfoCard('Weight', '${awb['weight'] ?? specificData?['weight'] ?? 0} kg', Icons.scale_outlined)),
+                                                                   ]
+                                                                 ),
+                                                                 if (finalHawbs.isNotEmpty) ...[
+                                                                   const SizedBox(height: 20),
+                                                                   Text('House AWBs (HAWBs)', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                                                   const SizedBox(height: 8),
+                                                                   Container(
+                                                                     padding: const EdgeInsets.all(12),
+                                                                     decoration: BoxDecoration(color: dark ? Colors.black.withAlpha(30) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(8), border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB))),
+                                                                     child: Column(
+                                                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                                                       children: finalHawbs.map((h) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.layers_outlined, size: 14, color: textS), const SizedBox(width: 8), Expanded(child: SelectableText(h, style: TextStyle(color: textP, fontSize: 13)))]))).toList(),
+                                                                     ),
+                                                                   ),
+                                                                 ],
+                                                                 if (remarks.trim().isNotEmpty) ...[
+                                                                   const SizedBox(height: 20),
+                                                                   Text('Remarks', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                                                   const SizedBox(height: 8),
+                                                                   Container(
+                                                                     padding: const EdgeInsets.all(12),
+                                                                     decoration: BoxDecoration(color: dark ? const Color(0xFFfef3c7).withAlpha(20) : const Color(0xFFfef3c7).withAlpha(120), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFf59e0b).withAlpha(50))),
+                                                                     child: Row(
+                                                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                                                       children: [
+                                                                         const Icon(Icons.priority_high_rounded, size: 16, color: Color(0xFFf59e0b)),
+                                                                         const SizedBox(width: 8),
+                                                                         Expanded(child: SelectableText(remarks, style: TextStyle(color: textP, fontSize: 13))),
+                                                                       ]
+                                                                     )
+                                                                   ),
+                                                                 ],
+                                                               ]
+                                                             ),
+                                                           ),
+                                                         );
+                                                       }
+                                                     ),
+                                                     actions: [
+                                                       TextButton(
+                                                         onPressed: () => Navigator.pop(ctxD),
+                                                         child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))),
+                                                       )
+                                                     ]
+                                                   )
+                                                 );
+                                               },
+                                               child: Padding(
+                                                 padding: const EdgeInsets.all(4.0),
+                                                 child: Icon(Icons.info_outline_rounded, color: textS, size: 18),
+                                               )
+                                             ),
+                                          ]
+                                        )
+                                      );
+                                   }),
+                                ],
+
+                                if ((u['data-received'] != null && (u['data-received'] as Map).isNotEmpty) || 
+                                    (u['data-checked'] != null && (u['data-checked'] as Map).isNotEmpty) || 
+                                    (u['data-saved'] != null && (u['data-saved'] as Map).isNotEmpty) || 
+                                    (u['data-delivery'] != null && (u['data-delivery'] as Map).isNotEmpty)) ...[
+                                   const SizedBox(height: 24),
+                                   Text('Audit Trail', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                   const SizedBox(height: 12),
+                                   _buildAuditItem('Received', u['data-received'], textP, textS, bgCard, borderC),
+                                   _buildAuditItem('Checked', u['data-checked'], textP, textS, bgCard, borderC),
+                                   _buildAuditItem('Saved', u['data-saved'], textP, textS, bgCard, borderC),
+                                   _buildAuditItem('Delivered', u['data-delivery'], textP, textS, bgCard, borderC),
+                                ],
                              ]
                            )
-                         ),
-                         IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close, color: textP)),
-                       ]
-                     )
-                   ),
-                   Expanded(
-                     child: SingleChildScrollView(
-                       padding: const EdgeInsets.all(24),
-                       child: Column(
-                         crossAxisAlignment: CrossAxisAlignment.start,
-                         children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                   Row(
-                                     children: [
-                                        Icon(Icons.flight_takeoff, size: 16, color: textP),
-                                        const SizedBox(width: 8),
-                                        Text('Flight Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
-                                     ]
-                                   ),
-                                   const SizedBox(height: 12),
-                                   Row(children: [
-                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                       Text('Flight', style: TextStyle(color: textS, fontSize: 12)),
-                                       Text('${u['refCarrier'] ?? ''} ${u['refNumber'] ?? ''}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                     ])),
-                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                       Text('Date', style: TextStyle(color: textS, fontSize: 12)),
-                                       Text('${u['refDate'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                     ])),
-                                   ]),
-                                   const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
-                                   Row(children: [
-                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                       Text('Pieces', style: TextStyle(color: textS, fontSize: 12)),
-                                       Text('${u['pieces'] ?? '0'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                     ])),
-                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                       Text('Weight', style: TextStyle(color: textS, fontSize: 12)),
-                                       Text('${u['weight'] ?? '0'} kg', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                     ])),
-                                   ]),
-                                   const SizedBox(height: 12),
-                                   Row(children: [
-                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                       Text('Type', style: TextStyle(color: textS, fontSize: 12)),
-                                       Text(u['isBreak'] == true ? 'BREAK' : 'NO BREAK', style: TextStyle(color: u['isBreak'] == true ? const Color(0xFF10b981) : const Color(0xFFef4444), fontWeight: FontWeight.w800)),
-                                     ])),
-                                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                       Text('Priority', style: TextStyle(color: textS, fontSize: 12)),
-                                       Text(u['isPriority'] == true ? 'Priority' : 'Normal', style: TextStyle(color: u['isPriority'] == true ? Colors.redAccent : textP, fontWeight: FontWeight.w600)),
-                                     ])),
-                                   ])
-                                ]
-                              )
-                            ),
-
-                            if (dataUld.isNotEmpty) ...[
-                               const SizedBox(height: 24),
-                               Text('Assigned AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
-                               const SizedBox(height: 12),
-                               ...dataUld.map((awb) {
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.inventory_2_outlined, size: 20, color: const Color(0xFF6366f1)),
-                                        const SizedBox(width: 12),
-                                        Expanded(flex: 2, child: Text(awb['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13))),
-                                        Expanded(flex: 1, child: Text('Pieces: ${awb['pieces'] ?? '-'}', style: TextStyle(color: textS, fontSize: 12))),
-                                        Expanded(flex: 1, child: Text('Total: ${awb['total'] ?? '-'}', style: TextStyle(color: textS, fontSize: 12))),
-                                      ]
-                                    )
-                                  );
-                               }),
-                            ],
-
-                            if ((u['data-received'] != null && (u['data-received'] as Map).isNotEmpty) || 
-                                (u['data-checked'] != null && (u['data-checked'] as Map).isNotEmpty) || 
-                                (u['data-saved'] != null && (u['data-saved'] as Map).isNotEmpty) || 
-                                (u['data-delivery'] != null && (u['data-delivery'] as Map).isNotEmpty)) ...[
-                               const SizedBox(height: 24),
-                               Text('Audit Trail', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
-                               const SizedBox(height: 12),
-                               _buildAuditItem('Received', u['data-received'], textP, textS, bgCard, borderC),
-                               _buildAuditItem('Checked', u['data-checked'], textP, textS, bgCard, borderC),
-                               _buildAuditItem('Saved', u['data-saved'], textP, textS, bgCard, borderC),
-                               _buildAuditItem('Delivered', u['data-delivery'], textP, textS, bgCard, borderC),
-                            ],
-                         ]
+                         )
                        )
-                     )
-                   )
-                ]
+                    ]
+                  )
+                )
               )
-            )
-          )
+            );
+          }
         );
       },
       transitionBuilder: (context, a1, a2, child) {
