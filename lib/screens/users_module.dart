@@ -4,7 +4,8 @@ import '../main.dart' show appLanguage, isDarkMode;
 import 'add_user_screen.dart';
 
 class UsersModule extends StatefulWidget {
-  const UsersModule({super.key});
+  final bool isActive;
+  const UsersModule({super.key, this.isActive = true});
 
   @override
   State<UsersModule> createState() => _UsersModuleState();
@@ -13,6 +14,19 @@ class UsersModule extends StatefulWidget {
 class _UsersModuleState extends State<UsersModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
+  final GlobalKey<AddUserScreenState> _addUserKey = GlobalKey<AddUserScreenState>();
+
+  @override
+  void didUpdateWidget(covariant UsersModule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      if (_showAddForm && _addUserKey.currentState != null) {
+        if (!_addUserKey.currentState!.hasDataSync) {
+          setState(() => _showAddForm = false);
+        }
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -45,11 +59,20 @@ class _UsersModuleState extends State<UsersModule> {
                       Row(
                         children: [
                           IconButton(
-                            onPressed: () => setState(() => _showAddForm = false),
-                            icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
-                            padding: const EdgeInsets.only(right: 8),
-                            constraints: const BoxConstraints(),
+                            onPressed: () async {
+                              if (_addUserKey.currentState != null) {
+                                final canPop = await _addUserKey.currentState!.handleBackRequest();
+                                if (canPop) {
+                                  setState(() => _showAddForm = false);
+                                }
+                              } else {
+                                setState(() => _showAddForm = false);
+                              }
+                            },
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                           ),
+                          const SizedBox(width: 8),
                           Text(appLanguage.value == 'es' ? 'Añadir Nuevo Usuario' : 'Add New User', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         ],
                       )
@@ -91,15 +114,20 @@ class _UsersModuleState extends State<UsersModule> {
             
             // Add User Button
             if (!_showAddForm)
-              ElevatedButton.icon(
-                onPressed: () => setState(() => _showAddForm = true),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text(appLanguage.value == 'es' ? 'Añadir Usuario' : 'Add User', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366f1),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _showAddForm = true),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(appLanguage.value == 'es' ? 'Añadir Usuario' : 'Add User', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
                 ),
               ),
             const SizedBox(width: 8),
@@ -129,6 +157,7 @@ class _UsersModuleState extends State<UsersModule> {
               borderRadius: BorderRadius.circular(16),
               child: _showAddForm 
                   ? AddUserScreen(
+                      key: _addUserKey,
                       isInline: true,
                       onPop: (_) => setState(() => _showAddForm = false),
                     )

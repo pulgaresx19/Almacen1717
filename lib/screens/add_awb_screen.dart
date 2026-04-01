@@ -1,32 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage;
 
 class AddAwbScreen extends StatefulWidget {
   final String? initialFlightId;
   final String? initialUld;
   final Function(bool)? onPop;
 
-  const AddAwbScreen({super.key, this.initialFlightId, this.initialUld, this.onPop});
+  const AddAwbScreen({
+    super.key,
+    this.initialFlightId,
+    this.initialUld,
+    this.onPop,
+  });
 
   @override
-  State<AddAwbScreen> createState() => _AddAwbScreenState();
+  State<AddAwbScreen> createState() => AddAwbScreenState();
 }
 
-class _AddAwbScreenState extends State<AddAwbScreen> {
+class AddAwbScreenState extends State<AddAwbScreen> {
   final _awbNumberCtrl = TextEditingController();
   final _piecesCtrl = TextEditingController();
   final _totalCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _houseCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
-  
+
   String? _selectedFlight;
   String _refUld = '';
-  bool _isSaving = false;
+  bool _isSavingAll = false;
   late final TextEditingController _refUldCtrl;
 
   List<Map<String, dynamic>> _flights = [];
+  final List<Map<String, dynamic>> _localAwbs = [];
+  final Set<String> _collapsedGroups = {};
 
   @override
   void initState() {
@@ -39,7 +46,10 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
 
   Future<void> _loadFlights() async {
     try {
-      final res = await Supabase.instance.client.from('Flight').select('id, carrier, number, date-arrived').order('created_at');
+      final res = await Supabase.instance.client
+          .from('Flight')
+          .select('id, carrier, number, date-arrived')
+          .order('created_at');
       if (mounted) {
         setState(() {
           _flights = List.from(res);
@@ -60,42 +70,139 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
     super.dispose();
   }
 
-  Future<void> _saveAWB() async {
-    if (_awbNumberCtrl.text.isEmpty || _totalCtrl.text.isEmpty) {
+  void _addLocalAwb() {
+    if (_awbNumberCtrl.text.trim().isEmpty || _totalCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('AWB Number & Total pieces are required.')),
+        const SnackBar(
+          content: Text('AWB Number & Total pieces are required.'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() {
+      String? flightLabel;
+      if (_selectedFlight != null) {
+        final f = _flights.firstWhere(
+          (x) => x['id'].toString() == _selectedFlight,
+          orElse: () => <String, dynamic>{},
+        );
+        if (f.isNotEmpty) {
+          flightLabel = '${f['carrier']} ${f['number']}';
+        }
+      }
+
+      _localAwbs.add({
+        'awbNumber': _awbNumberCtrl.text.trim().toUpperCase(),
+        'pieces': int.tryParse(_piecesCtrl.text) ?? 1,
+        'total': int.tryParse(_totalCtrl.text) ?? 1,
+        'weight': double.tryParse(_weightCtrl.text) ?? 0.0,
+        'house': _houseCtrl.text.trim().toUpperCase(),
+        'remarks': _remarksCtrl.text.trim().isEmpty
+            ? null
+            : _remarksCtrl.text.trim(),
+        'flight_id': _selectedFlight,
+        'flightLabel': flightLabel,
+        'refUld': _refUld.trim().toUpperCase(),
+      });
+
+      _awbNumberCtrl.clear();
+      _piecesCtrl.clear();
+      _totalCtrl.clear();
+      _weightCtrl.clear();
+      _houseCtrl.clear();
+      _remarksCtrl.clear();
+      _refUldCtrl.clear();
+      _refUld = '';
+    });
+  }
+
+  Future<void> _saveAllAwbs() async {
+    if (_localAwbs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one Air Waybill.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSavingAll = true);
 
     try {
-      final dataAwb = {
-        'flightID': _selectedFlight ?? '0',
-        'refULD': _refUld.toUpperCase(),
-        'pieces': int.tryParse(_piecesCtrl.text) ?? 1,
-        'weight': double.tryParse(_weightCtrl.text) ?? 0.0,
-        'house': _houseCtrl.text.toUpperCase(),
-        'remarks': _remarksCtrl.text,
-        'status': 'Received',
-      };
+      final dateStr = DateTime.now().toIso8601String().substring(0, 10);
+      List<Map<String, dynamic>> payloads = [];
 
-      final payload = {
-        'AWB-number': _awbNumberCtrl.text.toUpperCase(),
-        'total': int.tryParse(_totalCtrl.text) ?? 1,
-        'data-AWB': dataAwb,
-        'data-coordinator': {},
-        'data-location': {},
-        'created_at': DateTime.now().toIso8601String(),
-      };
+      for (var a in _localAwbs) {
+        final dataAwb = {
+          'flightID': a['flight_id'] ?? '0',
+          'refCarrier': 'WRHS',
+          'refNumber': 'LOCAL',
+          'refDate': dateStr,
+          'refULD': a['refUld'],
+          'pieces': a['pieces'],
+          'weight': a['weight'],
+          'house': a['house'],
+          'remarks': a['remarks'],
+          'status': 'Received',
+        };
 
-      await Supabase.instance.client.from('AWB').insert(payload);
-      
+        payloads.add({
+          'AWB-number': a['awbNumber'],
+          'total': a['total'],
+          'data-AWB': dataAwb,
+          'data-coordinator': {},
+          'data-location': {},
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      await Supabase.instance.client.from('AWB').insert(payloads);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ AWB successfully saved'), backgroundColor: Colors.green),
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) {
+            Future.delayed(const Duration(seconds: 1), () {
+              if (ctx.mounted && Navigator.canPop(ctx)) {
+                Navigator.pop(ctx);
+              }
+            });
+            return Dialog(
+              backgroundColor: const Color(0xFF1e293b),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: Color(0xFF10b981),
+                      size: 64,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Air Waybills saved successfully',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
+        if (!mounted) return;
         if (widget.onPop != null) {
           widget.onPop!(true);
         } else {
@@ -109,194 +216,676 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSavingAll = false);
     }
+  }
+
+  bool get hasDataSync {
+    if (_localAwbs.isNotEmpty) return true;
+    if (_awbNumberCtrl.text.isNotEmpty ||
+        _piecesCtrl.text.isNotEmpty ||
+        _weightCtrl.text.isNotEmpty ||
+        _totalCtrl.text.isNotEmpty ||
+        _refUldCtrl.text.isNotEmpty ||
+        _houseCtrl.text.isNotEmpty ||
+        _remarksCtrl.text.isNotEmpty) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _onBackPressed() async {
+    bool hasData = hasDataSync;
+
+    if (!hasData) {
+      if (widget.onPop != null) {
+        widget.onPop!(false);
+        return false;
+      }
+      return true;
+    }
+
+    final bool? shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: BorderSide(
+            color: const Color(0xFFf59e0b).withAlpha(100),
+            width: 2,
+          ),
+        ),
+        title: const Column(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFf59e0b),
+              size: 60,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Discard Data?',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+              ),
+            ),
+          ],
+        ),
+        content: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Any unsaved data entered for the Air Waybill will be permanently lost.\n\nDo you want to discard your changes and continue?',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFFcbd5e1),
+              fontSize: 16,
+              height: 1.4,
+            ),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 12.0,
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'STAY',
+              style: TextStyle(
+                color: Color(0xFF94a3b8),
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFef4444),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              shadowColor: const Color(0xFFef4444).withAlpha(100),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 32.0,
+                vertical: 12.0,
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'DISCARD',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldPop == true) {
+      if (widget.onPop != null) {
+        widget.onPop!(false);
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> handleBackRequest() async {
+    final canPop = await _onBackPressed();
+    if (canPop && widget.onPop == null) {
+      if (mounted) Navigator.pop(context);
+    }
+    return canPop;
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: isDarkMode,
-      builder: (context, dark, child) {
-        final textP = dark ? Colors.white : const Color(0xFF111827);
-        final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
-        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-        final primaryColor = dark ? const Color(0xFF8b5cf6) : const Color(0xFF6366f1);
-
-        final content = Column(
-          children: [
-            Expanded(
-              child: Form(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: bgCard,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: borderC),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.document_scanner_rounded, color: textP, size: 20),
-                                const SizedBox(width: 8),
-                                Text('Air Waybill Information', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            Row(
-                              children: [
-                                Expanded(child: _buildTextField('AWB Number', _awbNumberCtrl, dark, '123-1234 5678', maxLen: 13, prefixIcon: Icons.numbers_rounded)),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Reference Flight', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w500)),
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB), 
-                                          borderRadius: BorderRadius.circular(12), 
-                                          border: Border.all(color: borderC)
-                                        ),
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String?>(
-                                            value: _selectedFlight,
-                                            hint: Text('No Flight (Standalone)', style: TextStyle(color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280))),
-                                            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                                            isExpanded: true,
-                                            style: TextStyle(color: textP, fontSize: 13),
-                                            items: [
-                                              const DropdownMenuItem<String?>(value: null, child: Text('No Flight (Standalone)')),
-                                              ..._flights.map((f) => DropdownMenuItem<String?>(
-                                                value: f['id'].toString(),
-                                                child: Text('${f['carrier']} ${f['number']} (${f['date-arrived']})'),
-                                              ))
-                                            ],
-                                            onChanged: (v) => setState(() => _selectedFlight = v),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Ref ULD', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w500)),
-                                      const SizedBox(height: 8),
-                                      SizedBox(
-                                        height: 48,
-                                        child: TextField(
-                                          controller: _refUldCtrl,
-                                          onChanged: (v) => _refUld = v,
-                                          maxLength: 10,
-                                          style: TextStyle(color: textP, fontSize: 13),
-                                          decoration: InputDecoration(
-                                            hintText: 'AKE12345AA',
-                                            hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(76) : const Color(0xFF9CA3AF), fontSize: 13),
-                                            filled: true,
-                                            fillColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-                                            counterText: '',
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderC)),
-                                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryColor, width: 1.5)),
-                                            prefixIcon: Icon(Icons.inventory_2_rounded, size: 18, color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280)),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(child: _buildTextField('Pieces', _piecesCtrl, dark, '0', isNum: true, prefixIcon: Icons.view_in_ar_rounded)),
-                                const SizedBox(width: 16),
-                                Expanded(child: _buildTextField('Total', _totalCtrl, dark, '0', isNum: true, prefixIcon: Icons.functions_rounded)),
-                                const SizedBox(width: 16),
-                                Expanded(child: _buildTextField('Weight', _weightCtrl, dark, '0.0', isNum: true, prefixIcon: Icons.scale_rounded)),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                 Expanded(child: _buildTextField('House Number', _houseCtrl, dark, 'HAWB1, HAWB2...', prefixIcon: Icons.house_rounded)),
-                                 const SizedBox(width: 16),
-                                 Expanded(flex: 2, child: _buildTextField('Remarks', _remarksCtrl, dark, 'Notas del AWB...', prefixIcon: Icons.note_rounded)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: SizedBox(
-                          height: 50,
-                          child: ElevatedButton.icon(
-                            onPressed: _isSaving ? null : _saveAWB,
-                            icon: _isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.check_rounded),
-                            label: Text(appLanguage.value == 'es' ? 'Guardar AWB' : 'Save AWB', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              padding: const EdgeInsets.symmetric(horizontal: 32),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-
-        if (widget.onPop == null) {
-          return Scaffold(
-            backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
-            appBar: AppBar(
-              title: Text(appLanguage.value == 'es' ? 'Añadir Nuevo AWB' : 'Add New AWB', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
-              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-              elevation: 0,
-              iconTheme: IconThemeData(color: textP),
-              bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),
-            ),
-            body: Padding(padding: const EdgeInsets.all(24), child: content),
-          );
-        }
-
-        return content;
-      },
+    if (widget.onPop != null) {
+      return _buildFormContent();
+    }
+    return Scaffold(
+      backgroundColor: const Color(0xFF0f172a),
+      appBar: AppBar(
+        title: Text(
+          appLanguage.value == 'es'
+              ? 'Añadir Nuevo Air Waybill'
+              : 'Add New Air Waybill',
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF1e293b),
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
+      ),
+      body: _buildFormContent(),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, bool dark, String hint, {bool isNum = false, int? maxLen, IconData? prefixIcon}) {
-    final textP = dark ? Colors.white : const Color(0xFF111827);
-    final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-    final primaryColor = dark ? const Color(0xFF8b5cf6) : const Color(0xFF6366f1);
-    
+  Widget _buildFormContent() {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appLanguage.value == 'es'
+                        ? 'Detalles de AWB y Asignación'
+                        : 'AWB Details & Assignment',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          width: 130,
+                          child: _buildTextField(
+                            'AWB Number',
+                            _awbNumberCtrl,
+                            '123-1234 5678',
+                            maxLen: 13,
+                            prefixIcon: Icons.numbers_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(width: 200, child: _buildFlightDropdown()),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 140,
+                          child: _buildTextField(
+                            'Ref ULD',
+                            _refUldCtrl,
+                            'AKE12345AA',
+                            maxLen: 10,
+                            prefixIcon: Icons.inventory_2_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 90,
+                          child: _buildTextField(
+                            'Pieces',
+                            _piecesCtrl,
+                            '0',
+                            isNum: true,
+                            prefixIcon: Icons.view_in_ar_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 90,
+                          child: _buildTextField(
+                            'Total',
+                            _totalCtrl,
+                            '0',
+                            isNum: true,
+                            prefixIcon: Icons.functions_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 90,
+                          child: _buildTextField(
+                            'Weight',
+                            _weightCtrl,
+                            '0.0',
+                            isNum: true,
+                            prefixIcon: Icons.scale_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 160,
+                          child: _buildTextField(
+                            'House Number',
+                            _houseCtrl,
+                            'HAWB1...',
+                            prefixIcon: Icons.house_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 200,
+                          child: _buildTextField(
+                            'Remarks',
+                            _remarksCtrl,
+                            'Notas del AWB...',
+                            prefixIcon: Icons.note_rounded,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 140,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _addLocalAwb,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white.withAlpha(25),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              side: BorderSide(
+                                color: Colors.white.withAlpha(25),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              '+ Add AWB',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                  const Divider(color: Color(0xFF334155)),
+                  const SizedBox(height: 16),
+
+                  // Native table of added AWBs
+                  if (_localAwbs.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(5),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withAlpha(25)),
+                      ),
+                      child: Builder(
+                        builder: (context) {
+                          Map<String, List<Map<String, dynamic>>> groupedAwbs =
+                              {};
+                          for (int i = 0; i < _localAwbs.length; i++) {
+                            final a = _localAwbs[i];
+                            final groupKey =
+                                a['flightLabel'] ?? 'Standalone AWBs';
+                            groupedAwbs.putIfAbsent(groupKey, () => []);
+                            groupedAwbs[groupKey]!.add({'index': i, 'awb': a});
+                          }
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: groupedAwbs.entries.map((group) {
+                              final groupName = group.key;
+                              final groupItems = group.value;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(10),
+                                      border: Border(
+                                        bottom: BorderSide(
+                                          color: Colors.white.withAlpha(20),
+                                        ),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          groupName == 'Standalone AWBs'
+                                              ? Icons.inventory_2_outlined
+                                              : Icons.flight_takeoff_rounded,
+                                          color: const Color(0xFF94a3b8),
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          groupName,
+                                          style: const TextStyle(
+                                            color: Color(0xFFcbd5e1),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(
+                                              0xFF6366f1,
+                                            ).withAlpha(40),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${groupItems.length} items',
+                                            style: const TextStyle(
+                                              color: Color(0xFF818cf8),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        IconButton(
+                                          icon: Icon(
+                                            _collapsedGroups.contains(groupName)
+                                                ? Icons.visibility_off
+                                                : Icons.visibility,
+                                            color: const Color(0xFF94a3b8),
+                                            size: 20,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              if (_collapsedGroups.contains(
+                                                groupName,
+                                              )) {
+                                                _collapsedGroups.remove(
+                                                  groupName,
+                                                );
+                                              } else {
+                                                _collapsedGroups.add(groupName);
+                                              }
+                                            });
+                                          },
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (!_collapsedGroups.contains(groupName))
+                                    ListView.separated(
+                                      physics:
+                                          const NeverScrollableScrollPhysics(),
+                                      shrinkWrap: true,
+                                      itemCount: groupItems.length,
+                                      separatorBuilder: (c, i) => Divider(
+                                        color: Colors.white.withAlpha(15),
+                                        height: 1,
+                                      ),
+                                      itemBuilder: (ctx, i) {
+                                        final item = groupItems[i];
+                                        final int realIndex = item['index'];
+                                        final a = item['awb'];
+                                        final awbNum = a['awbNumber'];
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                flex: 2,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      awbNum,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                    if (a['remarks'] != null)
+                                                      const SizedBox(height: 4),
+                                                    if (a['remarks'] != null)
+                                                      Text(
+                                                        a['remarks'],
+                                                        style: const TextStyle(
+                                                          color: Color(
+                                                            0xFF94a3b8,
+                                                          ),
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  '${a['pieces']}/${a['total']} Pcs',
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFcbd5e1),
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  '${a['weight']} kg',
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFcbd5e1),
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ),
+                                              if (a['refUld'] != '' &&
+                                                  a['refUld'] != null)
+                                                Expanded(
+                                                  flex: 1,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white
+                                                          .withAlpha(20),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            4,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      a['refUld'],
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.close,
+                                                  color: Color(0xFFef4444),
+                                                  size: 18,
+                                                ),
+                                                padding: EdgeInsets.zero,
+                                                constraints:
+                                                    const BoxConstraints(),
+                                                onPressed: () {
+                                                  setState(
+                                                    () => _localAwbs.removeAt(
+                                                      realIndex,
+                                                    ),
+                                                  );
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        '$awbNum removed',
+                                                      ),
+                                                      duration: const Duration(
+                                                        seconds: 1,
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                ],
+                              );
+                            }).toList(),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Bottom Action Bar
+        Container(
+          padding: const EdgeInsets.all(24.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1e293b),
+            border: Border(top: BorderSide(color: Colors.white.withAlpha(25))),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _isSavingAll ? null : _saveAllAwbs,
+                  icon: _isSavingAll
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded, size: 20),
+                  label: Text(
+                    appLanguage.value == 'es' ? 'Guardar AWBs' : 'Save AWBs',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFlightDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w500)),
+        const Text(
+          'Reference Flight',
+          style: TextStyle(
+            color: Color(0xFFcbd5e1),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withAlpha(25)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              value: _selectedFlight,
+              hint: Text(
+                'No Flight (Standalone)',
+                style: TextStyle(color: Colors.white.withAlpha(150)),
+              ),
+              dropdownColor: const Color(0xFF1e293b),
+              isExpanded: true,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              menuMaxHeight: 300,
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('No Flight (Standalone)'),
+                ),
+                ..._flights.map(
+                  (f) => DropdownMenuItem<String?>(
+                    value: f['id'].toString(),
+                    child: Text(
+                      '${f['carrier']} ${f['number']} (${f['date-arrived']})',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (v) => setState(() => _selectedFlight = v),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl,
+    String hint, {
+    bool isNum = false,
+    int? maxLen,
+    IconData? prefixIcon,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFcbd5e1),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         const SizedBox(height: 8),
         SizedBox(
           height: 48,
@@ -304,17 +893,39 @@ class _AddAwbScreenState extends State<AddAwbScreen> {
             controller: ctrl,
             keyboardType: isNum ? TextInputType.number : TextInputType.text,
             maxLength: maxLen,
-            style: TextStyle(color: textP, fontSize: 13),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            onChanged: (ctrl == _refUldCtrl) ? (v) => _refUld = v : null,
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(76) : const Color(0xFF9CA3AF), fontSize: 13),
+              hintStyle: TextStyle(
+                color: Colors.white.withAlpha(76),
+                fontSize: 13,
+              ),
               filled: true,
-              fillColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+              fillColor: Colors.white.withAlpha(10),
               counterText: '',
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderC)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primaryColor, width: 1.5)),
-              prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 18, color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280)) : null,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 0,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withAlpha(25)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF6366f1),
+                  width: 1.5,
+                ),
+              ),
+              prefixIcon: prefixIcon != null
+                  ? Icon(
+                      prefixIcon,
+                      size: 18,
+                      color: Colors.white.withAlpha(150),
+                    )
+                  : null,
             ),
           ),
         ),

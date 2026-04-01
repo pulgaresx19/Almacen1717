@@ -4,7 +4,8 @@ import '../main.dart' show appLanguage, isDarkMode;
 import 'add_deliver_screen.dart';
 
 class DeliversModule extends StatefulWidget {
-  const DeliversModule({super.key});
+  final bool isActive;
+  const DeliversModule({super.key, this.isActive = true});
 
   @override
   State<DeliversModule> createState() => _DeliversModuleState();
@@ -14,6 +15,18 @@ class _DeliversModuleState extends State<DeliversModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddDeliverScreenState> _addDeliverKey = GlobalKey<AddDeliverScreenState>();
+
+  @override
+  void didUpdateWidget(covariant DeliversModule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      if (_showAddForm && _addDeliverKey.currentState != null) {
+        if (!_addDeliverKey.currentState!.hasDataSync) {
+          setState(() => _showAddForm = false);
+        }
+      }
+    }
+  }
 
   Future<List<Map<String, dynamic>>> _fetchData() async {
     try {
@@ -66,10 +79,10 @@ class _DeliversModuleState extends State<DeliversModule> {
                                 setState(() => _showAddForm = false);
                               }
                             },
-                            icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
-                            padding: const EdgeInsets.only(right: 8),
-                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                           ),
+                          const SizedBox(width: 8),
                           Text(appLanguage.value == 'es' ? 'Añadir Nueva Entrega' : 'Add New Deliver', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         ],
                       )
@@ -119,17 +132,22 @@ class _DeliversModuleState extends State<DeliversModule> {
                 ],
                 
                 if (!_showAddForm)
-                  ElevatedButton.icon(
-                    onPressed: () => setState(() => _showAddForm = true),
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: Text('Añadir Deliver', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366f1),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      onPressed: () => setState(() => _showAddForm = true),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: Text(appLanguage.value == 'es' ? 'Añadir Entrega' : 'Add Deliver', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366f1),
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                    ),
                   ),
-                ),
                 const SizedBox(width: 8),
 
                 // Refresh Button

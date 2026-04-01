@@ -468,6 +468,12 @@ class AddFlightScreenState extends State<AddFlightScreen> {
       return;
     }
 
+    final emptyUld = _flightLocalUlds.firstWhere((u) => (u['awbs'] as List).isEmpty, orElse: () => {});
+    if (emptyUld.isNotEmpty) {
+      _showRequiredFieldError(context, 'AWBs for ULD ${emptyUld['uldNumber']}');
+      return;
+    }
+
     if (!_isBreakAuto) {
       final manualBreak = int.tryParse(_breakCtrl.text) ?? 0;
       final actualBreakCount = _flightLocalUlds.where((u) => u['break'] == true).length;
@@ -555,7 +561,10 @@ class AddFlightScreenState extends State<AddFlightScreen> {
           final dataUld = awbs.map((a) => {
             'awb_number': a['awb_number'],
             'pieces': a['pieces'],
+            'weight': a['weight'],
             'total': a['total'],
+            'house_number': a['house_number'],
+            'remarks': a['remarks'],
           }).toList();
 
           uldPayloads.add({
@@ -684,12 +693,16 @@ class AddFlightScreenState extends State<AddFlightScreen> {
     }
   }
 
+  bool get hasDataSync {
+    return _carrierCtrl.text.isNotEmpty || 
+           _numberCtrl.text.isNotEmpty || 
+           _dateCtrl.text.isNotEmpty || 
+           _flightLocalUlds.isNotEmpty || 
+           _uldNumberCtrl.text.isNotEmpty;
+  }
+
   Future<bool> _onBackPressed() async {
-    bool hasData = _carrierCtrl.text.isNotEmpty || 
-                   _numberCtrl.text.isNotEmpty || 
-                   _dateCtrl.text.isNotEmpty || 
-                   _flightLocalUlds.isNotEmpty || 
-                   _uldNumberCtrl.text.isNotEmpty;
+    bool hasData = hasDataSync;
 
     if (!hasData) {
       if (widget.onPop != null) {
@@ -703,31 +716,40 @@ class AddFlightScreenState extends State<AddFlightScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1e293b),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
+        title: const Column(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 32),
-            SizedBox(width: 12),
-            Expanded(child: Text('Discard Data?', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 60),
+            SizedBox(height: 16),
+            Text('Discard Data?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
           ],
         ),
-        content: const Text(
-          'Any unsaved data entered for the flight, ULDs, and AWBs will be permanently lost.\n\nDo you want to discard your changes and continue?',
-          style: TextStyle(color: Color(0xFFcbd5e1), height: 1.4, fontSize: 15),
+        content: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Any unsaved data entered for the flight, ULDs, and AWBs will be permanently lost.\n\nDo you want to discard your changes and continue?',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4),
+          ),
         ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
           TextButton(
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0)),
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Stay', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+            child: const Text('STAY', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFef4444),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 8,
+              shadowColor: const Color(0xFFef4444).withAlpha(100),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Discard', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text('DISCARD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
           ),
         ],
       ),
@@ -973,7 +995,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                                 Container(
                                   width: 32, height: 32,
                                   alignment: Alignment.center,
-                                  decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(50), borderRadius: BorderRadius.circular(8)),
+                                  decoration: const BoxDecoration(color: Color(0x326366f1), shape: BoxShape.circle),
                                   child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 13)),
                                 ),
                                 const SizedBox(width: 12),
@@ -1096,7 +1118,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                           final a = entry.value;
                           return TableRow(
                             children: [
-                              Padding(padding: const EdgeInsets.all(8), child: Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.white.withAlpha(20), borderRadius: BorderRadius.circular(4)), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))))),
+                              Padding(padding: const EdgeInsets.all(8), child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: Color(0x14ffffff), shape: BoxShape.circle), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))))),
                               Padding(padding: const EdgeInsets.only(left: 8, right: 32, top: 8, bottom: 8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
                               Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['pieces']} pcs', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
                               Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['total'] ?? 0} ttl', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
@@ -1130,7 +1152,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                                                     Container(
                                                       width: 24, height: 24,
                                                       alignment: Alignment.center,
-                                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), borderRadius: BorderRadius.circular(6)),
+                                                      decoration: const BoxDecoration(color: Color(0x286366f1), shape: BoxShape.circle),
                                                       child: Text('${ent.key + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 12, fontWeight: FontWeight.bold)),
                                                     ),
                                                     const SizedBox(width: 12),

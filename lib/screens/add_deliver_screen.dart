@@ -55,27 +55,75 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     }
   }
 
-  Future<bool> handleBackRequest() async {
-    bool hasData = _truckCompanyCtrl.text.isNotEmpty || _driverCtrl.text.isNotEmpty || _doorCtrl.text.isNotEmpty || _idPickupCtrl.text.isNotEmpty || _selectedAwbs.isNotEmpty;
-    if (!hasData) return true;
+  bool get hasDataSync {
+    return _truckCompanyCtrl.text.isNotEmpty || 
+           _driverCtrl.text.isNotEmpty || 
+           _doorCtrl.text.isNotEmpty || 
+           _idPickupCtrl.text.isNotEmpty || 
+           _selectedAwbs.isNotEmpty;
+  }
 
-    bool? discard = await showDialog<bool>(
+  Future<bool> handleBackRequest() async {
+    bool hasData = hasDataSync;
+    if (!hasData) {
+      if (widget.onPop != null) {
+        widget.onPop!(false);
+        return false;
+      }
+      return true;
+    }
+
+    final bool? shouldPop = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1e293b),
-        title: const Text('Discard Changes?', style: TextStyle(color: Colors.white)),
-        content: const Text('You have unsaved details. Are you sure you want to go back? All progress will be lost.', style: TextStyle(color: Color(0xFFcbd5e1))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
+        title: const Column(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 60),
+            SizedBox(height: 16),
+            Text('Discard Data?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+          ],
+        ),
+        content: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Any unsaved data entered for the Delivery will be permanently lost.\n\nDo you want to discard your changes and continue?',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: Color(0xFF94a3b8)))),
+          TextButton(
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0)),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('STAY', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFef4444)),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Discard', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFef4444),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              shadowColor: const Color(0xFFef4444).withAlpha(100),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('DISCARD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
           ),
         ],
-      )
+      ),
     );
-    return discard ?? false;
+
+    if (shouldPop == true) {
+      if (widget.onPop != null) {
+        widget.onPop!(false);
+        return false;
+      }
+      return true;
+    }
+    return false;
   }
 
   @override

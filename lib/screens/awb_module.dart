@@ -12,6 +12,7 @@ class AwbModule extends StatefulWidget {
 
 class _AwbModuleState extends State<AwbModule> {
   final _searchController = TextEditingController();
+  final GlobalKey<AddAwbScreenState> _addAwbKey = GlobalKey<AddAwbScreenState>();
   bool _showAddForm = false;
 
   @override
@@ -43,14 +44,33 @@ class _AwbModuleState extends State<AwbModule> {
                   children: [
                     if (_showAddForm)
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          IconButton(
-                            onPressed: () => setState(() => _showAddForm = false),
-                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0, right: 8.0),
+                            child: IconButton(
+                              onPressed: () async {
+                                if (_addAwbKey.currentState != null) {
+                                  final canPop = await _addAwbKey.currentState!.handleBackRequest();
+                                  if (canPop) {
+                                    setState(() => _showAddForm = false);
+                                  }
+                                } else {
+                                  setState(() => _showAddForm = false);
+                                }
+                              },
+                              icon: const Icon(Icons.arrow_back_rounded, size: 24),
+                              tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo AWB' : 'Add New AWB', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(appLanguage.value == 'es' ? 'Añadir Nuevo Aerobill' : 'Add New Air Waybill', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
+                              Text(appLanguage.value == 'es' ? 'Crea y registra detalles de los aerobills.' : 'Create and register Air Waybill details.', style: TextStyle(color: textS, fontSize: 13)),
+                            ],
+                          ),
                         ],
                       )
                     else
@@ -120,28 +140,26 @@ class _AwbModuleState extends State<AwbModule> {
             ),
             const SizedBox(height: 30),
             
-            if (_showAddForm)
-              Expanded(
-                child: AddAwbScreen(
-                  onPop: (didAdd) {
-                    setState(() {
-                      _showAddForm = false;
-                    });
-                  },
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderCard),
                 ),
-              )
-            else
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderCard),
-                  ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: _showAddForm
+                      ? AddAwbScreen(
+                          key: _addAwbKey,
+                          onPop: (didAdd) {
+                            setState(() {
+                              _showAddForm = false;
+                            });
+                          },
+                        )
+                      : FutureBuilder<List<Map<String, dynamic>>>(
+                          future: Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));

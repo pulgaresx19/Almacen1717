@@ -14,10 +14,10 @@ class AddUserScreen extends StatefulWidget {
   });
 
   @override
-  State<AddUserScreen> createState() => _AddUserScreenState();
+  State<AddUserScreen> createState() => AddUserScreenState();
 }
 
-class _AddUserScreenState extends State<AddUserScreen> {
+class AddUserScreenState extends State<AddUserScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl = TextEditingController();
@@ -182,6 +182,86 @@ class _AddUserScreenState extends State<AddUserScreen> {
     }
   }
 
+  bool get hasDataSync {
+    return _nameCtrl.text.isNotEmpty || 
+           _emailCtrl.text.isNotEmpty || 
+           _passwordCtrl.text.isNotEmpty || 
+           _phoneCtrl.text.isNotEmpty || 
+           _buildingCtrl.text.isNotEmpty;
+  }
+
+  Future<bool> _onBackPressed() async {
+    bool hasData = hasDataSync;
+
+    if (!hasData) {
+      if (widget.onPop != null) {
+        widget.onPop!(null);
+        return false;
+      }
+      return true;
+    }
+
+    final bool? shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
+        title: const Column(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 60),
+            SizedBox(height: 16),
+            Text('Discard Data?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+          ],
+        ),
+        content: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'Any unsaved data entered for the User will be permanently lost.\n\nDo you want to discard your changes and continue?',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4),
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0)),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('STAY', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFef4444),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              shadowColor: const Color(0xFFef4444).withAlpha(100),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('DISCARD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldPop == true) {
+      if (widget.onPop != null) {
+        widget.onPop!(null);
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> handleBackRequest() async {
+    final canPop = await _onBackPressed();
+    if (canPop && widget.onPop == null) {
+      if (mounted) Navigator.pop(context);
+    }
+    return canPop;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -324,6 +404,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
         TextFormField(
           controller: controller,
           obscureText: obscureText,
+          enableSuggestions: false,
+          autocorrect: false,
+          autofillHints: const ['off'],
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           style: TextStyle(color: textP),

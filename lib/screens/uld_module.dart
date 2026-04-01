@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
 import 'add_uld_screen.dart';
 
 class UldModule extends StatefulWidget {
-  const UldModule({super.key});
+  final bool isActive;
+  const UldModule({super.key, this.isActive = true});
 
   @override
   State<UldModule> createState() => _UldModuleState();
@@ -12,6 +14,29 @@ class UldModule extends StatefulWidget {
 
 class _UldModuleState extends State<UldModule> {
   final _searchController = TextEditingController();
+  final GlobalKey<AddUldScreenState> _addUldKey = GlobalKey<AddUldScreenState>();
+
+  @override
+  void didUpdateWidget(covariant UldModule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      if (_showAddForm && _addUldKey.currentState != null) {
+        if (!_addUldKey.currentState!.hasDataSync) {
+          setState(() => _showAddForm = false);
+        }
+      }
+    }
+  }
+
+  String _formatDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(raw);
+      return DateFormat('MM/dd/yyyy').format(dt);
+    } catch (_) {
+      return raw;
+    }
+  }
   bool _showAddForm = false;
   final Set<String> _selectedReadyUlds = {};
   late Stream<List<Map<String, dynamic>>> _uldsStream;
@@ -62,13 +87,20 @@ class _UldModuleState extends State<UldModule> {
                       Row(
                         children: [
                           IconButton(
-                            onPressed: () {
-                              setState(() => _showAddForm = false);
+                            onPressed: () async {
+                              if (_addUldKey.currentState != null) {
+                                final canPop = await _addUldKey.currentState!.handleBackRequest();
+                                if (canPop) {
+                                  setState(() => _showAddForm = false);
+                                }
+                              } else {
+                                setState(() => _showAddForm = false);
+                              }
                             },
-                            icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
-                            padding: const EdgeInsets.only(right: 8),
-                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                           ),
+                          const SizedBox(width: 8),
                           Text(appLanguage.value == 'es' ? 'Añadir Nuevo ULD' : 'Add New ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         ],
                       )
@@ -110,15 +142,20 @@ class _UldModuleState extends State<UldModule> {
             
             // Add ULD Button
             if (!_showAddForm)
-              ElevatedButton.icon(
-                onPressed: () => setState(() => _showAddForm = true),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366f1),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: () => setState(() => _showAddForm = true),
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
                 ),
               ),
             const SizedBox(width: 8),
@@ -149,6 +186,7 @@ class _UldModuleState extends State<UldModule> {
               borderRadius: BorderRadius.circular(16),
               child: _showAddForm 
                   ? AddUldScreen(
+                      key: _addUldKey,
                       isInline: true,
                       onPop: (_) => setState(() => _showAddForm = false),
                     )
@@ -198,7 +236,7 @@ class _UldModuleState extends State<UldModule> {
                         columns: [
                           const DataColumn(label: Text('#')),
                           const DataColumn(label: Text('ULD Number')),
-                          const DataColumn(label: Text('Flight')),
+                          const DataColumn(label: Text('Ref. Flight')),
                           const DataColumn(label: Text('Pcs')),
                           const DataColumn(label: Text('Weight')),
                           const DataColumn(label: Text('Priority')),
@@ -360,8 +398,14 @@ class _UldModuleState extends State<UldModule> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('${u['refCarrier'] ?? '-'} ${u['refNumber'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  Text('${u['refDate'] ?? '-'}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11)),
+                                  Text(
+                                    u['refCarrier'] == null ? 'Standalone ULD' : '${u['refCarrier']} ${u['refNumber'] ?? ''}',
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    u['refCarrier'] == null && u['created_at'] != null ? _formatDate(u['created_at'].toString()) : _formatDate(u['refDate']?.toString()),
+                                    style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11),
+                                  ),
                                 ],
                               )),
                               DataCell(Text(u['pieces']?.toString() ?? '0')),
@@ -467,11 +511,12 @@ class _UldModuleState extends State<UldModule> {
         if (u['data-ULD'] is List) dataUld = u['data-ULD'];
 
         Set<String> editingKeys = {};
+        Map<String, dynamic> tempValues = {};
 
         return StatefulBuilder(
           builder: (ctxModal, setModalState) {
 
-            Widget buildEditable(String label, String key, {bool isBool = false, String trueText = '', String falseText = '', bool isNum = false}) {
+            Widget buildEditable(String label, String key, {bool isBool = false, String trueText = '', String falseText = '', bool isNum = false, List<String>? options}) {
                dynamic val = u[key];
                final bool isEditing = editingKeys.contains(key);
 
@@ -501,7 +546,10 @@ class _UldModuleState extends State<UldModule> {
                               children: [
                                  Text(label, style: TextStyle(color: textS, fontSize: 11)),
                                  InkWell(
-                                    onTap: () => setModalState(() => editingKeys.add(key)),
+                                    onTap: () => setModalState(() {
+                                       editingKeys.add(key);
+                                       tempValues[key] = val;
+                                    }),
                                     child: const Padding(
                                       padding: EdgeInsets.only(left: 8),
                                       child: Icon(Icons.edit_rounded, color: Color(0xFF94a3b8), size: 12),
@@ -553,6 +601,29 @@ class _UldModuleState extends State<UldModule> {
                         ),
                      ),
                   );
+               } else if (options != null) {
+                  editor = Container(
+                     height: 32,
+                     width: double.infinity,
+                     padding: const EdgeInsets.symmetric(horizontal: 8),
+                     decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+                     child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                           value: tempValues[key]?.toString() ?? val?.toString(),
+                           dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                           isExpanded: true,
+                           style: TextStyle(color: textP, fontSize: 12),
+                           items: options.map((String o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+                           onChanged: (v) {
+                              if (v != null) {
+                                 setModalState(() {
+                                    tempValues[key] = v;
+                                 });
+                              }
+                           },
+                        ),
+                     ),
+                  );
                } else {
                   editor = SizedBox(
                      height: 32,
@@ -567,20 +638,6 @@ class _UldModuleState extends State<UldModule> {
                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
                         ),
-                        onSubmitted: (newVal) async {
-                           try {
-                              dynamic parsedVal = newVal;
-                              if (isNum) parsedVal = int.tryParse(newVal) ?? 0;
-                              await Supabase.instance.client.from('ULD').update({key: parsedVal}).eq('id', u['id']);
-                              setModalState(() {
-                                 u[key] = parsedVal;
-                                 editingKeys.remove(key);
-                              });
-                              if (mounted) setState(() {});
-                           } catch (e) {
-                              debugPrint('Error: $e');
-                           }
-                        },
                      ),
                   );
                }
@@ -610,8 +667,13 @@ class _UldModuleState extends State<UldModule> {
                                  InkWell(
                                     onTap: () async {
                                        try {
-                                          dynamic parsedVal = ctrl.text;
-                                          if (isNum) parsedVal = int.tryParse(ctrl.text) ?? 0;
+                                          dynamic parsedVal;
+                                          if (options != null) {
+                                             parsedVal = tempValues[key] ?? val;
+                                          } else {
+                                             parsedVal = ctrl.text;
+                                             if (isNum) parsedVal = int.tryParse(ctrl.text) ?? 0;
+                                          }
                                           await Supabase.instance.client.from('ULD').update({key: parsedVal}).eq('id', u['id']);
                                           setModalState(() {
                                              u[key] = parsedVal;
@@ -698,12 +760,12 @@ class _UldModuleState extends State<UldModule> {
                                        const SizedBox(height: 12),
                                        Row(children: [
                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                           Text('Flight', style: TextStyle(color: textS, fontSize: 12)),
-                                           Text('${u['refCarrier'] ?? ''} ${u['refNumber'] ?? ''}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                           Text('Ref. Flight', style: TextStyle(color: textS, fontSize: 12)),
+                                           Text(u['refCarrier'] == null ? 'Standalone ULD' : '${u['refCarrier']} ${u['refNumber'] ?? ''}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
                                          ])),
                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                            Text('Date', style: TextStyle(color: textS, fontSize: 12)),
-                                           Text('${u['refDate'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
+                                           Text(u['refCarrier'] == null ? (u['created_at'] != null ? _formatDate(u['created_at'].toString()) : '-') : _formatDate(u['refDate']?.toString()), style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
                                          ])),
                                        ]),
                                        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
@@ -715,6 +777,12 @@ class _UldModuleState extends State<UldModule> {
                                        Row(children: [
                                          Expanded(child: buildEditable('Type', 'isBreak', isBool: true, trueText: 'BREAK', falseText: 'NO BREAK')),
                                          Expanded(child: buildEditable('Priority', 'isPriority', isBool: true, trueText: 'Priority', falseText: 'Normal')),
+                                       ]),
+                                       const SizedBox(height: 12),
+                                       Row(children: [
+                                         Expanded(flex: 2, child: buildEditable('Status', 'status', options: ['Waiting', 'Received', 'Checked', 'Ready'])),
+                                         const SizedBox(width: 12),
+                                         Expanded(flex: 3, child: buildEditable('Remarks', 'remarks')),
                                        ])
                                     ]
                                   )
@@ -724,21 +792,31 @@ class _UldModuleState extends State<UldModule> {
                                    const SizedBox(height: 24),
                                    Text('Assigned AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                                    const SizedBox(height: 12),
-                                   ...dataUld.map((awb) {
+                                   ...dataUld.asMap().entries.map((entry) {
+                                      final index = entry.key;
+                                      final awb = entry.value;
                                       return Container(
                                         margin: const EdgeInsets.only(bottom: 8),
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
                                         child: Row(
                                           children: [
+                                             Container(
+                                               width: 20, height: 20,
+                                               alignment: Alignment.center,
+                                               decoration: const BoxDecoration(color: Color(0x326366f1), shape: BoxShape.circle),
+                                               child: Text('${index + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                             ),
+                                             const SizedBox(width: 8),
                                              const Icon(Icons.description_rounded, color: Color(0xFF6366f1), size: 14),
                                              const SizedBox(width: 8),
                                              Expanded(
                                                child: Row(
                                                   children: [
-                                                     Text(awb['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w500)),
-                                                     const SizedBox(width: 12),
-                                                     Flexible(child: Text('Pieces: ${awb['pieces'] ?? 0}  |  Total: ${awb['total'] ?? 0}  |  Weight: ${awb['weight'] ?? 0} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                     SizedBox(width: 120, child: Text(awb['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w500))),
+                                                     const SizedBox(width: 8),
+                                                     Expanded(child: Text('Pieces: ${awb['pieces'] ?? 0}', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                     Expanded(child: Text('Weight: ${awb['weight'] ?? 0} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
                                                   ],
                                                )
                                              ),
@@ -750,9 +828,8 @@ class _UldModuleState extends State<UldModule> {
                                                      backgroundColor: bg,
                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                                      title: Text('AWB Information', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                                                     content: FutureBuilder<Map<String, dynamic>?>(
-                                                       future: Supabase.instance.client.from('AWB').select().eq('AWB-number', awb['awb_number']).maybeSingle(),
-                                                       builder: (ctx, snap) {
+                                                     content: Builder(
+                                                       builder: (ctx) {
                                                          Widget buildInfoCard(String title, String value, IconData icon) {
                                                            return Container(
                                                              padding: const EdgeInsets.all(12),
@@ -779,22 +856,10 @@ class _UldModuleState extends State<UldModule> {
                                                            );
                                                          }
 
-                                                         if (snap.connectionState == ConnectionState.waiting) {
-                                                           return const SizedBox(width: 450, height: 150, child: Center(child: CircularProgressIndicator()));
-                                                         }
-                                                         
-                                                         final dbAwb = snap.data ?? {};
-                                                         List dataAwbArray = (dbAwb['data-AWB'] is List) ? dbAwb['data-AWB'] : [];
-                                                         
-                                                         Map<String, dynamic>? specificData;
-                                                         try {
-                                                            specificData = dataAwbArray.firstWhere((e) => e['refULD']?.toString() == u['ULD-number']?.toString());
-                                                         } catch(_) {}
-
-                                                         final String remarks = specificData?['remarks']?.toString() ?? awb['remarks']?.toString() ?? '';
+                                                         final String remarks = awb['remarks']?.toString() ?? '';
                                                          
                                                          List<String> finalHawbs = [];
-                                                         final hRaw = specificData?['house_number'] ?? specificData?['house'] ?? awb['house_number'] ?? awb['house'];
+                                                         final hRaw = awb['house_number'] ?? awb['house'];
                                                          if (hRaw != null) {
                                                             if (hRaw is List) {
                                                               finalHawbs = hRaw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
@@ -838,7 +903,7 @@ class _UldModuleState extends State<UldModule> {
                                                                       const SizedBox(width: 12),
                                                                       Expanded(child: buildInfoCard('Total Pcs', '${awb['total'] ?? 0}', Icons.all_inbox_outlined)),
                                                                       const SizedBox(width: 12),
-                                                                      Expanded(child: buildInfoCard('Weight', '${awb['weight'] ?? specificData?['weight'] ?? 0} kg', Icons.scale_outlined)),
+                                                                      Expanded(child: buildInfoCard('Weight', '${awb['weight'] ?? 0} kg', Icons.scale_outlined)),
                                                                    ]
                                                                  ),
                                                                  if (finalHawbs.isNotEmpty) ...[
@@ -961,7 +1026,7 @@ class _UldModuleState extends State<UldModule> {
                const Spacer(),
                Icon(Icons.access_time, size: 14, color: textS),
                const SizedBox(width: 6),
-               Text(data['time'] != null ? DateTime.tryParse(data['time'])?.toLocal().toString().split('.').first ?? '-' : '-', style: TextStyle(color: textS, fontSize: 12)),
+               Text(data['time'] != null ? DateFormat('hh:mm a • MM/dd/yyyy').format(DateTime.parse(data['time']).toLocal()) : '-', style: TextStyle(color: textS, fontSize: 12)),
              ]
            )
         ]

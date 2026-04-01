@@ -5,13 +5,26 @@ import '../main.dart' show appLanguage, isDarkMode;
 import 'add_flight_screen.dart';
 
 class FlightModule extends StatefulWidget {
-  const FlightModule({super.key});
+  final bool isActive;
+  const FlightModule({super.key, this.isActive = true});
 
   @override
   State<FlightModule> createState() => _FlightModuleState();
 }
 
 class _FlightModuleState extends State<FlightModule> {
+
+  @override
+  void didUpdateWidget(covariant FlightModule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) {
+      if (_showAddForm && _addFlightKey.currentState != null) {
+        if (!_addFlightKey.currentState!.hasDataSync) {
+          setState(() => _showAddForm = false);
+        }
+      }
+    }
+  }
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddFlightScreenState> _addFlightKey = GlobalKey<AddFlightScreenState>();
@@ -58,10 +71,10 @@ class _FlightModuleState extends State<FlightModule> {
                                 setState(() => _showAddForm = false);
                               }
                             },
-                            icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
-                            padding: const EdgeInsets.only(right: 8),
-                            constraints: const BoxConstraints(),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                           ),
+                          const SizedBox(width: 8),
                           Text(appLanguage.value == 'es' ? 'Añadir Nuevo Vuelo' : 'Add New Flight', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         ],
                       )
@@ -103,17 +116,22 @@ class _FlightModuleState extends State<FlightModule> {
             
             // Add Flight Button
             if (!_showAddForm)
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() => _showAddForm = true);
-                },
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text(appLanguage.value == 'es' ? 'Añadir Vuelo' : 'Add Flight', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366f1),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              SizedBox(
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() => _showAddForm = true);
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: Text(appLanguage.value == 'es' ? 'Añadir Vuelo' : 'Add Flight', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
                 ),
               ),
             if (!_showAddForm)
@@ -503,7 +521,6 @@ class FlightDrawerDetails extends StatefulWidget {
 
 class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
   List<Map<String, dynamic>> _ulds = [];
-  List<Map<String, dynamic>> _allAwbs = [];
   bool _isLoading = true;
   String? _selectedUldId;
   List<Map<String, dynamic>> _selectedAwbs = [];
@@ -534,24 +551,11 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
       if (mounted) {
         setState(() {
           _ulds = List<Map<String, dynamic>>.from(resUlds);
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetch ULDs: $e');
-    }
-
-    try {
-      // Robust AWB fetching: Fetch all and filter in memory to avoid JSONB dialect errors
-      final resAwbs = await Supabase.instance.client.from('AWB').select();
-      
-      if (mounted) {
-        setState(() {
-          _allAwbs = List<Map<String, dynamic>>.from(resAwbs);
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetch AWBs: $e');
+      debugPrint('Error fetch ULDs: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -560,19 +564,15 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
     setState(() {
       if (_selectedUldId == uldNumber) {
         _selectedUldId = null;
+        _selectedAwbs = [];
       } else {
         _selectedUldId = uldNumber;
-        final fCarrier = widget.flight['carrier']?.toString() ?? '';
-        final fNumber = widget.flight['number']?.toString() ?? '';
-        
-        _selectedAwbs = _allAwbs.where((awb) {
-          final dataAwb = awb['data-AWB'] as List?;
-          if (dataAwb == null) return false;
-          return dataAwb.any((entry) => 
-               entry['refCarrier']?.toString() == fCarrier && 
-               entry['refNumber']?.toString() == fNumber &&
-               entry['refULD']?.toString() == uldNumber);
-        }).toList();
+        final selectedUld = _ulds.firstWhere((element) => element['ULD-number'] == uldNumber, orElse: () => {});
+        if (selectedUld['data-ULD'] is List) {
+           _selectedAwbs = List<Map<String, dynamic>>.from(selectedUld['data-ULD']);
+        } else {
+           _selectedAwbs = [];
+        }
       }
     });
   }
@@ -1271,19 +1271,10 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                     Text('${index + 1}. ', style: TextStyle(color: isSelected ? const Color(0xFF818cf8) : textS, fontWeight: FontWeight.bold, fontSize: 13)),
                                     Icon(isSelected ? Icons.folder_open_rounded : Icons.folder_rounded, color: isSelected ? const Color(0xFF818cf8) : textS, size: 18),
                                     const SizedBox(width: 8),
-                                    Text('${u['ULD-number']}', style: TextStyle(color: isSelected ? Colors.white : textP, fontWeight: FontWeight.bold, fontSize: 14)),
-                                    const SizedBox(width: 12),
-                                    Text('${u['pieces'] ?? 0} pcs  |  ${u['weight'] ?? 0} kg', style: TextStyle(color: isSelected ? const Color(0xFFcbd5e1) : textS, fontSize: 12)),
-                                    if (u['remarks'] != null && u['remarks'].toString().trim().isNotEmpty) ...[
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          '${u['remarks']}',
-                                          style: const TextStyle(color: Color(0xFF60a5fa), fontSize: 12),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
+                                    SizedBox(width: 100, child: Text('${u['ULD-number']}', style: TextStyle(color: isSelected ? Colors.white : textP, fontWeight: FontWeight.bold, fontSize: 14))),
+                                    const SizedBox(width: 16),
+                                    Expanded(child: Text('Pieces: ${u['pieces'] ?? 0}', style: TextStyle(color: isSelected ? const Color(0xFFcbd5e1) : textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                    Expanded(child: Text('Weight: ${u['weight'] ?? 0} kg', style: TextStyle(color: isSelected ? const Color(0xFFcbd5e1) : textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
                                   ],
                                 ),
                               ),
@@ -1304,6 +1295,124 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                     ),
                                  )
                               ),
+                              const SizedBox(width: 12),
+                              InkWell(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctxD) {
+                                      Widget buildInfoCard(String title, String value, IconData icon) {
+                                        return Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: widget.dark ? Colors.white.withAlpha(10) : Colors.white,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: widget.dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(icon, size: 16, color: textS),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(title, style: TextStyle(color: textS, fontSize: 11)),
+                                                    Text(value, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                                  ]
+                                                )
+                                              ),
+                                            ]
+                                          )
+                                        );
+                                      }
+                                      
+                                      return AlertDialog(
+                                        backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                        title: Text('ULD Information', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                        content: SizedBox(
+                                          width: 450,
+                                          child: SingleChildScrollView(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: widget.dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(Icons.inventory_2_rounded, color: Color(0xFF6366f1), size: 20),
+                                                      const SizedBox(width: 12),
+                                                      Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text('ULD Number', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                                          Text(u['ULD-number']?.toString() ?? '-', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                        ]
+                                                      ),
+                                                    ]
+                                                  )
+                                                ),
+                                                const SizedBox(height: 16),
+                                                Row(
+                                                  children: [
+                                                     Expanded(child: buildInfoCard('Pieces', '${u['pieces'] ?? 0}', Icons.extension_outlined)),
+                                                     const SizedBox(width: 12),
+                                                     Expanded(child: buildInfoCard('Weight', '${u['weight'] ?? 0} kg', Icons.scale_outlined)),
+                                                  ]
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Row(
+                                                  children: [
+                                                     Expanded(child: buildInfoCard('Priority', (u['isPriority'] == true) ? 'Yes' : 'No', Icons.star_rounded)),
+                                                     const SizedBox(width: 12),
+                                                     Expanded(child: buildInfoCard('Break', (u['isBreak'] == true) ? 'Yes' : 'No', Icons.broken_image_rounded)),
+                                                     const SizedBox(width: 12),
+                                                     Expanded(child: buildInfoCard('Status', u['status']?.toString() ?? 'Pending', Icons.info_outline_rounded)),
+                                                  ]
+                                                ),
+                                                if (u['remarks'] != null && u['remarks'].toString().trim().isNotEmpty == true) ...[
+                                                  const SizedBox(height: 20),
+                                                  Text('Remarks', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(height: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.all(12),
+                                                    decoration: BoxDecoration(color: widget.dark ? const Color(0xFFfef3c7).withAlpha(20) : const Color(0xFFfef3c7).withAlpha(120), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFf59e0b).withAlpha(50))),
+                                                    child: Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        const Icon(Icons.priority_high_rounded, size: 16, color: Color(0xFFf59e0b)),
+                                                        const SizedBox(width: 8),
+                                                        Expanded(child: SelectableText('${u['remarks']}', style: TextStyle(color: textP, fontSize: 13))),
+                                                      ]
+                                                    )
+                                                  ),
+                                                ],
+                                              ]
+                                            )
+                                          )
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctxD),
+                                            child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))),
+                                          )
+                                        ]
+                                      );
+                                    }
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4.0),
+                                  child: Icon(Icons.info_outline_rounded, size: 18, color: textS),
+                                )
+                              )
                             ],
                           ),
                         ),
@@ -1332,38 +1441,41 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                        padding: const EdgeInsets.only(bottom: 8),
                                        child: Text('Air Waybills:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
                                      ),
-                                     ..._selectedAwbs.map((a) {
-                                       Map<String, dynamic>? matchAwbData;
-                                       try {
-                                          matchAwbData = (a['data-AWB'] as List).firstWhere((e) => e['refULD'] == u['ULD-number'].toString() && e['refCarrier'] == widget.flight['carrier'] && e['refNumber'] == widget.flight['number']);
-                                       } catch (_) {}
-                                       
+                                     ..._selectedAwbs.asMap().entries.map((awbEntry) {
+                                       final awbIndex = awbEntry.key;
+                                       final a = awbEntry.value;
                                        List<String> validHawbs = [];
-                                       if (matchAwbData != null) {
-                                          if (matchAwbData['house_number'] != null) {
-                                            var hRaw = matchAwbData['house_number'];
-                                            if (hRaw is List) {
-                                              validHawbs = hRaw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
-                                            } else if (hRaw is String) {
-                                              validHawbs = hRaw.toString().split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-                                            }
-                                          } else if (matchAwbData['house'] != null) {
-                                            validHawbs = matchAwbData['house'].toString().split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-                                          }
+                                       if (a['house_number'] != null) {
+                                         var hRaw = a['house_number'];
+                                         if (hRaw is List) {
+                                           validHawbs = hRaw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+                                         } else if (hRaw is String) {
+                                           validHawbs = hRaw.toString().split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                                         }
+                                       } else if (a['house'] != null) {
+                                         validHawbs = a['house'].toString().split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
                                        }
 
                                        return Padding(
                                          padding: const EdgeInsets.only(bottom: 6),
                                          child: Row(
                                            children: [
+                                              Container(
+                                                width: 20, height: 20,
+                                                alignment: Alignment.center,
+                                                decoration: const BoxDecoration(color: Color(0x326366f1), shape: BoxShape.circle),
+                                                child: Text('${awbIndex + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                              const SizedBox(width: 8),
                                               const Icon(Icons.description_rounded, color: Color(0xFF6366f1), size: 14),
                                               const SizedBox(width: 6),
                                               Expanded(
                                                 child: Row(
                                                    children: [
-                                                      Text(a['AWB-number'] ?? '', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w500)),
-                                                      const SizedBox(width: 12),
-                                                      Flexible(child: Text('Pieces: ${matchAwbData?['pieces'] ?? 0}  |  Total: ${a['total'] ?? 0}  |  Weight: ${matchAwbData?['weight'] ?? 0} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                      SizedBox(width: 120, child: Text(a['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w500))),
+                                                      const SizedBox(width: 8),
+                                                      Expanded(child: Text('Pieces: ${a['pieces'] ?? 0}', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                      Expanded(child: Text('Weight: ${a['weight'] ?? 0} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
                                                    ],
                                                 )
                                               ),
@@ -1424,7 +1536,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                                                         crossAxisAlignment: CrossAxisAlignment.start,
                                                                         children: [
                                                                           Text('AWB Number', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
-                                                                          Text(a['AWB-number']?.toString() ?? '-', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                                          Text(a['awb_number']?.toString() ?? '-', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                                                                         ]
                                                                       ),
                                                                     ]
@@ -1433,11 +1545,11 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                                                 const SizedBox(height: 16),
                                                                 Row(
                                                                   children: [
-                                                                     Expanded(child: buildInfoCard('Pieces', '${matchAwbData?['pieces'] ?? 0}', Icons.extension_outlined)),
+                                                                     Expanded(child: buildInfoCard('Pieces', '${a['pieces'] ?? 0}', Icons.extension_outlined)),
                                                                      const SizedBox(width: 12),
                                                                      Expanded(child: buildInfoCard('Total Pcs', '${a['total'] ?? 0}', Icons.all_inbox_outlined)),
                                                                      const SizedBox(width: 12),
-                                                                     Expanded(child: buildInfoCard('Weight', '${matchAwbData?['weight'] ?? 0} kg', Icons.scale_outlined)),
+                                                                     Expanded(child: buildInfoCard('Weight', '${a['weight'] ?? 0} kg', Icons.scale_outlined)),
                                                                   ]
                                                                 ),
                                                                 if (validHawbs.isNotEmpty) ...[
@@ -1453,7 +1565,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                                                     ),
                                                                   ),
                                                                 ],
-                                                                if (matchAwbData?['remarks'] != null && matchAwbData?['remarks'].toString().trim().isNotEmpty == true) ...[
+                                                                if (a['remarks'] != null && a['remarks'].toString().trim().isNotEmpty == true) ...[
                                                                   const SizedBox(height: 20),
                                                                   Text('Remarks', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
                                                                   const SizedBox(height: 8),
@@ -1465,7 +1577,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                                                                       children: [
                                                                         const Icon(Icons.priority_high_rounded, size: 16, color: Color(0xFFf59e0b)),
                                                                         const SizedBox(width: 8),
-                                                                        Expanded(child: SelectableText('${matchAwbData?['remarks']}', style: TextStyle(color: textP, fontSize: 13))),
+                                                                        Expanded(child: SelectableText('${a['remarks']}', style: TextStyle(color: textP, fontSize: 13))),
                                                                       ]
                                                                     )
                                                                   ),

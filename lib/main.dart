@@ -112,6 +112,9 @@ class _LoginScreenState extends State<LoginScreen>
 
       if (response.user != null) {
 
+        // Clear text fields to trick Google Chrome into not prompting for password save
+        _emailController.clear();
+        _passwordController.clear();
 
         // Navigation to Dashboard!
         if (mounted) {
@@ -343,6 +346,9 @@ class _LoginScreenState extends State<LoginScreen>
     return TextField(
       controller: controller,
       obscureText: obscureText,
+      enableSuggestions: false,
+      autocorrect: false,
+      autofillHints: const ['off'],
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         hintText: hintText,
@@ -381,18 +387,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
   // Dashboard content placeholder based on selection
-  final List<String> _titles = [
-    'Dashboard',
-    'Flight',
-    'ULD',
-    'AWB',
-    'Delivers',
-    'Users',
-    'System',
-    'Coordinator',
-    'Location',
-    'Driver',
-  ];
 
   void _onDestinationSelected(int index) {
     setState(() {
@@ -723,66 +717,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildBodyContent() {
-    if (_selectedIndex == 0) return const DashboardViewModule();
-    if (_selectedIndex == 1) return const FlightModule();
-    if (_selectedIndex == 2) return const UldModule();
-    if (_selectedIndex == 3) return const AwbModule();
-    if (_selectedIndex == 4) return const DeliversModule();
-    if (_selectedIndex == 5) return const UsersModule();
-    if (_selectedIndex == 6) return const SystemModule();
-    if (_selectedIndex == 7) {
-      return const CoordinatorModule(singlePanelMode: true);
-    }
-    if (_selectedIndex == 8) return const LocationModule();
-    if (_selectedIndex == 9) return const DriverModule();
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return IndexedStack(
+      index: _selectedIndex,
       children: [
-        Icon(
-          _getIconForIndex(_selectedIndex),
-          size: 80,
-          color: const Color(0xFF334155),
-        ),
-        const SizedBox(height: 24),
-        Text(
-          'Módulo de ${_titles[_selectedIndex]}',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: isDarkMode.value ? Colors.white : const Color(0xFF0f172a),
-          ),
-        ),
+        const DashboardViewModule(),
+        FlightModule(isActive: _selectedIndex == 1),
+        UldModule(isActive: _selectedIndex == 2),
+        const AwbModule(),
+        DeliversModule(isActive: _selectedIndex == 4),
+        UsersModule(isActive: _selectedIndex == 5),
+        const SystemModule(),
+        const CoordinatorModule(singlePanelMode: true),
+        const LocationModule(),
+        const DriverModule(),
       ],
     );
   }
 
-  IconData _getIconForIndex(int index) {
-    switch (index) {
-      case 0:
-        return Icons.dashboard_rounded;
-      case 1:
-        return Icons.flight_land_rounded;
-      case 2:
-        return Icons.inventory_2_rounded;
-      case 3:
-        return Icons.description_rounded;
-      case 4:
-        return Icons.airport_shuttle_rounded;
-      case 5:
-        return Icons.people_alt_rounded;
-      case 6:
-        return Icons.settings_system_daydream_rounded;
-      case 7:
-        return Icons.support_agent_rounded;
-      case 8:
-        return Icons.location_on_rounded;
-      case 9:
-        return Icons.local_shipping_rounded;
-      default:
-        return Icons.dashboard_rounded;
-    }
-  }
 
   Widget _buildNavItem(IconData icon, String title, int index) {
     final isSelected = _selectedIndex == index;

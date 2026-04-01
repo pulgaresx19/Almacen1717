@@ -365,9 +365,20 @@ class _LocationModuleState extends State<LocationModule> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: (!isLoading && flights.isNotEmpty) ? MainAxisAlignment.spaceBetween : MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // The title has been extracted to the outer layout
+                  if (!isLoading && flights.isNotEmpty)
+                    Text(
+                      appLanguage.value == 'es'
+                          ? 'Vuelos en esta fecha'
+                          : 'Flights on this date',
+                      style: TextStyle(
+                        color: textS,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
 
                   ElevatedButton.icon(
                     onPressed: () => _pickDate(context, isLeft),
@@ -418,17 +429,6 @@ class _LocationModuleState extends State<LocationModule> {
                   ),
                 )
               else ...[
-                Text(
-                  appLanguage.value == 'es'
-                      ? 'Vuelos en esta fecha'
-                      : 'Flights on this date',
-                  style: TextStyle(
-                    color: textS,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
