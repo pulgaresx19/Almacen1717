@@ -2014,7 +2014,7 @@ class _LocationModuleState extends State<LocationModule> {
                                     '${f['carrier']}-${f['number']}' ==
                                     selectedId,
                               );
-                              final bool isFlightReady = currentFlightIdx != -1 && flightList[currentFlightIdx]['status'] == 'Ready';
+                              final bool isFlightReady = currentFlightIdx != -1 && flightList[currentFlightIdx]['isSaved'] == true;
 
                               Widget baseActionButton = ElevatedButton.icon(
                                 onPressed: isFlightReady
@@ -2033,6 +2033,7 @@ class _LocationModuleState extends State<LocationModule> {
                                                   .from('Flight')
                                                   .update({
                                                     'status': 'Ready',
+                                                    'isSaved': true,
                                                   })
                                                   .eq('carrier', parts[0])
                                                   .eq('number', parts[1])
@@ -2043,6 +2044,7 @@ class _LocationModuleState extends State<LocationModule> {
 
                                               if (currentFlightIdx != -1) {
                                                 flightList[currentFlightIdx]['status'] = 'Ready';
+                                                flightList[currentFlightIdx]['isSaved'] = true;
                                               }
                                             }
                                           }
@@ -2135,6 +2137,8 @@ class _LocationModuleState extends State<LocationModule> {
                                   ),
                                 ),
                               );
+                              if (isFlightReady) return const SizedBox.shrink();
+
                               return baseActionButton;
                             },
                           ),
@@ -4218,6 +4222,12 @@ class _LocationModuleState extends State<LocationModule> {
                       Expanded(
                         child: TextField(
                           controller: _searchController,
+                          textCapitalization: TextCapitalization.characters,
+                          inputFormatters: [
+                            TextInputFormatter.withFunction(
+                              (oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase()),
+                            ),
+                          ],
                           style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13),
                           onChanged: (v) => setState(() {}),
                           onSubmitted: (v) {

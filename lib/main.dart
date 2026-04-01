@@ -723,7 +723,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const DashboardViewModule(),
         FlightModule(isActive: _selectedIndex == 1),
         UldModule(isActive: _selectedIndex == 2),
-        const AwbModule(),
+        AwbModule(isActive: _selectedIndex == 3),
         DeliversModule(isActive: _selectedIndex == 4),
         UsersModule(isActive: _selectedIndex == 5),
         const SystemModule(),

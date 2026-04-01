@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage;
 
@@ -25,6 +26,9 @@ class AddAwbScreenState extends State<AddAwbScreen> {
   final _weightCtrl = TextEditingController();
   final _houseCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+  final _coordinatorCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
+  bool _showExtraData = false;
 
   String? _selectedFlight;
   String _refUld = '';
@@ -34,6 +38,169 @@ class AddAwbScreenState extends State<AddAwbScreen> {
   List<Map<String, dynamic>> _flights = [];
   final List<Map<String, dynamic>> _localAwbs = [];
   final Set<String> _collapsedGroups = {};
+  bool _totalLocked = false;
+
+  void _showCustomListDialog(String title, List<String> items) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(20))),
+        child: Container(
+          width: 320,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                items.length > 1 ? '$title (${items.length})' : title,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: items.asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      String val = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 20, height: 20,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle),
+                              child: Text('${idx + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(val, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14))),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showValidationDialog(List<String> missingFields, bool isMissingList) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withAlpha(200),
+      builder: (ctx) {
+        String message;
+        if (isMissingList) {
+           message = appLanguage.value == 'es'
+             ? 'No has añadido ningún AWB a la lista.\nPor favor, ingresa los datos y haz clic en "+ Add AWB" para proceder.'
+             : 'You have not added any AWBs to the list.\nPlease enter the data and click "+ Add AWB" to proceed.';
+        } else {
+           String fieldsStr = missingFields.map((e) => '"$e"').join(', ');
+           message = appLanguage.value == 'es'
+             ? 'El campo $fieldsStr está ausente.\nPor favor, provea esta información para proceder.'
+             : 'The field $fieldsStr is missing.\nPlease provide this information to proceed.';
+           if (missingFields.length > 1) {
+             message = appLanguage.value == 'es'
+               ? 'Los campos $fieldsStr están ausentes.\nPor favor, provea esta información para proceder.'
+               : 'The fields $fieldsStr are missing.\nPlease provide this information to proceed.';
+           }
+        }
+
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: const Color(0xFFef4444).withAlpha(100), width: 1.5),
+          ),
+          backgroundColor: const Color(0xFF1e293b),
+          elevation: 20,
+          child: SizedBox(
+            width: 400,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Color(0xFFef4444),
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    appLanguage.value == 'es' ? 'Acción Requerida' : 'Action Required',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFcbd5e1),
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Container(
+                    width: 200,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFef4444).withAlpha(76),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFef4444),
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      child: Text(
+                        appLanguage.value == 'es' ? 'ENTENDIDO' : 'UNDERSTOOD',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -41,6 +208,52 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     _selectedFlight = widget.initialFlightId;
     _refUld = widget.initialUld ?? '';
     _refUldCtrl = TextEditingController(text: _refUld);
+    
+    _awbNumberCtrl.addListener(() {
+      final text = _awbNumberCtrl.text.toUpperCase();
+      if (text.length == 13) {
+        bool foundLocally = false;
+        String foundTotal = '';
+        for (var a in _localAwbs) {
+          if (a['awbNumber'] == text) {
+            foundLocally = true;
+            foundTotal = a['total'].toString();
+            break;
+          }
+        }
+        
+        if (foundLocally) {
+          setState(() {
+            _totalLocked = true;
+            if (_totalCtrl.text != foundTotal) {
+              _totalCtrl.text = foundTotal;
+            }
+          });
+        } else {
+          () async {
+            try {
+              final res = await Supabase.instance.client.from('AWB').select('total').eq('AWB-number', text).maybeSingle();
+              if (res != null && res['total'] != null && _awbNumberCtrl.text.toUpperCase() == text) {
+                if (mounted) {
+                  setState(() {
+                    _totalLocked = true;
+                    _totalCtrl.text = res['total'].toString();
+                  });
+                }
+              }
+            } catch (_) {}
+          }();
+        }
+      } else {
+        if (_totalLocked) {
+          setState(() {
+            _totalLocked = false;
+            _totalCtrl.text = '';
+          });
+        }
+      }
+    });
+
     _loadFlights();
   }
 
@@ -66,18 +279,20 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     _weightCtrl.dispose();
     _houseCtrl.dispose();
     _remarksCtrl.dispose();
+    _coordinatorCtrl.dispose();
+    _locationCtrl.dispose();
     _refUldCtrl.dispose();
     super.dispose();
   }
 
   void _addLocalAwb() {
-    if (_awbNumberCtrl.text.trim().isEmpty || _totalCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('AWB Number & Total pieces are required.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    List<String> errors = [];
+    if (_awbNumberCtrl.text.trim().isEmpty) errors.add(appLanguage.value == 'es' ? 'Número' : 'Number');
+    if (_piecesCtrl.text.trim().isEmpty) errors.add('Pieces');
+    if (_totalCtrl.text.trim().isEmpty) errors.add('Total');
+
+    if (errors.isNotEmpty) {
+      _showValidationDialog(errors, false);
       return;
     }
 
@@ -98,10 +313,12 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         'pieces': int.tryParse(_piecesCtrl.text) ?? 1,
         'total': int.tryParse(_totalCtrl.text) ?? 1,
         'weight': double.tryParse(_weightCtrl.text) ?? 0.0,
-        'house': _houseCtrl.text.trim().toUpperCase(),
+        'house': _houseCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toList(),
         'remarks': _remarksCtrl.text.trim().isEmpty
             ? null
             : _remarksCtrl.text.trim(),
+        'coordinator': _showExtraData && _coordinatorCtrl.text.trim().isNotEmpty ? _coordinatorCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
+        'location': _showExtraData && _locationCtrl.text.trim().isNotEmpty ? _locationCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
         'flight_id': _selectedFlight,
         'flightLabel': flightLabel,
         'refUld': _refUld.trim().toUpperCase(),
@@ -113,30 +330,66 @@ class AddAwbScreenState extends State<AddAwbScreen> {
       _weightCtrl.clear();
       _houseCtrl.clear();
       _remarksCtrl.clear();
+      _coordinatorCtrl.clear();
+      _locationCtrl.clear();
+      _showExtraData = false;
       _refUldCtrl.clear();
       _refUld = '';
     });
   }
 
   Future<void> _saveAllAwbs() async {
+    List<String> errors = [];
     if (_localAwbs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add at least one Air Waybill.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+      if (_awbNumberCtrl.text.trim().isEmpty) errors.add(appLanguage.value == 'es' ? 'Número' : 'Number');
+      if (_piecesCtrl.text.trim().isEmpty) errors.add('Pieces');
+      if (_totalCtrl.text.trim().isEmpty) errors.add('Total');
+
+      if (errors.isEmpty) {
+        // Validation passes but hasn't been added to list
+        _showValidationDialog([], true);
+        return;
+      } else {
+        _showValidationDialog(errors, false);
+        return;
+      }
     }
 
     setState(() => _isSavingAll = true);
 
     try {
-      final dateStr = DateTime.now().toIso8601String().substring(0, 10);
-      List<Map<String, dynamic>> payloads = [];
+      final session = Supabase.instance.client.auth.currentSession;
+      String userName = session?.user.email ?? 'Unknown';
+      
+      if (session != null) {
+        if (session.user.userMetadata?['full_name'] != null) {
+          userName = session.user.userMetadata!['full_name'].toString();
+        }
+        try {
+          final profile = await Supabase.instance.client.from('Users').select('full-name').eq('id', session.user.id).maybeSingle();
+          if (profile != null && profile['full-name'] != null && profile['full-name'].toString().trim().isNotEmpty) {
+            userName = profile['full-name'].toString().trim();
+          }
+        } catch (_) {}
+      }
 
+      final nowUtc = DateTime.now().toUtc().toIso8601String();
+      final dateStr = nowUtc.substring(0, 10);
+      
+      Map<String, Map<String, dynamic>> mergedAwbs = {};
       for (var a in _localAwbs) {
-        final dataAwb = {
+        final num = a['awbNumber'];
+        if (!mergedAwbs.containsKey(num)) {
+           mergedAwbs[num] = {
+             'AWB-number': num,
+             'total': a['total'],
+             'data-AWB': [],
+             'data-coordinator': a['coordinator'] != null ? {'manual_entry': a['coordinator'], 'user': userName, 'time': nowUtc} : {},
+             'data-location': a['location'] != null ? {'manual_entry': a['location'], 'user': userName, 'time': nowUtc} : {},
+           };
+        }
+        
+        final dataAwbItem = {
           'flightID': a['flight_id'] ?? '0',
           'refCarrier': 'WRHS',
           'refNumber': 'LOCAL',
@@ -144,22 +397,47 @@ class AddAwbScreenState extends State<AddAwbScreen> {
           'refULD': a['refUld'],
           'pieces': a['pieces'],
           'weight': a['weight'],
-          'house': a['house'],
+          'house_number': a['house'],
           'remarks': a['remarks'],
           'status': 'Received',
         };
-
-        payloads.add({
-          'AWB-number': a['awbNumber'],
-          'total': a['total'],
-          'data-AWB': dataAwb,
-          'data-coordinator': {},
-          'data-location': {},
-          'created_at': DateTime.now().toIso8601String(),
-        });
+        
+        (mergedAwbs[num]!['data-AWB'] as List).add(dataAwbItem);
       }
 
-      await Supabase.instance.client.from('AWB').insert(payloads);
+      if (mergedAwbs.isNotEmpty) {
+         final awbNumbers = mergedAwbs.keys.toList();
+         final existingDbAwbs = await Supabase.instance.client.from('AWB').select('AWB-number, data-AWB').inFilter('AWB-number', awbNumbers);
+         final existingAwbMap = { for (var e in existingDbAwbs) e['AWB-number'] : e['data-AWB'] };
+         
+         for (var awbNum in mergedAwbs.keys) {
+            if (existingAwbMap.containsKey(awbNum)) {
+               var dbData = existingAwbMap[awbNum];
+               if (dbData is List) {
+                  (mergedAwbs[awbNum]!['data-AWB'] as List).insertAll(0, dbData);
+               } else if (dbData is Map) {
+                  (mergedAwbs[awbNum]!['data-AWB'] as List).insert(0, dbData);
+               }
+            }
+         }
+         
+         final finalAwbPayloads = mergedAwbs.values.map((v) {
+           final n = v['AWB-number'];
+           Map<String, dynamic> out = {
+             'AWB-number': n,
+             'total': v['total'],
+             'data-AWB': v['data-AWB'],
+             'data-coordinator': v['data-coordinator'],
+             'data-location': v['data-location'],
+           };
+           if (!existingAwbMap.containsKey(n)) {
+              out['created_at'] = DateTime.now().toIso8601String();
+           }
+           return out;
+         }).toList();
+         
+         await Supabase.instance.client.from('AWB').upsert(finalAwbPayloads, onConflict: 'AWB-number');
+      }
 
       if (mounted) {
         await showDialog(
@@ -228,6 +506,8 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         _totalCtrl.text.isNotEmpty ||
         _refUldCtrl.text.isNotEmpty ||
         _houseCtrl.text.isNotEmpty ||
+        _coordinatorCtrl.text.isNotEmpty ||
+        _locationCtrl.text.isNotEmpty ||
         _remarksCtrl.text.isNotEmpty) {
       return true;
     }
@@ -380,100 +660,85 @@ class AddAwbScreenState extends State<AddAwbScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    appLanguage.value == 'es'
-                        ? 'Detalles de AWB y Asignación'
-                        : 'AWB Details & Assignment',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        appLanguage.value == 'es'
+                            ? 'Detalles de AWB y Asignación'
+                            : 'AWB Details & Assignment',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Extra Data?', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 13, fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 8),
+                          Switch(
+                            value: _showExtraData, 
+                            activeThumbColor: const Color(0xFF6366f1), 
+                            onChanged: (v) => setState(() => _showExtraData = v)
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
 
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
+
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      double baseWidth = _showExtraData ? 1435 : 1111;
+                      double rWidth = constraints.maxWidth - baseWidth - 1;
+                      if (rWidth < 180) rWidth = 180;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        crossAxisAlignment: WrapCrossAlignment.end,
+                        children: [
+                        SizedBox(
+                          width: 135,
+                          child: _buildTextField('AWB Number', _awbNumberCtrl, '123-1234 5678', maxLen: 13, inputFormatters: [AwbNumberFormatter()]),
+                        ),
+                        SizedBox(width: 160, child: _buildFlightDropdown()),
                         SizedBox(
                           width: 130,
-                          child: _buildTextField(
-                            'AWB Number',
-                            _awbNumberCtrl,
-                            '123-1234 5678',
-                            maxLen: 13,
-                            prefixIcon: Icons.numbers_rounded,
-                          ),
+                          child: _buildTextField('Ref ULD', _refUldCtrl, 'AKE12345AA', maxLen: 10, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters),
                         ),
-                        const SizedBox(width: 12),
-                        SizedBox(width: 200, child: _buildFlightDropdown()),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 140,
-                          child: _buildTextField(
-                            'Ref ULD',
-                            _refUldCtrl,
-                            'AKE12345AA',
-                            maxLen: 10,
-                            prefixIcon: Icons.inventory_2_rounded,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         SizedBox(
                           width: 90,
-                          child: _buildTextField(
-                            'Pieces',
-                            _piecesCtrl,
-                            '0',
-                            isNum: true,
-                            prefixIcon: Icons.view_in_ar_rounded,
-                          ),
+                          child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
                         ),
-                        const SizedBox(width: 12),
                         SizedBox(
                           width: 90,
-                          child: _buildTextField(
-                            'Total',
-                            _totalCtrl,
-                            '0',
-                            isNum: true,
-                            prefixIcon: Icons.functions_rounded,
-                          ),
+                          child: _buildTextField('Total', _totalCtrl, '0', isNum: true, inputFormatters: [FilteringTextInputFormatter.digitsOnly], readOnly: _totalLocked),
                         ),
-                        const SizedBox(width: 12),
                         SizedBox(
                           width: 90,
-                          child: _buildTextField(
-                            'Weight',
-                            _weightCtrl,
-                            '0.0',
-                            isNum: true,
-                            prefixIcon: Icons.scale_rounded,
-                          ),
+                          child: _buildTextField('Weight', _weightCtrl, '0.0', isNum: true, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]),
                         ),
-                        const SizedBox(width: 12),
                         SizedBox(
-                          width: 160,
-                          child: _buildTextField(
-                            'House Number',
-                            _houseCtrl,
-                            'HAWB1...',
-                            prefixIcon: Icons.house_rounded,
-                          ),
+                          width: rWidth,
+                          child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...'),
                         ),
-                        const SizedBox(width: 12),
                         SizedBox(
-                          width: 200,
-                          child: _buildTextField(
-                            'Remarks',
-                            _remarksCtrl,
-                            'Notas del AWB...',
-                            prefixIcon: Icons.note_rounded,
-                          ),
+                          width: 180,
+                          child: _buildTextField('House Number', _houseCtrl, 'HAWB', maxLines: 3, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters),
                         ),
-                        const SizedBox(width: 12),
+                        if (_showExtraData) ...[
+                          SizedBox(
+                            width: 150,
+                            child: _buildTextField('Data Coordinator', _coordinatorCtrl, 'Details...', maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.sentences, inputFormatters: [SentenceCaseTextFormatter()]),
+                          ),
+                          SizedBox(
+                            width: 150,
+                            child: _buildTextField('Data Location', _locationCtrl, 'Details...', maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.sentences, inputFormatters: [SentenceCaseTextFormatter()]),
+                          ),
+                        ],
                         SizedBox(
                           width: 140,
                           height: 48,
@@ -499,7 +764,8 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                           ),
                         ),
                       ],
-                    ),
+                    );
+                  }
                   ),
 
                   const SizedBox(height: 32),
@@ -619,137 +885,170 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                                     ),
                                   ),
                                   if (!_collapsedGroups.contains(groupName))
-                                    ListView.separated(
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      shrinkWrap: true,
-                                      itemCount: groupItems.length,
-                                      separatorBuilder: (c, i) => Divider(
-                                        color: Colors.white.withAlpha(15),
-                                        height: 1,
-                                      ),
-                                      itemBuilder: (ctx, i) {
-                                        final item = groupItems[i];
+                                    Table(
+                                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                                      columnWidths: const {
+                                        0: IntrinsicColumnWidth(),
+                                        1: IntrinsicColumnWidth(),
+                                        2: IntrinsicColumnWidth(),
+                                        3: IntrinsicColumnWidth(),
+                                        4: IntrinsicColumnWidth(),
+                                        5: FlexColumnWidth(),      // remarks
+                                        6: IntrinsicColumnWidth(), // coord/location
+                                        7: IntrinsicColumnWidth(), // house
+                                        8: IntrinsicColumnWidth(),
+                                      },
+                                      children: groupItems.asMap().entries.map((entry) {
+                                        final i = entry.key;
+                                        final item = entry.value;
                                         final int realIndex = item['index'];
                                         final a = item['awb'];
                                         final awbNum = a['awbNumber'];
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                flex: 2,
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      awbNum,
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 14,
+                                        return TableRow(
+                                          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.white.withAlpha(15)))),
+                                          children: [
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 16, right: 12, top: 12, bottom: 12),
+                                              child: Container(
+                                                width: 24, height: 24,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle),
+                                                child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 12, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 24, top: 12, bottom: 12),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(awbNum, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                                  if (a['refUld'] != '' && a['refUld'] != null)
+                                                    Padding(
+                                                      padding: const EdgeInsets.only(top: 4),
+                                                      child: Row(
+                                                        children: [
+                                                          const Icon(Icons.inventory_2_outlined, size: 12, color: Color(0xFF94a3b8)),
+                                                          const SizedBox(width: 4),
+                                                          Text(a['refUld'], style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 12)),
+                                                        ],
                                                       ),
                                                     ),
-                                                    if (a['remarks'] != null)
-                                                      const SizedBox(height: 4),
-                                                    if (a['remarks'] != null)
-                                                      Text(
-                                                        a['remarks'],
-                                                        style: const TextStyle(
-                                                          color: Color(
-                                                            0xFF94a3b8,
-                                                          ),
-                                                          fontSize: 12,
+                                                ],
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 12),
+                                              child: RichText(text: TextSpan(children: [
+                                                const TextSpan(text: 'PIECES: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                TextSpan(text: '${a['pieces']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13, fontWeight: FontWeight.w500)),
+                                              ])),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 12),
+                                              child: RichText(text: TextSpan(children: [
+                                                const TextSpan(text: 'TOTAL: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                TextSpan(text: '${a['total']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13, fontWeight: FontWeight.w500)),
+                                              ])),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 12),
+                                              child: RichText(text: TextSpan(children: [
+                                                const TextSpan(text: 'WEIGHT: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                TextSpan(text: '${a['weight']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13, fontWeight: FontWeight.w500)),
+                                              ])),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
+                                              child: RichText(
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                text: TextSpan(children: [
+                                                  const TextSpan(text: 'REMARKS: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                  TextSpan(
+                                                    text: (a['remarks'] != null && a['remarks'].toString().isNotEmpty) ? a['remarks'].toString() : '-',
+                                                    style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13),
+                                                  ),
+                                                ]),
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 12, top: 12, bottom: 12),
+                                              child: Builder(
+                                                builder: (ctx) {
+                                                  List<String> houses = (a['house'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+                                                  if (houses.isEmpty) return const SizedBox.shrink();
+                                                  return Align(
+                                                    alignment: Alignment.centerLeft,
+                                                    child: InkWell(
+                                                      onTap: () => _showCustomListDialog('House Numbers', houses),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                        decoration: BoxDecoration(color: const Color(0xFF1e293b), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF334155))),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.maps_home_work_outlined, size: 12, color: Color(0xFFcbd5e1)),
+                                                            const SizedBox(width: 4),
+                                                            Text('${houses.length} HAWB', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 11)),
+                                                          ],
                                                         ),
                                                       ),
-                                                  ],
-                                                ),
-                                              ),
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text(
-                                                  '${a['pieces']}/${a['total']} Pcs',
-                                                  style: const TextStyle(
-                                                    color: Color(0xFFcbd5e1),
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                              ),
-                                              Expanded(
-                                                flex: 1,
-                                                child: Text(
-                                                  '${a['weight']} kg',
-                                                  style: const TextStyle(
-                                                    color: Color(0xFFcbd5e1),
-                                                    fontSize: 13,
-                                                  ),
-                                                ),
-                                              ),
-                                              if (a['refUld'] != '' &&
-                                                  a['refUld'] != null)
-                                                Expanded(
-                                                  flex: 1,
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 2,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white
-                                                          .withAlpha(20),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            4,
-                                                          ),
                                                     ),
-                                                    child: Text(
-                                                      a['refUld'],
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 11,
+                                                  );
+                                                }
+                                              ),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
+                                              child: ((a['coordinator'] != null && (a['coordinator'] is List ? (a['coordinator'] as List).isNotEmpty : a['coordinator'].toString().isNotEmpty)) || (a['location'] != null && (a['location'] is List ? (a['location'] as List).isNotEmpty : a['location'].toString().isNotEmpty))) ? Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (a['coordinator'] != null && (a['coordinator'] is List ? (a['coordinator'] as List).isNotEmpty : a['coordinator'].toString().isNotEmpty))
+                                                    InkWell(
+                                                      onTap: () {
+                                                        List<String> dcList = a['coordinator'] is List ? (a['coordinator'] as List).map((e) => e.toString()).toList() : a['coordinator'].toString().split('\n').where((e) => e.trim().isNotEmpty).toList();
+                                                        _showCustomListDialog('Data Coordinator', dcList);
+                                                      },
+                                                      customBorder: const CircleBorder(),
+                                                      child: Container(
+                                                        margin: const EdgeInsets.only(right: 6),
+                                                        padding: const EdgeInsets.all(6),
+                                                        decoration: BoxDecoration(color: Colors.amber.withAlpha(30), shape: BoxShape.circle),
+                                                        child: const Icon(Icons.person_outline, size: 14, color: Colors.amber),
                                                       ),
                                                     ),
-                                                  ),
-                                                ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.close,
-                                                  color: Color(0xFFef4444),
-                                                  size: 18,
-                                                ),
+                                                  if (a['location'] != null && (a['location'] is List ? (a['location'] as List).isNotEmpty : a['location'].toString().isNotEmpty))
+                                                    InkWell(
+                                                      onTap: () {
+                                                        List<String> locList = a['location'] is List ? (a['location'] as List).map((e) => e.toString()).toList() : a['location'].toString().split('\n').where((e) => e.trim().isNotEmpty).toList();
+                                                        _showCustomListDialog('Data Location', locList);
+                                                      },
+                                                      customBorder: const CircleBorder(),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.all(6),
+                                                        decoration: BoxDecoration(color: Colors.green.withAlpha(30), shape: BoxShape.circle),
+                                                        child: const Icon(Icons.location_on_outlined, size: 14, color: Colors.green),
+                                                      ),
+                                                    ),
+                                                ],
+                                              ) : const SizedBox.shrink(),
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
+                                              child: IconButton(
+                                                icon: const Icon(Icons.close, color: Color(0xFFef4444), size: 18),
                                                 padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(),
+                                                constraints: const BoxConstraints(),
                                                 onPressed: () {
-                                                  setState(
-                                                    () => _localAwbs.removeAt(
-                                                      realIndex,
-                                                    ),
-                                                  );
-                                                  ScaffoldMessenger.of(
-                                                    context,
-                                                  ).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        '$awbNum removed',
-                                                      ),
-                                                      duration: const Duration(
-                                                        seconds: 1,
-                                                      ),
-                                                    ),
-                                                  );
+                                                  setState(() => _localAwbs.removeAt(realIndex));
                                                 },
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         );
-                                      },
+                                      }).toList(),
                                     ),
                                 ],
                               );
@@ -873,8 +1172,53 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     String hint, {
     bool isNum = false,
     int? maxLen,
-    IconData? prefixIcon,
+    List<TextInputFormatter>? inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    bool readOnly = false,
+    int? maxLines = 1,
+    int? minLines = 1,
   }) {
+    Widget field = TextField(
+      controller: ctrl,
+      keyboardType: maxLines == null || maxLines > 1 ? TextInputType.multiline : (isNum ? TextInputType.number : TextInputType.text),
+      textCapitalization: textCapitalization,
+      maxLength: maxLen,
+      readOnly: readOnly,
+      maxLines: maxLines,
+      minLines: minLines,
+      inputFormatters: inputFormatters,
+      style: TextStyle(
+        color: readOnly ? const Color(0xFFcbd5e1) : Colors.white,
+        fontSize: 13,
+      ),
+      onChanged: (ctrl == _refUldCtrl) ? (v) => _refUld = v : null,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(
+          color: Colors.white.withAlpha(76),
+          fontSize: 13,
+        ),
+        filled: true,
+        fillColor: readOnly ? const Color(0xFF0f172a).withAlpha(150) : Colors.white.withAlpha(10),
+        counterText: '',
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withAlpha(25)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Color(0xFF6366f1),
+            width: 1.5,
+          ),
+        ),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -887,49 +1231,87 @@ class AddAwbScreenState extends State<AddAwbScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 48,
-          child: TextField(
-            controller: ctrl,
-            keyboardType: isNum ? TextInputType.number : TextInputType.text,
-            maxLength: maxLen,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-            onChanged: (ctrl == _refUldCtrl) ? (v) => _refUld = v : null,
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(
-                color: Colors.white.withAlpha(76),
-                fontSize: 13,
-              ),
-              filled: true,
-              fillColor: Colors.white.withAlpha(10),
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 0,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withAlpha(25)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: Color(0xFF6366f1),
-                  width: 1.5,
-                ),
-              ),
-              prefixIcon: prefixIcon != null
-                  ? Icon(
-                      prefixIcon,
-                      size: 18,
-                      color: Colors.white.withAlpha(150),
-                    )
-                  : null,
-            ),
-          ),
-        ),
+        field,
       ],
+    );
+  }
+}
+
+class AwbNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final StringBuffer buffer = StringBuffer();
+
+    for (int i = 0; i < digitsOnly.length; i++) {
+      if (i == 3) {
+        buffer.write('-');
+      } else if (i == 7) {
+        buffer.write(' ');
+      }
+      buffer.write(digitsOnly[i]);
+    }
+
+    final formattedText = buffer.toString();
+
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+  }
+}
+
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
+}
+
+class SentenceCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+
+    List<String> lines = newValue.text.split('\n');
+    for (int i = 0; i < lines.length; i++) {
+        if (lines[i].trim().isNotEmpty) {
+            String leftPad = '';
+            String rightPad = '';
+            String core = lines[i];
+
+            while (core.isNotEmpty && core.startsWith(' ')) {
+              leftPad += ' ';
+              core = core.substring(1);
+            }
+            while (core.isNotEmpty && core.endsWith(' ')) {
+              rightPad += ' ';
+              core = core.substring(0, core.length - 1);
+            }
+
+            if (core.isNotEmpty) {
+               String first = core[0].toUpperCase();
+               String rest = core.substring(1).toLowerCase();
+               lines[i] = leftPad + first + rest + rightPad;
+            }
+        }
+    }
+
+    return TextEditingValue(
+      text: lines.join('\n'),
+      selection: newValue.selection,
     );
   }
 }

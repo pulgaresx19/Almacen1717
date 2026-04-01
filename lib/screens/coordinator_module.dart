@@ -458,7 +458,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                   children: flights.map((f) {
                     final chipId = '${f['carrier']}-${f['number']}';
                     final isSel = selectedId == chipId;
-                    final isChecked = f['status'] == 'Checked';
+                    final isChecked = f['isChecked'] == true;
 
                     Color textColor = isSel
                         ? Colors.white
@@ -3107,8 +3107,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               );
                               final bool isFlightChecked =
                                   currentFlightIdx != -1 &&
-                                  flightList[currentFlightIdx]['status'] ==
-                                      'Checked';
+                                  flightList[currentFlightIdx]['isChecked'] == true;
 
                               int totalFlightDiscrepancies = 0;
                               List<Map<String, dynamic>>
@@ -3354,6 +3353,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                     .from('Flight')
                                                     .update({
                                                       'status': 'Checked',
+                                                      'isChecked': true,
                                                       'end-break': eBreakTime,
                                                       'first-truck':
                                                           firstTruckTime,
@@ -3370,6 +3370,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                 if (currentFlightIdx != -1) {
                                                   flightList[currentFlightIdx]['status'] =
                                                       'Checked';
+                                                  flightList[currentFlightIdx]['isChecked'] = true;
                                                   flightList[currentFlightIdx]['end-break'] =
                                                       eBreakTime;
                                                   flightList[currentFlightIdx]['first-truck'] =
@@ -3488,7 +3489,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: isFlightChecked
-                                      ? const Color(0xFF38bdf8)
+                                      ? Colors.lightBlue.shade100
                                       : (allUldsChecked &&
                                                 (totalFlightDiscrepancies ==
                                                         0 ||
@@ -3498,9 +3499,11 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                 0xFF10b981,
                                               ).withAlpha(100)),
                                   disabledBackgroundColor: isFlightChecked
-                                      ? const Color(0xFF38bdf8)
+                                      ? Colors.lightBlue.withAlpha(dark ? 40 : 100)
                                       : const Color(0xFF10b981).withAlpha(100),
-                                  disabledForegroundColor: Colors.white,
+                                  disabledForegroundColor: isFlightChecked
+                                      ? Colors.lightBlue.shade700
+                                      : Colors.white,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -5154,8 +5157,10 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               Widget actionButton = Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  discrepanciesButton,
-                                  const SizedBox(width: 12),
+                                  if (totalFlightDiscrepancies > 0) ...[
+                                    discrepanciesButton,
+                                    const SizedBox(width: 12),
+                                  ],
                                   baseActionButton,
                                 ],
                               );
@@ -8064,6 +8069,12 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                           Expanded(
                             child: TextField(
                               controller: _searchController,
+                              textCapitalization: TextCapitalization.characters,
+                              inputFormatters: [
+                                TextInputFormatter.withFunction(
+                                  (oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase()),
+                                ),
+                              ],
                               style: TextStyle(
                                 color: dark
                                     ? Colors.white
@@ -8268,6 +8279,42 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                             : const Color(0xFF4B5563);
                                         return ListTile(
                                           contentPadding: EdgeInsets.zero,
+                                          onTap: () async {
+                                            Map<String, dynamic> uld = Map<String, dynamic>.from(uItem);
+                                            setState(() {
+                                              _globalSearchResult = null;
+                                              if (uld['refCarrier'] != null && uld['refNumber'] != null) {
+                                                _selectedFlightIdLeft = '${uld['refCarrier']}-${uld['refNumber']}';
+                                              }
+                                              _activeAwbOverlayLeft = uld;
+                                              uld['isLoadingAwbs'] = true;
+                                            });
+
+                                            try {
+                                              List<Map<String, dynamic>> parsedAwbs = [];
+                                              if (uld['data-ULD'] != null && uld['data-ULD'] is List) {
+                                                for (var awb in (uld['data-ULD'] as List)) {
+                                                  parsedAwbs.add({
+                                                    'number': awb['awb_number'] ?? awb['number'] ?? awb['AWB-number'] ?? '-',
+                                                    'pieces': awb['pieces'] ?? 0,
+                                                    'weight': awb['weight'] ?? 0,
+                                                    'remarks': awb['remarks'] ?? '',
+                                                  });
+                                                }
+                                              }
+                                              uld['awbList'] = parsedAwbs;
+                                            } catch (e) {
+                                              debugPrint('Err AWB: $e');
+                                              uld['awbList'] = [];
+                                            }
+
+                                            if (mounted) {
+                                              setState(() {
+                                                uld['isLoadingAwbs'] = false;
+                                                _activeAwbOverlayLeft = uld;
+                                              });
+                                            }
+                                          },
                                           title: Text(
                                             'ULD: ${uItem['ULD-number'] ?? 'Unknown'}',
                                             style: TextStyle(

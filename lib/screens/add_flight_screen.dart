@@ -316,10 +316,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
     await showDialog(
       context: context,
       builder: (ctx) {
-        double houseHeight = 120.0;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
+        return AlertDialog(
               backgroundColor: const Color(0xFF1e293b),
               title: Text('Add AWB to ${_flightLocalUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
           content: SizedBox(
@@ -350,33 +347,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                 const SizedBox(height: 12),
                 _buildTextField('Remarks', remCtrl, 'Additional remarks...'),
                 const SizedBox(height: 12),
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    SizedBox(
-                      height: houseHeight,
-                      child: _buildTextField('House Number', houseCtrl, 'HAWB1, HAWB2...', expands: true, isUpperCase: true),
-                    ),
-                    GestureDetector(
-                      onPanUpdate: (details) {
-                        setDialogState(() {
-                          houseHeight = (houseHeight + details.delta.dy).clamp(80.0, 500.0);
-                        });
-                      },
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeUpDown,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: SizedBox(
-                            width: 10,
-                            height: 10,
-                            child: CustomPaint(painter: ResizeHandlePainter()),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                _buildTextField('House Number', houseCtrl, 'HAWB', maxLines: 3, minLines: 1, isUpperCase: true),
               ],
             ),
           ),
@@ -432,7 +403,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                       'pieces': int.tryParse(piecesCtrl.text) ?? 0,
                       'weight': double.tryParse(weightCtrl.text) ?? 0.0,
                       'total': int.tryParse(totalCtrl.text) ?? 1,
-                      'house_number': houseCtrl.text.split(RegExp(r'[,\n]+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                      'house_number': houseCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
                       'remarks': remCtrl.text,
                     });
                     if (_flightLocalUlds[uldIndex]['isAutoPieces'] == true) {
@@ -447,8 +418,6 @@ class AddFlightScreenState extends State<AddFlightScreen> {
               child: const Text('Add AWB', style: TextStyle(color: Colors.white)),
             ),
           ],
-        );
-        }
         );
       }
     );
@@ -826,7 +795,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
               crossAxisAlignment: WrapCrossAlignment.end,
               children: [
                 SizedBox(width: 90, child: _buildTextField('Carrier', _carrierCtrl, 'AMERICAN', maxLen: 10, isUpperCase: true)),
-                SizedBox(width: 80, child: _buildTextField('Number', _numberCtrl, '204', isNum: true, maxLen: 10)),
+                SizedBox(width: 80, child: _buildTextField('Number', _numberCtrl, '204', isUpperCase: true, maxLen: 10)),
                 SizedBox(width: 85, child: _buildTextField('Break', _breakCtrl, '', disabled: _isBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
                   width: 20, height: 20,
                   child: Checkbox(
@@ -1043,10 +1012,11 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                width: 32, height: 32,
+                                alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withAlpha(15), 
-                                  borderRadius: BorderRadius.circular(6)
+                                  shape: BoxShape.circle
                                 ),
                                 child: Text(
                                   '${awbs.length}', 
@@ -1120,58 +1090,97 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                             children: [
                               Padding(padding: const EdgeInsets.all(8), child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: Color(0x14ffffff), shape: BoxShape.circle), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))))),
                               Padding(padding: const EdgeInsets.only(left: 8, right: 32, top: 8, bottom: 8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
-                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['pieces']} pcs', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['total'] ?? 0} ttl', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                              Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('${a['weight']} kg', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13))),
-                              Padding(padding: const EdgeInsets.only(left: 16, right: 8, top: 8, bottom: 8), child: Text(a['remarks']?.isNotEmpty == true ? a['remarks'] : '-', style: const TextStyle(color: Color(0xFF94a3b8), fontStyle: FontStyle.italic, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                              Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [
+                                const TextSpan(text: 'PIECES: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                TextSpan(text: '${a['pieces']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13)),
+                              ]))),
+                              Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [
+                                const TextSpan(text: 'TOTAL: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                TextSpan(text: '${a['total'] ?? 0}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13)),
+                              ]))),
+                              Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [
+                                const TextSpan(text: 'WEIGHT: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                TextSpan(text: '${a['weight']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13)),
+                              ]))),
+                              Padding(padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8), child: RichText(
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                text: TextSpan(children: [
+                                  const TextSpan(text: 'REMARKS: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
+                                  TextSpan(text: a['remarks']?.isNotEmpty == true ? a['remarks'] : '-', style: const TextStyle(color: Color(0xFF94a3b8), fontStyle: FontStyle.italic, fontSize: 12)),
+                                ]),
+                              )),
                               Padding(padding: const EdgeInsets.all(8), child: Builder(
                                 builder: (ctx) {
                                   final rawH = a['house_number'];
                                   final List<String> items = (rawH is List) ? rawH.map((e) => e.toString()).toList() : [];
                                   if (items.isEmpty) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                      decoration: BoxDecoration(color: Colors.white.withAlpha(10), borderRadius: BorderRadius.circular(4), border: Border.all(color: Colors.white.withAlpha(30))),
-                                      child: const Center(child: Text('0 HAWBs', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.w600))),
-                                    );
+                                    return const SizedBox.shrink();
                                   }
-                                  return InkWell(
-                                    onTap: () {
-                                      showDialog(
-                                        context: ctx,
-                                        builder: (c) => AlertDialog(
-                                          backgroundColor: const Color(0xFF1e293b),
-                                          title: Text('House Numbers (${items.length})', style: const TextStyle(color: Colors.white)),
-                                          content: SingleChildScrollView(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: items.asMap().entries.map((ent) => Padding(
-                                                padding: const EdgeInsets.only(bottom: 8),
-                                                child: Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 24, height: 24,
-                                                      alignment: Alignment.center,
-                                                      decoration: const BoxDecoration(color: Color(0x286366f1), shape: BoxShape.circle),
-                                                      child: Text('${ent.key + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 12, fontWeight: FontWeight.bold)),
+                                  return Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: InkWell(
+                                      onTap: () {
+                                        showDialog(
+                                          context: ctx,
+                                          builder: (c) => Dialog(
+                                            backgroundColor: const Color(0xFF1e293b),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(20))),
+                                            child: Container(
+                                              width: 320,
+                                              padding: const EdgeInsets.all(20),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('House Numbers (${items.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(height: 16),
+                                                  Flexible(
+                                                    child: SingleChildScrollView(
+                                                      child: Column(
+                                                        children: items.asMap().entries.map((ent) => Padding(
+                                                          padding: const EdgeInsets.only(bottom: 12),
+                                                          child: Row(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Container(
+                                                                width: 20, height: 20,
+                                                                alignment: Alignment.center,
+                                                                decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle),
+                                                                child: Text('${ent.key + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                              ),
+                                                              const SizedBox(width: 12),
+                                                              Expanded(child: Text(ent.value, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14))),
+                                                            ],
+                                                          ),
+                                                        )).toList(),
+                                                      ),
                                                     ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(child: Text(ent.value, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14))),
-                                                  ]
-                                                ),
-                                              )).toList(),
-                                            )
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  Align(
+                                                    alignment: Alignment.centerRight,
+                                                    child: TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1)))),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                                           ),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))))
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(color: const Color(0xFF1e293b), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF334155))),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.maps_home_work_outlined, size: 12, color: Color(0xFFcbd5e1)),
+                                            const SizedBox(width: 4),
+                                            Text('${items.length} HAWB', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 11)),
                                           ],
-                                        )
-                                      );
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(100))),
-                                      child: Center(child: Text('${items.length} HAWB${items.length > 1 ? 's' : ''}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.w600))),
+                                        ),
+                                      ),
                                     ),
                                   );
                                 }
@@ -1272,7 +1281,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
       enabled: !disabled,
       readOnly: readOnly,
       onTap: onTap,
-      keyboardType: isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text,
+      keyboardType: (maxLines == null || maxLines > 1) ? TextInputType.multiline : (isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text),
       textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
           inputFormatters: [
             if (isAwb) AwbTextInputFormatter(),

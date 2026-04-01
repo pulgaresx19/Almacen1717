@@ -4,7 +4,8 @@ import '../main.dart' show appLanguage, isDarkMode;
 import 'add_awb_screen.dart';
 
 class AwbModule extends StatefulWidget {
-  const AwbModule({super.key});
+  final bool isActive;
+  const AwbModule({super.key, this.isActive = true});
 
   @override
   State<AwbModule> createState() => _AwbModuleState();
@@ -14,6 +15,20 @@ class _AwbModuleState extends State<AwbModule> {
   final _searchController = TextEditingController();
   final GlobalKey<AddAwbScreenState> _addAwbKey = GlobalKey<AddAwbScreenState>();
   bool _showAddForm = false;
+
+  @override
+  void didUpdateWidget(AwbModule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isActive && oldWidget.isActive) {
+      if (_showAddForm && _addAwbKey.currentState != null) {
+        if (!_addAwbKey.currentState!.hasDataSync) {
+          setState(() {
+            _showAddForm = false;
+          });
+        }
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -112,15 +127,20 @@ class _AwbModuleState extends State<AwbModule> {
                   const SizedBox(width: 16),
                   
                   // Add AWB Button
-                  ElevatedButton.icon(
-                    onPressed: () => setState(() => _showAddForm = true),
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366f1),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      onPressed: () => setState(() => _showAddForm = true),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6366f1),
+                        foregroundColor: Colors.white,
+                        elevation: 4,
+                        shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -302,6 +322,24 @@ class _AwbModuleState extends State<AwbModule> {
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setStateBuilder) {
+            String formatChicagoTime(String? timeStr) {
+               if (timeStr == null) return '-';
+               final dt = DateTime.tryParse(timeStr);
+               if (dt == null) return '-';
+               final utc = dt.isUtc ? dt : dt.toUtc();
+               final chicago = utc.subtract(const Duration(hours: 5));
+               int h = chicago.hour;
+               String amPm = h >= 12 ? 'PM' : 'AM';
+               if (h == 0) { h = 12; }
+               else if (h > 12) { h -= 12; }
+               String hh = h.toString().padLeft(2, '0');
+               String mm = chicago.minute.toString().padLeft(2, '0');
+               String mth = chicago.month.toString().padLeft(2, '0');
+               String dd = chicago.day.toString().padLeft(2, '0');
+               String yy = chicago.year.toString();
+               return '$hh:$mm $amPm $mth/$dd/$yy';
+            }
+
             List<Widget> buildCombinedAuditItems() {
               List awbList = [];
               if (u['data-AWB'] is List) {
@@ -479,7 +517,7 @@ class _AwbModuleState extends State<AwbModule> {
                                                 const Spacer(),
                                                 Icon(Icons.access_time, size: 14, color: textS),
                                                 const SizedBox(width: 6),
-                                                Text(dc['time'] != null ? DateTime.tryParse(dc['time'])?.toLocal().toString().split('.').first ?? '-' : '-', style: TextStyle(color: textS, fontSize: 12)),
+                                                Text(formatChicagoTime(dc['time']), style: TextStyle(color: textS, fontSize: 12)),
                                              ]
                                           ),
                                           if (bd.isNotEmpty) ...[
@@ -496,6 +534,24 @@ class _AwbModuleState extends State<AwbModule> {
                                                    child: Text('${entry.key}: ${entry.value is List ? entry.value.join(', ') : entry.value}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
                                                  );
                                                }).toList(),
+                                             ),
+                                          ],
+                                          if (dc['manual_entry'] != null) ...[
+                                             const SizedBox(height: 10),
+                                             Wrap(
+                                               spacing: 6,
+                                               runSpacing: 6,
+                                               crossAxisAlignment: WrapCrossAlignment.center,
+                                               children: [
+                                                 Text('Manual Entry:', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                 ...(dc['manual_entry'] is List ? dc['manual_entry'] as List : [dc['manual_entry']]).map((entry) {
+                                                   return Container(
+                                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                     decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
+                                                     child: Text(entry.toString(), style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
+                                                   );
+                                                 }),
+                                               ],
                                              ),
                                           ]
                                         ]
@@ -530,7 +586,7 @@ class _AwbModuleState extends State<AwbModule> {
                                                 const Spacer(),
                                                 Icon(Icons.access_time, size: 14, color: textS),
                                                 const SizedBox(width: 6),
-                                                Text(loc['time'] != null ? DateTime.tryParse(loc['time'])?.toLocal().toString().split('.').first ?? '-' : '-', style: TextStyle(color: textS, fontSize: 12)),
+                                                Text(formatChicagoTime(loc['time']), style: TextStyle(color: textS, fontSize: 12)),
                                              ]
                                           ),
                                           if (itemLocs.isNotEmpty) ...[
@@ -546,6 +602,24 @@ class _AwbModuleState extends State<AwbModule> {
                                                    child: Text('${entry.key} ➔ ${entry.value}', style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
                                                  );
                                                }).toList(),
+                                             ),
+                                          ],
+                                          if (loc['manual_entry'] != null) ...[
+                                             const SizedBox(height: 10),
+                                             Wrap(
+                                               spacing: 6,
+                                               runSpacing: 6,
+                                               crossAxisAlignment: WrapCrossAlignment.center,
+                                               children: [
+                                                 Text('Manual Entry:', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                 ...(loc['manual_entry'] is List ? loc['manual_entry'] as List : [loc['manual_entry']]).map((entry) {
+                                                   return Container(
+                                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                     decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF10b981).withAlpha(50))),
+                                                     child: Text(entry.toString(), style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
+                                                   );
+                                                 }),
+                                               ],
                                              ),
                                           ]
                                         ]

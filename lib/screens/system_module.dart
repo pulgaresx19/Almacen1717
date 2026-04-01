@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
@@ -456,18 +457,18 @@ class _SystemModuleState extends State<SystemModule> {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               if (isLoading)
                 const Center(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 40),
+                    padding: EdgeInsets.only(top: 24),
                     child: CircularProgressIndicator(color: Color(0xFF6366f1)),
                   ),
                 )
               else if (flights.isEmpty)
                 Center(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 40),
+                    padding: const EdgeInsets.only(top: 24),
                     child: Text(
                       dt == null
                           ? (appLanguage.value == 'es'
@@ -491,7 +492,7 @@ class _SystemModuleState extends State<SystemModule> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -723,52 +724,21 @@ class _SystemModuleState extends State<SystemModule> {
                                                 });
 
                                                 try {
-                                                  final currentFlight =
-                                                      match.first;
-                                                  final res = await Supabase
-                                                      .instance
-                                                      .client
-                                                      .from('AWB')
-                                                      .select();
 
                                                   List<Map<String, dynamic>>
                                                   parsedAwbs = [];
-                                                  for (var awbRow in res) {
-                                                    if (awbRow['data-AWB'] !=
-                                                            null &&
-                                                        awbRow['data-AWB']
-                                                            is List) {
-                                                      for (var innerItem
-                                                          in (awbRow['data-AWB']
-                                                              as List)) {
-                                                        if (innerItem['refULD']
-                                                                    ?.toString() ==
-                                                                uld['ULD-number']
-                                                                    ?.toString() &&
-                                                            innerItem['refCarrier']
-                                                                    ?.toString() ==
-                                                                currentFlight['carrier']
-                                                                    ?.toString() &&
-                                                            innerItem['refNumber']
-                                                                    ?.toString() ==
-                                                                currentFlight['number']
-                                                                    ?.toString() &&
-                                                            innerItem['refDate']
-                                                                    ?.toString() ==
-                                                                currentFlight['date-arrived']
-                                                                    ?.toString()) {
-                                                          parsedAwbs.add({
-                                                            'number':
-                                                                awbRow['AWB-number'],
-                                                            'pieces':
-                                                                innerItem['pieces'],
-                                                            'weight':
-                                                                innerItem['weight'],
-                                                            'remarks':
-                                                                innerItem['remarks'],
-                                                          });
-                                                        }
-                                                      }
+                                                  if (uld['data-ULD'] != null &&
+                                                      uld['data-ULD'] is List) {
+                                                    for (var awb in (uld['data-ULD'] as List)) {
+                                                      parsedAwbs.add({
+                                                        'number': awb['awb_number'] ??
+                                                                  awb['number'] ??
+                                                                  awb['AWB-number'] ??
+                                                                  '-',
+                                                        'pieces': awb['pieces'] ?? 0,
+                                                        'weight': awb['weight'] ?? 0,
+                                                        'remarks': awb['remarks'] ?? '',
+                                                      });
                                                     }
                                                   }
                                                   uld['awbList'] = parsedAwbs;
@@ -938,51 +908,63 @@ class _SystemModuleState extends State<SystemModule> {
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(),
                                             onPressed: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) {
-                                                  return AlertDialog(
-                                                    backgroundColor: dark
-                                                        ? const Color(
-                                                            0xFF1e293b,
-                                                          )
-                                                        : Colors.white,
-                                                    title: Text(
-                                                      appLanguage.value == 'es'
-                                                          ? 'Detalles de Recepción'
-                                                          : 'Receipt Details',
-                                                      style: TextStyle(
-                                                        color: textP,
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (context) {
+                                                    return AlertDialog(
+                                                      alignment: isLeft ? const Alignment(-0.5, 0.0) : const Alignment(0.5, 0.0),
+                                                      backgroundColor: dark
+                                                          ? const Color(
+                                                              0xFF1e293b,
+                                                            )
+                                                          : Colors.white,
+                                                      title: Text(
+                                                        appLanguage.value == 'es'
+                                                            ? 'Detalles de Recepción'
+                                                            : 'Receipt Details',
+                                                        style: TextStyle(
+                                                          color: textP,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
                                                       ),
-                                                    ),
-                                                    content: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          '${appLanguage.value == 'es' ? 'Usuario' : 'User'}: ${receivedUser ?? '-'}',
-                                                          style: TextStyle(
-                                                            color: textP,
-                                                            fontSize: 14,
+                                                      content: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .start,
+                                                        children: [
+                                                          Text(
+                                                            'ULD: ${uld['ULD-number'] ?? '-'}',
+                                                            style: TextStyle(
+                                                              color: textP,
+                                                              fontSize: 14,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
                                                           ),
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 8,
-                                                        ),
-                                                        Text(
-                                                          '${appLanguage.value == 'es' ? 'Hora y Fecha' : 'Date & Time'}: ${toAmPmFormat(indTime!)}',
-                                                          style: TextStyle(
-                                                            color: textP,
-                                                            fontSize: 14,
+                                                          const SizedBox(
+                                                            height: 12,
                                                           ),
-                                                        ),
-                                                      ],
-                                                    ),
+                                                          Text(
+                                                            '${appLanguage.value == 'es' ? 'Usuario' : 'User'}: ${receivedUser ?? '-'}',
+                                                            style: TextStyle(
+                                                              color: textP,
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                            height: 8,
+                                                          ),
+                                                          Text(
+                                                            '${appLanguage.value == 'es' ? 'Hora y Fecha' : 'Date & Time'}: ${toAmPmFormat(indTime!)}',
+                                                            style: TextStyle(
+                                                              color: textP,
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     actions: [
                                                       TextButton(
                                                         onPressed: () =>
@@ -1105,10 +1087,23 @@ class _SystemModuleState extends State<SystemModule> {
                                                         }
 
                                                         if (idx != -1) {
-                                                          if (currentFlightList[idx]['local-first-truck'] ==
-                                                              null) {
-                                                            currentFlightList[idx]['local-first-truck'] =
-                                                                truckTime;
+                                                          if (currentFlightList[idx]['local-first-truck'] == null && currentFlightList[idx]['first-truck'] == null) {
+                                                            currentFlightList[idx]['local-first-truck'] = truckTime;
+                                                            if (dt != null) {
+                                                              final fParts = selectedId.split('-');
+                                                              if (fParts.length >= 2) {
+                                                                final dStr = DateFormat('yyyy-MM-dd').format(dt);
+                                                                Supabase.instance.client
+                                                                    .from('Flight')
+                                                                    .update({'first-truck': truckTime})
+                                                                    .eq('carrier', fParts[0])
+                                                                    .eq('number', fParts[1])
+                                                                    .eq('date-arrived', dStr)
+                                                                    .catchError((e) {
+                                                                      debugPrint('Flight First Truck Update Err: $e');
+                                                                    });
+                                                              }
+                                                            }
                                                           }
                                                           currentFlightList[idx]['local-truck-arrived'] ??=
                                                               <
@@ -1499,9 +1494,25 @@ class _SystemModuleState extends State<SystemModule> {
                                 ),
                               );
 
-                              if (isFlightReceived &&
-                                  currentFlight != null &&
-                                  currentFlight['first-truck'] != null) {
+                              String? fTruck = currentFlight?['first-truck']?.toString();
+                              String? lTruck = currentFlight?['last-truck']?.toString();
+
+                              if (currentFlight != null) {
+                                final Map<String, dynamic> truckMap =
+                                    currentFlight['local-truck-arrived'] is Map
+                                        ? Map<String, dynamic>.from(currentFlight['local-truck-arrived'])
+                                        : {};
+                                if (truckMap.isNotEmpty) {
+                                  List<String> times = truckMap.values.map((v) => v.toString()).toList();
+                                  times.sort((a, b) => a.compareTo(b));
+                                  fTruck ??= times.first;
+                                  lTruck ??= times.last;
+                                } else if (currentFlight['local-first-truck'] != null) {
+                                  fTruck ??= currentFlight['local-first-truck'].toString();
+                                }
+                              }
+
+                              if (fTruck != null) {
                                 String toAmPm(String? t) {
                                   if (t == null) return '-';
                                   try {
@@ -1548,7 +1559,7 @@ class _SystemModuleState extends State<SystemModule> {
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              'First Truck: ${toAmPm(currentFlight['first-truck']?.toString())}',
+                                              'First Truck: ${toAmPm(fTruck)}',
                                               style: const TextStyle(
                                                 fontSize: 12,
                                                 color: Color(0xFF94a3b8),
@@ -1557,26 +1568,28 @@ class _SystemModuleState extends State<SystemModule> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.done_all,
-                                              size: 13,
-                                              color: Color(0xFF10b981),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'Last Truck: ${toAmPm(currentFlight['last-truck']?.toString())}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
+                                        if (isFlightReceived) ...[
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(
+                                                Icons.done_all,
+                                                size: 13,
                                                 color: Color(0xFF10b981),
-                                                fontWeight: FontWeight.bold,
                                               ),
-                                            ),
-                                          ],
-                                        ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Last Truck: ${toAmPm(lTruck ?? fTruck)}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF10b981),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
                                     ),
                                     const SizedBox(width: 12),
@@ -1886,8 +1899,14 @@ class _SystemModuleState extends State<SystemModule> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: TextField(
-                              controller: _searchController,
+                              child: TextField(
+                                controller: _searchController,
+                                textCapitalization: TextCapitalization.characters,
+                                inputFormatters: [
+                                  TextInputFormatter.withFunction(
+                                    (oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase()),
+                                  ),
+                                ],
                               style: TextStyle(
                                 color: dark
                                     ? Colors.white
@@ -2132,17 +2151,82 @@ class _SystemModuleState extends State<SystemModule> {
                                               ),
                                             ],
                                           ),
-                                          trailing: isReceived
-                                              ? const Icon(
-                                                  Icons.check_circle,
-                                                  color: Color(0xFF10b981),
-                                                  size: 20,
-                                                )
-                                              : const Icon(
-                                                  Icons.access_time,
-                                                  color: Color(0xFFf59e0b),
-                                                  size: 20,
-                                                ),
+                                          trailing: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: Checkbox(
+                                              value: isReceived,
+                                              activeColor: const Color(0xFF10b981),
+                                              side: BorderSide(
+                                                color: dark
+                                                    ? Colors.white.withAlpha(50)
+                                                    : const Color(0xFFE5E7EB),
+                                                width: 2,
+                                              ),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              onChanged: (v) async {
+                                                final bool isChecked = v == true;
+                                                String authorName = 'Usuario';
+                                                try {
+                                                  final uUser = Supabase.instance.client.auth.currentUser;
+                                                  if (uUser != null) {
+                                                    authorName = uUser.email?.split('@')[0] ?? 'Usuario';
+                                                    final userRow = await Supabase.instance.client.from('Users').select('full-name').eq('id', uUser.id).maybeSingle();
+                                                    if (userRow != null && userRow['full-name'] != null) {
+                                                      authorName = userRow['full-name'];
+                                                    }
+                                                  }
+                                                } catch(_) {}
+
+                                                final truckTime = DateTime.now().toUtc().toIso8601String();
+                                                
+                                                setState(() {
+                                                  if (isChecked) {
+                                                    uItem['data-received'] = {
+                                                      'user': authorName,
+                                                      'time': truckTime,
+                                                      'status': true,
+                                                    };
+                                                    uItem['status'] = 'Received';
+                                                  } else {
+                                                    uItem['data-received'] = {};
+                                                    uItem['status'] = 'Waiting';
+                                                  }
+                                                });
+
+                                                if (isChecked) {
+                                                  final payload = {
+                                                    'user': authorName,
+                                                    'time': truckTime,
+                                                    'status': true,
+                                                  };
+                                                  await Supabase.instance.client.from('ULD').update({
+                                                    'data-received': payload,
+                                                    'status': 'Received',
+                                                  }).eq('id', uItem['id']);
+
+                                                  if (uItem['refCarrier'] != null && uItem['refNumber'] != null && uItem['refDate'] != null) {
+                                                    final fl = await Supabase.instance.client.from('Flight').select('first-truck')
+                                                        .eq('carrier', uItem['refCarrier'])
+                                                        .eq('number', uItem['refNumber'])
+                                                        .eq('date-arrived', uItem['refDate'])
+                                                        .maybeSingle();
+                                                    if (fl != null && fl['first-truck'] == null) {
+                                                      await Supabase.instance.client.from('Flight').update({'first-truck': truckTime})
+                                                        .eq('carrier', uItem['refCarrier'])
+                                                        .eq('number', uItem['refNumber'])
+                                                        .eq('date-arrived', uItem['refDate']);
+                                                    }
+                                                  }
+                                                } else {
+                                                  await Supabase.instance.client.from('ULD').update({
+                                                    'data-received': {},
+                                                    'status': 'Waiting',
+                                                  }).eq('id', uItem['id']);
+                                                }
+                                              },
+                                            ),
+                                          ),
                                         );
                                       },
                                     ),
