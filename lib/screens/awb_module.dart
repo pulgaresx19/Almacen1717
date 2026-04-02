@@ -60,44 +60,32 @@ class _AwbModuleState extends State<AwbModule> {
                   children: [
                     if (_showAddForm)
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0, right: 8.0),
-                            child: IconButton(
-                              onPressed: () async {
-                                if (_addAwbKey.currentState != null) {
-                                  final canPop = await _addAwbKey.currentState!.handleBackRequest();
-                                  if (canPop) {
-                                    setState(() => _showAddForm = false);
-                                  }
-                                } else {
+                          IconButton(
+                            onPressed: () async {
+                              if (_addAwbKey.currentState != null) {
+                                final canPop = await _addAwbKey.currentState!.handleBackRequest();
+                                if (canPop) {
                                   setState(() => _showAddForm = false);
                                 }
-                              },
-                              icon: const Icon(Icons.arrow_back_rounded, size: 24),
-                              tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
-                            ),
+                              } else {
+                                setState(() => _showAddForm = false);
+                              }
+                            },
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(appLanguage.value == 'es' ? 'Añadir Nuevo Aerobill' : 'Add New Air Waybill', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 4),
-                              Text(appLanguage.value == 'es' ? 'Crea y registra detalles de los aerobills.' : 'Create and register Air Waybill details.', style: TextStyle(color: textS, fontSize: 13)),
-                            ],
-                          ),
+                          const SizedBox(width: 8),
+                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo Aerobill' : 'Add New Air Waybill', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         ],
                       )
                     else
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(appLanguage.value == 'es' ? 'Guías Aéreas' : 'Air Waybills (AWB)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          Text(appLanguage.value == 'es' ? 'Administración y desglose de guías aéreas.' : 'Management and breakdown of Air Waybills.', style: TextStyle(color: textS, fontSize: 13)),
-                        ],
-                      ),
+                      Text(appLanguage.value == 'es' ? 'Guías Aéreas' : 'Air Waybills (AWB)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    if (_showAddForm)
+                      Text(appLanguage.value == 'es' ? 'Crea y registra detalles de los aerobills.' : 'Create and register Air Waybill details.', style: TextStyle(color: textS, fontSize: 13))
+                    else
+                      Text(appLanguage.value == 'es' ? 'Administración y desglose de guías aéreas.' : 'Management and breakdown of Air Waybills.', style: TextStyle(color: textS, fontSize: 13)),
                   ],
                 ),
                 const Spacer(),

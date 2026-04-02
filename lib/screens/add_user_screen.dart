@@ -20,6 +20,124 @@ class AddUserScreen extends StatefulWidget {
 class AddUserScreenState extends State<AddUserScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  final List<Map<String, dynamic>> _pagesList = [
+    {
+      'key': 'dashboard',
+      'titleEs': 'Dashboard',
+      'titleEn': 'Dashboard',
+      'descEs': 'Panel general.',
+      'descEn': 'General dashboard.',
+      'icon': Icons.dashboard_rounded,
+    },
+    {
+      'key': 'flights',
+      'titleEs': 'Vuelos',
+      'titleEn': 'Flights',
+      'descEs': 'Acceso para gestionar y visualizar vuelos.',
+      'descEn': 'Access to manage and view flights.',
+      'icon': Icons.flight_land_rounded,
+    },
+    {
+      'key': 'ulds',
+      'titleEs': 'Contenedores (ULD)',
+      'titleEn': 'Unit Load Devices (ULD)',
+      'descEs': 'Acceso para crear y asignar contenedores.',
+      'descEn': 'Access to create and assign ULDs.',
+      'icon': Icons.luggage_rounded,
+    },
+    {
+      'key': 'awbs',
+      'titleEs': 'Guías Aéreas (AWB)',
+      'titleEn': 'Air Waybills (AWB)',
+      'descEs': 'Acceso a la administración de guías aéreas.',
+      'descEn': 'Access to the management of Air Waybills.',
+      'icon': Icons.receipt_long_rounded,
+    },
+    {
+      'key': 'delivers',
+      'titleEs': 'Entregas',
+      'titleEn': 'Delivers',
+      'descEs': 'Acceso para registrar y administrar entregas.',
+      'descEn': 'Access to register and manage deliveries.',
+      'icon': Icons.local_shipping_rounded,
+    },
+    {
+      'key': 'users',
+      'titleEs': 'Usuarios',
+      'titleEn': 'Users',
+      'descEs': 'Administración de roles y accesos.',
+      'descEn': 'Management of roles and accesses.',
+      'icon': Icons.people_alt_rounded,
+    },
+    {
+      'key': 'system',
+      'titleEs': 'Sistema',
+      'titleEn': 'System',
+      'descEs': 'Configuración general.',
+      'descEn': 'General system settings.',
+      'icon': Icons.settings_system_daydream_rounded,
+    },
+    {
+      'key': 'coordinator',
+      'titleEs': 'Coordinador',
+      'titleEn': 'Coordinator',
+      'descEs': 'Coordinación de recursos operativos.',
+      'descEn': 'Coordination of operational resources.',
+      'icon': Icons.support_agent_rounded,
+    },
+    {
+      'key': 'location',
+      'titleEs': 'Ubicación',
+      'titleEn': 'Location',
+      'descEs': 'Gestión del almacén.',
+      'descEn': 'Warehouse management.',
+      'icon': Icons.location_on_rounded,
+    },
+    {
+      'key': 'driver',
+      'titleEs': 'Conductor',
+      'titleEn': 'Driver',
+      'descEs': 'Administración y asignación de manejo.',
+      'descEn': 'Driver management and assignment.',
+      'icon': Icons.local_shipping_rounded,
+    },
+    {
+      'key': 'system_bf',
+      'titleEs': 'Sistema (BF)',
+      'titleEn': 'System (BF)',
+      'descEs': 'Acceso a la configuración del sistema.',
+      'descEn': 'Access to the system configuration.',
+      'icon': Icons.computer_rounded,
+    },
+    {
+      'key': 'area_nobreak',
+      'titleEs': 'Área (No break)',
+      'titleEn': 'Area (No break)',
+      'descEs': 'Acceso a la gestión de áreas.',
+      'descEn': 'Access to area management.',
+      'icon': Icons.dashboard_customize_rounded,
+    },
+    {
+      'key': 'control_flight',
+      'titleEs': 'Control (Flight)',
+      'titleEn': 'Control (Flight)',
+      'descEs': 'Acceso al módulo de control de vuelos.',
+      'descEn': 'Access to the flight control module.',
+      'icon': Icons.airplane_ticket_rounded,
+    },
+  ];
+
+  bool _masterDriver = false;
+  final Map<String, bool> _accessMap = {};
+
+  @override
+  void initState() {
+    super.initState();
+    for (var p in _pagesList) {
+      _accessMap[p['key'] as String] = false;
+    }
+  }
+
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -29,8 +147,9 @@ class AddUserScreenState extends State<AddUserScreen> {
   String _position = 'Agent';
   String _shift = 'Morning';
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
-  final List<String> _positions = ['Agent', 'Coordinator', 'Supervisor', 'Admin'];
+  final List<String> _positions = ['Agent', 'Coordinator', 'Supervisor', 'Manager', 'Office'];
   final List<String> _shifts = ['Morning', 'Evening', 'Night'];
 
   @override
@@ -69,6 +188,8 @@ class AddUserScreenState extends State<AddUserScreen> {
           'building': _buildingCtrl.text.trim(),
           'shift': _shift,
           'phone-number': _phoneCtrl.text.trim(),
+          'master-driver': _masterDriver,
+          'access-page': _accessMap,
         };
 
         // Try to insert (sometimes signUp trigger creates it, so we upsert or just update)
@@ -279,7 +400,7 @@ class AddUserScreenState extends State<AddUserScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
+                      Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: bgCard,
@@ -297,46 +418,179 @@ class AddUserScreenState extends State<AddUserScreen> {
                             ],
                           ),
                           const SizedBox(height: 24),
-                          Row(
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 16,
                             children: [
-                              Expanded(
+                              SizedBox(
+                                width: 260,
                                 child: _buildTextField('Full Name', _nameCtrl, dark, Icons.person_rounded),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
+                              SizedBox(
+                                width: 260,
                                 child: _buildTextField('Email', _emailCtrl, dark, Icons.email_rounded, keyboardType: TextInputType.emailAddress),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildTextField('Password', _passwordCtrl, dark, Icons.lock_rounded, obscureText: true),
+                              SizedBox(
+                                width: 200,
+                                child: _buildTextField(
+                                  'Password', 
+                                  _passwordCtrl, 
+                                  dark, 
+                                  Icons.lock_rounded, 
+                                  obscureText: _obscurePassword,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
+                                      color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), 
+                                      size: 18,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                    tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
+                              SizedBox(
+                                width: 180,
                                 child: _buildTextField('Phone Number', _phoneCtrl, dark, Icons.phone_rounded, keyboardType: TextInputType.phone, inputFormatters: [_PhoneFormatter()]),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildDropdownField('Position', _position, _positions, (v) => setState(() => _position = v!), dark, Icons.work_rounded),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
+                              SizedBox(
+                                width: 150,
                                 child: _buildTextField('Building', _buildingCtrl, dark, Icons.domain_rounded),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
+                              SizedBox(
+                                width: 150,
                                 child: _buildDropdownField('Shift', _shift, _shifts, (v) => setState(() => _shift = v!), dark, Icons.schedule_rounded),
+                              ),
+                              SizedBox(
+                                width: 180,
+                                child: _buildDropdownField('Position', _position, _positions, (v) => setState(() => _position = v!), dark, Icons.work_rounded),
+                              ),
+                              SizedBox(
+                                width: 180,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Master Driver', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      height: 48,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Icon(Icons.directions_car_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 20),
+                                          Switch(
+                                            value: _masterDriver,
+                                            onChanged: (v) => setState(() => _masterDriver = v),
+                                            activeThumbColor: Colors.white,
+                                            activeTrackColor: const Color(0xFF6366f1),
+                                            inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF),
+                                            inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: bgCard,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderC),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.vpn_key_rounded, color: textP, size: 20),
+                                const SizedBox(width: 8),
+                                Text(appLanguage.value == 'es' ? 'Acceso a Páginas' : 'Page Access', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              appLanguage.value == 'es' 
+                                  ? 'Selecciona las páginas a las que el usuario tendrá acceso dentro del sistema.' 
+                                  : 'Select the pages the user will have access to within the system.',
+                              style: TextStyle(
+                                color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Expanded(
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: _pagesList.length,
+                                itemBuilder: (context, index) {
+                                  final page = _pagesList[index];
+                                  final isAccess = _accessMap[page['key']] ?? false;
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: borderC),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(page['icon'] as IconData, color: textP, size: 20),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(appLanguage.value == 'es' ? page['titleEs'] : page['titleEn'], style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                              const SizedBox(height: 2),
+                                              Text(appLanguage.value == 'es' ? page['descEs'] : page['descEn'], style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
+                                            ],
+                                          )
+                                        ),
+                                        Switch(
+                                          value: isAccess,
+                                          onChanged: (v) {
+                                            setState(() => _accessMap[page['key'] as String] = v);
+                                          },
+                                          activeThumbColor: Colors.white,
+                                          activeTrackColor: const Color(0xFF6366f1),
+                                          inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF),
+                                          inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -394,7 +648,7 @@ class AddUserScreenState extends State<AddUserScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData icon, {bool obscureText = false, TextInputType? keyboardType, List<TextInputFormatter>? inputFormatters}) {
+  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData icon, {bool obscureText = false, TextInputType? keyboardType, List<TextInputFormatter>? inputFormatters, Widget? suffixIcon}) {
     final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
     final fillC = dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB);
     final textP = dark ? Colors.white : const Color(0xFF111827);
@@ -402,8 +656,8 @@ class AddUserScreenState extends State<AddUserScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           obscureText: obscureText,
@@ -415,7 +669,8 @@ class AddUserScreenState extends State<AddUserScreen> {
           style: TextStyle(color: textP),
           validator: (v) => v == null || v.isEmpty ? 'Required' : null,
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: const Color(0xFF6366f1), size: 20),
+            prefixIcon: Icon(icon, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 20),
+            suffixIcon: suffixIcon,
             filled: true,
             fillColor: fillC,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderC)),
@@ -435,15 +690,15 @@ class AddUserScreenState extends State<AddUserScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           initialValue: value,
           onChanged: onChanged,
           dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
           style: TextStyle(color: textP),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: const Color(0xFF6366f1), size: 20),
+            prefixIcon: Icon(icon, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 20),
             filled: true,
             fillColor: fillC,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderC)),

@@ -9,6 +9,10 @@ import 'screens/awb_module.dart';
 import 'screens/delivers_module.dart';
 import 'screens/driver_module.dart';
 import 'screens/other_modules.dart';
+import 'screens/system_bf_module.dart';
+import 'screens/area_nobreak_module.dart';
+import 'screens/control_flight_module.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -564,6 +568,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 'Driver',
                                 9,
                               ),
+                              _buildNavItem(
+                                Icons.computer_rounded,
+                                'System (BF)',
+                                10,
+                              ),
+                              _buildNavItem(
+                                Icons.dashboard_customize_rounded,
+                                'Area (No break)',
+                                11,
+                              ),
+                              _buildNavItem(
+                                Icons.airplane_ticket_rounded,
+                                'Control (Flight)',
+                                12,
+                              ),
                             ],
                           ),
                         ),
@@ -746,6 +765,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const CoordinatorModule(singlePanelMode: true),
         const LocationModule(),
         const DriverModule(),
+        const SystemBfModule(),
+        const AreaNobreakModule(),
+        const ControlFlightModule(),
       ],
     );
   }

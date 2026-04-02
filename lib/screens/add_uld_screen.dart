@@ -632,7 +632,7 @@ class AddUldScreenState extends State<AddUldScreen> {
                             const SizedBox(height: 24),
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                double rWidth = constraints.maxWidth - 845; 
+                                double rWidth = constraints.maxWidth - 965; 
                                 if (rWidth < 180) rWidth = 180;
                                 return Wrap(
                                   spacing: 12,
@@ -684,22 +684,72 @@ class AddUldScreenState extends State<AddUldScreen> {
                                     )),
                                     SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...')),
                                     SizedBox(
-                                      width: 65,
+                                      width: 125,
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                            const Text('Priority?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                                            Switch(value: _isPriority, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isPriority = v)),
+                                          const Text('Priority?', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            height: 48,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withAlpha(13),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.white.withAlpha(25)),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Icon(Icons.star_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                                                Switch(
+                                                  value: _isPriority,
+                                                  onChanged: (v) => setState(() => _isPriority = v),
+                                                  activeThumbColor: Colors.white,
+                                                  activeTrackColor: const Color(0xFFf59e0b),
+                                                  inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF),
+                                                  inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                     SizedBox(
-                                      width: 65,
+                                      width: 125,
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                            const Text('Break?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                                            Switch(value: _isBreak, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isBreak = v)),
+                                          const Text('Break?', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            height: 48,
+                                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withAlpha(13),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.white.withAlpha(25)),
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Icon(Icons.broken_image_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                                                Switch(
+                                                  value: _isBreak,
+                                                  onChanged: (v) => setState(() => _isBreak = v),
+                                                  activeThumbColor: Colors.white,
+                                                  activeTrackColor: const Color(0xFF22c55e),
+                                                  inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF),
+                                                  inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                                  trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                                    if (states.contains(WidgetState.selected)) return Colors.transparent;
+                                                    return const Color(0xFFef4444).withAlpha(180);
+                                                  }),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -773,7 +823,7 @@ class AddUldScreenState extends State<AddUldScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 Text(
                                   appLanguage.value == 'es' ? 'Vea y gestione todos los ULDs nuevos que serán guardados.' : 'View and manage all new ULDs that will be saved.', 
                                   style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 13)

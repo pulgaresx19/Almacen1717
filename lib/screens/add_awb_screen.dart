@@ -800,7 +800,7 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         Text(
                           appLanguage.value == 'es' ? 'Vea y gestione todos los AWBs que serán guardados.' : 'View and manage all AWBs pending to be saved.', 
                           style: TextStyle(color: textS, fontSize: 13)

@@ -570,11 +570,12 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(76) : Colors.black.withAlpha(76), fontSize: 13),
-            prefixIcon: icon != null ? Icon(icon, color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), size: 18) : null,
+            prefixIcon: icon != null ? Icon(icon, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18) : null,
             suffixIcon: suffixIcon,
             filled: true,
             fillColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), width: 1.5),
@@ -598,20 +599,36 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
           initialValue: _typeCtrl.text.isNotEmpty ? _typeCtrl.text : 'Walk-in',
           dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
           style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13),
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5)),
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF)),
           decoration: InputDecoration(
             filled: true,
             fillColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), width: 1.5),
             ),
           ),
           items: types.map((String val) {
+            IconData iconData;
+            switch (val) {
+              case 'Walk-in': iconData = Icons.directions_walk_rounded; break;
+              case 'Appointment': iconData = Icons.calendar_month_rounded; break;
+              case 'Transfer': iconData = Icons.swap_horiz_rounded; break;
+              case 'Import': iconData = Icons.move_to_inbox_rounded; break;
+              case 'Priority Load': iconData = Icons.bolt_rounded; break;
+              default: iconData = Icons.circle;
+            }
             return DropdownMenuItem(
               value: val,
-              child: Text(val),
+              child: Row(
+                children: [
+                  Icon(iconData, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 16),
+                  const SizedBox(width: 8),
+                  Text(val),
+                ],
+              ),
             );
           }).toList(),
           onChanged: (val) {
@@ -1614,7 +1631,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                             Expanded(flex: 2, child: _buildTextField('Door', _doorCtrl, dark, null, maxLen: 6, uppercase: true, hint: '05')),
                             const SizedBox(width: 16),
                             Expanded(flex: 3, child: _buildTextField('ID Pickup', _idPickupCtrl, dark, null, maxLen: 10, uppercase: true, hint: 'ID12345', suffixIcon: IconButton(
-                              icon: Icon(Icons.auto_awesome_rounded, color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), size: 18),
+                              icon: Icon(Icons.auto_awesome_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
                               onPressed: () {
                                 final chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
                                 final rnd = Random();
@@ -1630,7 +1647,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                             const SizedBox(width: 16),
                             SizedBox(width: 140, child: Builder(builder: (context) {
                               return _buildTextField('Time', _timeCtrl, dark, null, hint: '14:30', suffixIcon: IconButton(
-                                icon: Icon(Icons.access_time_rounded, color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), size: 18),
+                                icon: Icon(Icons.access_time_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
                                 onPressed: () async {
                                   FocusManager.instance.primaryFocus?.unfocus(); // Deep unfocus to avoid Web Engine text sync bug
                                   final selected = await showTimePicker(
@@ -1657,25 +1674,40 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                               ));
                             })),
                             const SizedBox(width: 16),
-                            Expanded(flex: 5, child: _buildTextField('Remarks', _remarksCtrl, dark, null, hint: appLanguage.value == 'es' ? 'Notas del conductor...' : 'Driver additional notes...')),
+                            Expanded(flex: 4, child: _buildTextField('Remarks', _remarksCtrl, dark, null, hint: appLanguage.value == 'es' ? 'Notas del conductor...' : 'Driver additional notes...')),
                             const SizedBox(width: 16),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('Priority?', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
-                                const SizedBox(height: 6),
-                                Container(
-                                  height: 48,
-                                  alignment: Alignment.center,
-                                  child: Switch(
-                                    value: _isPriority,
-                                    onChanged: (v) => setState(() => _isPriority = v),
-                                    activeTrackColor: const Color(0xFF6366f1).withAlpha(128),
-                                    activeThumbColor: const Color(0xFF6366f1),
+                            SizedBox(
+                              width: 130,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Priority?', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    height: 48,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    decoration: BoxDecoration(
+                                      color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Icon(Icons.star_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                                        Switch(
+                                          value: _isPriority,
+                                          onChanged: (v) => setState(() => _isPriority = v),
+                                          activeThumbColor: Colors.white,
+                                          activeTrackColor: const Color(0xFFf59e0b),
+                                          inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF),
+                                          inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                             const SizedBox(width: 8),
                           ],
@@ -1725,7 +1757,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         Text(
                           appLanguage.value == 'es' 
                             ? 'Seleccione uno o más AWBs para añadirlos al listado de pickup.' 
