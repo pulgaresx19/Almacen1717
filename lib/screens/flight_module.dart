@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
@@ -101,6 +102,8 @@ class _FlightModuleState extends State<FlightModule> {
                 ),
                 child: TextField(
                   controller: _searchController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
                   style: TextStyle(color: textP, fontSize: 13),
                   onChanged: (v) => setState(() {}),
                   decoration: InputDecoration(
@@ -153,29 +156,32 @@ class _FlightModuleState extends State<FlightModule> {
         const SizedBox(height: 30),
         
         // Flight Table
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderCard),
+        if (_showAddForm)
+          Expanded(
+            child: AddFlightScreen(
+              key: _addFlightKey,
+              isInline: true,
+              onPop: (bool isSaved) {
+                setState(() {
+                  _showAddForm = false;
+                });
+              },
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: _showAddForm
-                  ? AddFlightScreen(
-                      key: _addFlightKey,
-                      isInline: true,
-                      onPop: (bool isSaved) {
-                        setState(() {
-                          _showAddForm = false;
-                        });
-                      },
-                    )
-                  : _buildFlightList(dark),
+          )
+        else
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: bgCard,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderCard),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _buildFlightList(dark),
+              ),
             ),
           ),
-        ),
       ],
     );
      }
@@ -550,7 +556,27 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
 
       if (mounted) {
         setState(() {
-          _ulds = List<Map<String, dynamic>>.from(resUlds);
+          var fetchedUlds = List<Map<String, dynamic>>.from(resUlds);
+          fetchedUlds.sort((a, b) {
+            String numA = a['ULD-number']?.toString().toUpperCase() ?? '';
+            String numB = b['ULD-number']?.toString().toUpperCase() ?? '';
+            
+            bool isBulkA = numA.contains('BULK');
+            bool isBulkB = numB.contains('BULK');
+            
+            if (isBulkA && !isBulkB) return -1;
+            if (!isBulkA && isBulkB) return 1;
+            
+            bool isBreakA = a['isBreak'] == true;
+            bool isBreakB = b['isBreak'] == true;
+            
+            if (isBreakA && !isBreakB) return -1;
+            if (!isBreakA && isBreakB) return 1;
+            
+            return numA.compareTo(numB);
+          });
+          
+          _ulds = fetchedUlds;
           _isLoading = false;
         });
       }

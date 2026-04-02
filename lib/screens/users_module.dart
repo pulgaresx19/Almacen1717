@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode;
 import 'add_user_screen.dart';
@@ -99,6 +100,8 @@ class _UsersModuleState extends State<UsersModule> {
                 ),
                 child: TextField(
                   controller: _searchController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
                   style: TextStyle(color: textP, fontSize: 13),
                   onChanged: (v) => setState(() {}),
                   decoration: InputDecoration(

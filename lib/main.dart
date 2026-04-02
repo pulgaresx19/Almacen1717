@@ -35,7 +35,7 @@ class AlmacenApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       scaffoldMessengerKey: scaffoldMessengerKey,
-      title: 'Almacén 1717',
+      title: 'Warehouse 1717',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         fontFamily: 'Inter',
@@ -66,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen>
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isPasswordObscured = true;
 
   @override
   void initState() {
@@ -95,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (email.isEmpty || password.isEmpty) {
       scaffoldMessengerKey.currentState?.showSnackBar(
-        const SnackBar(content: Text('Por favor llena todos los campos')),
+        const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
@@ -207,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen>
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const Text(
-                              'Almacén 1717',
+                              'Warehouse 1717',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 28,
@@ -217,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Ingresa al sistema',
+                              'Sign in to your account',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
@@ -227,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen>
                             const SizedBox(height: 30),
 
                             const Text(
-                              'Correo Electrónico',
+                              'Email Address',
                               style: TextStyle(
                                 color: Color(0xFFcbd5e1),
                                 fontSize: 14,
@@ -236,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                             const SizedBox(height: 8),
                             _buildTextField(
-                              'ejemplo@correo.com',
+                              'example@email.com',
                               false,
                               _emailController,
                             ),
@@ -244,7 +245,7 @@ class _LoginScreenState extends State<LoginScreen>
                             const SizedBox(height: 20),
 
                             const Text(
-                              'Contraseña',
+                              'Password',
                               style: TextStyle(
                                 color: Color(0xFFcbd5e1),
                                 fontSize: 14,
@@ -303,7 +304,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         ),
                                       )
                                     : const Text(
-                                        'Iniciar Sesión',
+                                        'Sign In',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 16,
@@ -340,12 +341,12 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _buildTextField(
     String hintText,
-    bool obscureText,
+    bool isPassword,
     TextEditingController controller,
   ) {
     return TextField(
       controller: controller,
-      obscureText: obscureText,
+      obscureText: isPassword ? _isPasswordObscured : false,
       enableSuggestions: false,
       autocorrect: false,
       autofillHints: const ['off'],
@@ -359,6 +360,21 @@ class _LoginScreenState extends State<LoginScreen>
           horizontal: 16,
           vertical: 14,
         ),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _isPasswordObscured
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                  color: Colors.white.withAlpha(128),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isPasswordObscured = !_isPasswordObscured;
+                  });
+                },
+              )
+            : null,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.white.withAlpha(25)),
@@ -464,7 +480,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                'Almacén 1717',
+                                'Warehouse 1717',
                                 style: TextStyle(
                                   color: textP,
                                   fontSize: 20,
@@ -502,7 +518,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 3,
                               ),
                               _buildNavItem(
-                                Icons.airport_shuttle_rounded,
+                                Icons.local_shipping_outlined,
                                 'Delivers',
                                 4,
                               ),

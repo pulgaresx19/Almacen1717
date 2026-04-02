@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../main.dart' show isDarkMode, appLanguage;
 
 class AddUldScreen extends StatefulWidget {
   final Function(bool)? onPop;
@@ -16,6 +17,7 @@ class AddUldScreenState extends State<AddUldScreen> {
   final _piecesCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
+  final _searchUldCtrl = TextEditingController();
   
   String? _selectedFlight;
   bool _isPriority = false;
@@ -55,6 +57,7 @@ class AddUldScreenState extends State<AddUldScreen> {
     _piecesCtrl.dispose();
     _weightCtrl.dispose();
     _remarksCtrl.dispose();
+    _searchUldCtrl.dispose();
     super.dispose();
   }
 
@@ -103,29 +106,66 @@ class AddUldScreenState extends State<AddUldScreen> {
   void _showRequiredFieldError(BuildContext context, String fieldName) {
     showDialog(
       context: context,
-      builder: (c) => AlertDialog(
+      builder: (alertCtx) => AlertDialog(
         backgroundColor: const Color(0xFF1e293b),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFef4444).withAlpha(100), width: 2)),
-        title: const Column(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Colors.redAccent.withAlpha(50)),
+        ),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, color: Color(0xFFef4444), size: 60),
-            SizedBox(height: 16),
-            Text('Action Required', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Action Required',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFFcbd5e1),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFef4444),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () => Navigator.pop(alertCtx),
+                child: const Text(
+                  'UNDERSTOOD',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
-        content: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text('The field "$fieldName" is missing.\nPlease provide this information to proceed.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4)),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFef4444), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0)),
-            onPressed: () => Navigator.pop(c),
-            child: const Text('UNDERSTOOD', style: TextStyle(fontWeight: FontWeight.bold)),
-          )
-        ],
-      )
+      ),
     );
   }
 
@@ -537,170 +577,258 @@ class AddUldScreenState extends State<AddUldScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isInline) {
-      return _buildFormContent();
-    }
-    return Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
-      appBar: AppBar(
-        title: const Text('Add New ULDs'),
-        backgroundColor: const Color(0xFF1e293b),
-        elevation: 0,
-      ),
-      body: _buildFormContent(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (context, dark, child) {
+        final textP = dark ? Colors.white : const Color(0xFF111827);
+        final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+
+        final content = _buildFormContent(dark, textP, bgCard, borderC);
+
+        if (widget.isInline) {
+          return content;
+        }
+
+        return Scaffold(
+          backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
+          appBar: AppBar(
+            title: Text('Add New ULDs', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
+            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            elevation: 0,
+            iconTheme: IconThemeData(color: textP),
+            bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),
+          ),
+          body: Padding(padding: const EdgeInsets.all(24), child: content),
+        );
+      },
     );
   }
 
-  Widget _buildFormContent() {
+  Widget _buildFormContent(bool dark, Color textP, Color bgCard, Color borderC) {
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('ULD Details & Assignment', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      double rWidth = constraints.maxWidth - 844; 
-                      if (rWidth < 180) rWidth = 180;
-                      return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        crossAxisAlignment: WrapCrossAlignment.end,
-                        children: [
-                          SizedBox(width: 130, child: _buildTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true)),
-                          SizedBox(width: 200, child: _buildFlightDropdown(
-                            titleTrailing: SizedBox(
-                              width: 20, height: 20,
-                              child: Checkbox(
-                                value: _isFlightChk,
-                                activeColor: const Color(0xFF6366f1),
-                                side: const BorderSide(color: Color(0xFF94a3b8)),
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                onChanged: (v) => setState(() => _isFlightChk = v ?? true),
-                              )
-                            )
-                          )),
-                          SizedBox(width: 90, child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, digitsOnly: true, disabled: _isPiecesChk,
-                            titleTrailing: SizedBox(
-                              width: 20, height: 20,
-                              child: Checkbox(
-                                value: _isPiecesChk,
-                                activeColor: const Color(0xFF6366f1),
-                                side: const BorderSide(color: Color(0xFF94a3b8)),
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                onChanged: (v) => setState(() {
-                                  _isPiecesChk = v ?? true;
-                                  _piecesCtrl.text = _isPiecesChk ? 'Auto' : '';
-                                }),
-                              )
-                            )
-                          )),
-                          SizedBox(width: 90, child: _buildTextField('Weight', _weightCtrl, '0.0', isNum: true, allowDecimal: true, disabled: _isWeightChk,
-                            titleTrailing: SizedBox(
-                              width: 20, height: 20,
-                              child: Checkbox(
-                                value: _isWeightChk,
-                                activeColor: const Color(0xFF6366f1),
-                                side: const BorderSide(color: Color(0xFF94a3b8)),
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                onChanged: (v) => setState(() {
-                                  _isWeightChk = v ?? true;
-                                  _weightCtrl.text = _isWeightChk ? 'Auto' : '';
-                                }),
-                              )
-                            )
-                          )),
-                          SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...')),
-                          SizedBox(
-                            width: 65,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderC),
+                ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                  const Text('Priority?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                                  Switch(value: _isPriority, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isPriority = v)),
+                                Icon(Icons.assignment_rounded, color: textP, size: 20),
+                                const SizedBox(width: 8),
+                                Text('ULD Details & Assignment', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
                               ],
                             ),
-                          ),
-                          SizedBox(
-                            width: 65,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                  const Text('Break?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
-                                  Switch(value: _isBreak, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isBreak = v)),
-                              ],
+                            const SizedBox(height: 24),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                double rWidth = constraints.maxWidth - 845; 
+                                if (rWidth < 180) rWidth = 180;
+                                return Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  crossAxisAlignment: WrapCrossAlignment.end,
+                                  children: [
+                                    SizedBox(width: 130, child: _buildTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true)),
+                                    SizedBox(width: 200, child: _buildFlightDropdown(
+                                      titleTrailing: SizedBox(
+                                        width: 20, height: 20,
+                                        child: Checkbox(
+                                          value: _isFlightChk,
+                                          activeColor: const Color(0xFF6366f1),
+                                          side: const BorderSide(color: Color(0xFF94a3b8)),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          onChanged: (v) => setState(() => _isFlightChk = v ?? true),
+                                        )
+                                      )
+                                    )),
+                                    SizedBox(width: 90, child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, digitsOnly: true, disabled: _isPiecesChk,
+                                      titleTrailing: SizedBox(
+                                        width: 20, height: 20,
+                                        child: Checkbox(
+                                          value: _isPiecesChk,
+                                          activeColor: const Color(0xFF6366f1),
+                                          side: const BorderSide(color: Color(0xFF94a3b8)),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          onChanged: (v) => setState(() {
+                                            _isPiecesChk = v ?? true;
+                                            _piecesCtrl.text = _isPiecesChk ? 'Auto' : '';
+                                          }),
+                                        )
+                                      )
+                                    )),
+                                    SizedBox(width: 90, child: _buildTextField('Weight', _weightCtrl, '0.0', isNum: true, allowDecimal: true, disabled: _isWeightChk,
+                                      titleTrailing: SizedBox(
+                                        width: 20, height: 20,
+                                        child: Checkbox(
+                                          value: _isWeightChk,
+                                          activeColor: const Color(0xFF6366f1),
+                                          side: const BorderSide(color: Color(0xFF94a3b8)),
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          onChanged: (v) => setState(() {
+                                            _isWeightChk = v ?? true;
+                                            _weightCtrl.text = _isWeightChk ? 'Auto' : '';
+                                          }),
+                                        )
+                                      )
+                                    )),
+                                    SizedBox(width: rWidth, child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...')),
+                                    SizedBox(
+                                      width: 65,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                            const Text('Priority?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
+                                            Switch(value: _isPriority, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isPriority = v)),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 65,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                            const Text('Break?', style: TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w500)),
+                                            Switch(value: _isBreak, activeThumbColor: const Color(0xFF6366f1), onChanged: (v) => setState(() => _isBreak = v)),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 120, height: 48,
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                                          foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        onPressed: _addLocalUld,
+                                        child: const Text('+ Add ULD', style: TextStyle(fontWeight: FontWeight.w600)),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }
                             ),
-                          ),
-                          SizedBox(
-                            width: 120,
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: _addLocalUld,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white.withAlpha(25),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                side: BorderSide(color: Colors.white.withAlpha(25)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('+ Add ULD', style: TextStyle(fontWeight: FontWeight.w600)),
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-                  ),
-
-                  const SizedBox(height: 32),
-                  const Divider(color: Color(0xFF334155)),
+                          ],
+                        ),
+                      ),
                   const SizedBox(height: 16),
 
-                  // Native table of added ULDs
-                  if (_localUlds.isNotEmpty)
-                    Container(
+                  // Persistent Container for Native table of added ULDs
+                  Expanded(
+                    child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(5), 
-                        borderRadius: BorderRadius.circular(8), 
-                        border: Border.all(color: Colors.white.withAlpha(25)),
+                        color: bgCard, 
+                        borderRadius: BorderRadius.circular(16), 
+                        border: Border.all(color: borderC),
                       ),
-                      child: Builder(
-                        builder: (context) {
-                          Map<String, List<Map<String, dynamic>>> groupedUlds = {};
-                          for (int i = 0; i < _localUlds.length; i++) {
-                            final u = _localUlds[i];
-                            final groupKey = u['flightLabel'] ?? 'Standalone ULDs';
-                            groupedUlds.putIfAbsent(groupKey, () => []);
-                            groupedUlds[groupKey]!.add({'index': i, 'uld': u});
-                          }
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: groupedUlds.entries.map((group) {
-                              final groupName = group.key;
-                              final groupItems = group.value;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(10),
-                                      border: Border(bottom: BorderSide(color: Colors.white.withAlpha(20)))
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.list_alt_rounded, color: textP, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('Added ULDs', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                    const Spacer(),
+                                    Container(
+                                       width: 300,
+                                       height: 40,
+                                       decoration: BoxDecoration(
+                                          color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: borderC),
+                                       ),
+                                       child: TextField(
+                                          controller: _searchUldCtrl,
+                                          style: TextStyle(color: textP, fontSize: 13),
+                                          onChanged: (v) => setState(() {}),
+                                          decoration: InputDecoration(
+                                             hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...',
+                                             hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                                             prefixIcon: Icon(Icons.search_rounded, color: textP.withAlpha(76), size: 16),
+                                             border: InputBorder.none,
+                                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                          ),
+                                       ),
                                     ),
-                                    child: Row(
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  appLanguage.value == 'es' ? 'Vea y gestione todos los ULDs nuevos que serán guardados.' : 'View and manage all new ULDs that will be saved.', 
+                                  style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 13)
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: borderC),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: _localUlds.isNotEmpty
+                                    ? Builder(
+                                        builder: (context) {
+                                          Map<String, List<Map<String, dynamic>>> groupedUlds = {};
+                                          for (int i = 0; i < _localUlds.length; i++) {
+                                            final u = _localUlds[i];
+                                            if (_searchUldCtrl.text.isNotEmpty) {
+                                              final term = _searchUldCtrl.text.toLowerCase();
+                                              final number = (u['uldNumber'] ?? u['ULD-number'] ?? '').toString().toLowerCase();
+                                              if (!number.contains(term)) continue;
+                                            }
+                                            final groupKey = u['flightLabel'] ?? 'Standalone ULDs';
+                                            groupedUlds.putIfAbsent(groupKey, () => []);
+                                            groupedUlds[groupKey]!.add({'index': i, 'uld': u});
+                                          }
+                
+                                          return SingleChildScrollView(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: groupedUlds.entries.map((group) {
+                                final groupName = group.key;
+                                final groupItems = group.value;
+  
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                                        border: Border(bottom: BorderSide(color: borderC))
+                                      ),
+                                      child: Row(
                                       children: [
                                         Icon(groupName == 'Standalone ULDs' ? Icons.inventory_2_outlined : Icons.flight_takeoff_rounded, color: const Color(0xFF94a3b8), size: 16),
                                         const SizedBox(width: 8),
-                                        Text(groupName, style: const TextStyle(color: Color(0xFFcbd5e1), fontWeight: FontWeight.bold, fontSize: 13)),
+                                        Text(groupName, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13)),
                                         const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -735,7 +863,7 @@ class AddUldScreenState extends State<AddUldScreen> {
                                       return Column(
                                         children: [
                                           Container(
-                                            color: Colors.white.withAlpha(15),
+                                            color: dark ? Colors.white.withAlpha(15) : Colors.white,
                                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                             margin: const EdgeInsets.only(bottom: 2),
                                             child: Row(
@@ -747,41 +875,41 @@ class AddUldScreenState extends State<AddUldScreen> {
                                                       Container(
                                                         width: 32, height: 32,
                                                         alignment: Alignment.center,
-                                                        decoration: const BoxDecoration(color: Color(0x326366f1), shape: BoxShape.circle),
+                                                        decoration: BoxDecoration(color: dark ? const Color(0x326366f1) : const Color(0xFFEEF2FF), shape: BoxShape.circle),
                                                         child: Text('${groupIndex + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 13)),
                                                       ),
                                                       const SizedBox(width: 12),
                                                       SizedBox(
                                                       width: 115,
-                                                      child: Text(u['uldNumber'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5))
+                                                      child: Text(u['uldNumber'] ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5))
                                                     ),
                                                     const SizedBox(width: 16),
                                                     Container(
                                                       width: 95,
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
-                                                      decoration: BoxDecoration(color: Colors.white.withAlpha(15), borderRadius: BorderRadius.circular(6)), 
-                                                      child: Text('Pieces: ${u['pieces']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12))
+                                                      decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)), 
+                                                      child: Text('Pieces: ${u['pieces']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 12))
                                                     ),
                                                     const SizedBox(width: 12),
                                                     Container(
                                                       width: 95,
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
-                                                      decoration: BoxDecoration(color: Colors.white.withAlpha(15), borderRadius: BorderRadius.circular(6)), 
-                                                      child: Text('Weight: ${u['weight']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12))
+                                                      decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)), 
+                                                      child: Text('Weight: ${u['weight']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 12))
                                                     ),
                                                     const SizedBox(width: 12),
                                                     Container(
                                                       width: 90,
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
-                                                      decoration: BoxDecoration(color: (u['priority'] == true) ? const Color(0xFFf59e0b).withAlpha(50) : Colors.white.withAlpha(15), borderRadius: BorderRadius.circular(6)), 
-                                                      child: Text('Priority: ${(u['priority'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['priority'] == true) ? const Color(0xFFfde68a) : const Color(0xFFcbd5e1), fontSize: 12, fontWeight: (u['priority'] == true) ? FontWeight.bold : FontWeight.normal))
+                                                      decoration: BoxDecoration(color: (u['priority'] == true) ? const Color(0xFFf59e0b).withAlpha(50) : (dark ? Colors.white.withAlpha(15) : const Color(0xFFF1F5F9)), borderRadius: BorderRadius.circular(6)), 
+                                                      child: Text('Priority: ${(u['priority'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['priority'] == true) ? (dark ? const Color(0xFFfde68a) : const Color(0xFFD97706)) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569)), fontSize: 12, fontWeight: (u['priority'] == true) ? FontWeight.bold : FontWeight.normal))
                                                     ),
                                                     const SizedBox(width: 12),
                                                     Container(
                                                       width: 80,
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), 
                                                       decoration: BoxDecoration(color: (u['break'] == true) ? const Color(0xFF10b981).withAlpha(50) : const Color(0xFFef4444).withAlpha(50), borderRadius: BorderRadius.circular(6)), 
-                                                      child: Text('Break: ${(u['break'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['break'] == true) ? const Color(0xFF6ee7b7) : const Color(0xFFfca5a5), fontSize: 12, fontWeight: FontWeight.bold))
+                                                      child: Text('Break: ${(u['break'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['break'] == true) ? (dark ? const Color(0xFF6ee7b7) : const Color(0xFF059669)) : (dark ? const Color(0xFFfca5a5) : const Color(0xFFDC2626)), fontSize: 12, fontWeight: FontWeight.bold))
                                                     ),
                                                     const SizedBox(width: 16),
                                                     if (u['remarks'] != null && u['remarks'].toString().isNotEmpty)
@@ -798,12 +926,12 @@ class AddUldScreenState extends State<AddUldScreen> {
                                                     width: 32, height: 32,
                                                     alignment: Alignment.center,
                                                     decoration: BoxDecoration(
-                                                      color: Colors.white.withAlpha(15), 
+                                                      color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE2E8F0), 
                                                       shape: BoxShape.circle
                                                     ),
                                                     child: Text(
                                                       '${awbs.length}', 
-                                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
+                                                      style: TextStyle(color: dark ? Colors.white : const Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 13)
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
@@ -861,19 +989,19 @@ class AddUldScreenState extends State<AddUldScreen> {
                                               final a = entry.value;
                                               return TableRow(
                                                 children: [
-                                                  Padding(padding: const EdgeInsets.all(8), child: Container(width: 24, height: 24, decoration: const BoxDecoration(color: Color(0x14ffffff), shape: BoxShape.circle), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))))),
-                                                  Padding(padding: const EdgeInsets.only(left: 8, right: 32, top: 8, bottom: 8), child: Text(a['awb_number'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600))),
+                                                  Padding(padding: const EdgeInsets.all(8), child: Container(width: 24, height: 24, decoration: BoxDecoration(color: dark ? const Color(0x326366f1) : const Color(0xFFEEF2FF), shape: BoxShape.circle), child: Center(child: Text('${aInt + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.bold))))),
+                                                  Padding(padding: const EdgeInsets.only(left: 8, right: 32, top: 8, bottom: 8), child: Text(a['awb_number'], style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600))),
                                                   Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [
                                                     const TextSpan(text: 'PIECES: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                    TextSpan(text: '${a['pieces']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13)),
+                                                    TextSpan(text: '${a['pieces']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 13)),
                                                   ]))),
                                                   Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [
                                                     const TextSpan(text: 'TOTAL: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                    TextSpan(text: '${a['total'] ?? 0}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13)),
+                                                    TextSpan(text: '${a['total'] ?? 0}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 13)),
                                                   ]))),
                                                   Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [
                                                     const TextSpan(text: 'WEIGHT: ', style: TextStyle(color: Color(0xFF64748b), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                    TextSpan(text: '${a['weight']}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 13)),
+                                                    TextSpan(text: '${a['weight']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 13)),
                                                   ]))),
                                                   Padding(padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8), child: RichText(
                                                     maxLines: 1,
@@ -897,8 +1025,8 @@ class AddUldScreenState extends State<AddUldScreen> {
                                                               showDialog(
                                                                 context: ctx,
                                                                 builder: (c) => Dialog(
-                                                                  backgroundColor: const Color(0xFF1e293b),
-                                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(20))),
+                                                                  backgroundColor: bgCard,
+                                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: borderC)),
                                                                   child: Container(
                                                                     width: 320,
                                                                     padding: const EdgeInsets.all(20),
@@ -906,7 +1034,7 @@ class AddUldScreenState extends State<AddUldScreen> {
                                                                       mainAxisSize: MainAxisSize.min,
                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                       children: [
-                                                                        Text('House Numbers (${items.length})', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                                        Text('House Numbers (${items.length})', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                                                                         const SizedBox(height: 16),
                                                                         Flexible(
                                                                           child: SingleChildScrollView(
@@ -919,11 +1047,11 @@ class AddUldScreenState extends State<AddUldScreen> {
                                                                                     Container(
                                                                                       width: 20, height: 20,
                                                                                       alignment: Alignment.center,
-                                                                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle),
+                                                                                      decoration: BoxDecoration(color: dark ? const Color(0xFF6366f1).withAlpha(40) : const Color(0xFFEEF2FF), shape: BoxShape.circle),
                                                                                       child: Text('${ent.key + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
                                                                                     ),
                                                                                     const SizedBox(width: 12),
-                                                                                    Expanded(child: Text(ent.value, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14))),
+                                                                                    Expanded(child: Text(ent.value, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF475569), fontSize: 14))),
                                                                                   ],
                                                                                 ),
                                                                               )).toList(),
@@ -944,13 +1072,13 @@ class AddUldScreenState extends State<AddUldScreen> {
                                                           borderRadius: BorderRadius.circular(12),
                                                           child: Container(
                                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                            decoration: BoxDecoration(color: const Color(0xFF1e293b), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFF334155))),
+                                                            decoration: BoxDecoration(color: dark ? const Color(0xFF1e293b) : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
                                                             child: Row(
                                                               mainAxisSize: MainAxisSize.min,
                                                               children: [
-                                                                const Icon(Icons.maps_home_work_outlined, size: 12, color: Color(0xFFcbd5e1)),
+                                                                Icon(Icons.maps_home_work_outlined, size: 12, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF64748b)),
                                                                 const SizedBox(width: 4),
-                                                                Text('${items.length} HAWB', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 11)),
+                                                                Text('${items.length} HAWB', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF64748b), fontSize: 11)),
                                                               ],
                                                             ),
                                                           ),
@@ -990,41 +1118,50 @@ class AddUldScreenState extends State<AddUldScreen> {
                                 ],
                               );
                             }).toList(),
-                          );
-                        }
+                                        )
+                                      );
+                                    }
+                                  )
+                                : Center(
+                                    child: Text(
+                                      'No ULDs added yet',
+                                      style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 13, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+                  // Bottom Pinned Action Bar
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                        ),
+                        onPressed: _isSaving ? null : _saveAllUlds,
+                        icon: _isSaving 
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.check_rounded),
+                        label: Text(
+                          _isSaving ? 'Processing...' : 'Save ULDs', 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
+                        ),
                       ),
                     ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Bottom Pinned Action Bar
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.only(right: 24.0, bottom: 24.0),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366f1),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                ),
-                onPressed: _isSaving ? null : _saveAllUlds,
-                icon: _isSaving 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.check_rounded),
-                label: Text(
-                  _isSaving ? 'Processing...' : 'Save ULDs', 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
-                ),
-              ),
-            ),
+                  ),
+            ],
           ),
         ),
       ],

@@ -271,86 +271,107 @@ class AddUserScreenState extends State<AddUserScreen> {
         final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
         final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
 
-        final padding = widget.isInline ? const EdgeInsets.all(24) : const EdgeInsets.all(32);
-
         Widget content = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField('Full Name', _nameCtrl, dark, Icons.person_rounded),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderC),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTextField('Email', _emailCtrl, dark, Icons.email_rounded, keyboardType: TextInputType.emailAddress),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.person_add_alt_1_rounded, color: textP, size: 20),
+                              const SizedBox(width: 8),
+                              Text('User Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField('Full Name', _nameCtrl, dark, Icons.person_rounded),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildTextField('Email', _emailCtrl, dark, Icons.email_rounded, keyboardType: TextInputType.emailAddress),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField('Password', _passwordCtrl, dark, Icons.lock_rounded, obscureText: true),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildTextField('Phone Number', _phoneCtrl, dark, Icons.phone_rounded, keyboardType: TextInputType.phone, inputFormatters: [_PhoneFormatter()]),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildDropdownField('Position', _position, _positions, (v) => setState(() => _position = v!), dark, Icons.work_rounded),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildTextField('Building', _buildingCtrl, dark, Icons.domain_rounded),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildDropdownField('Shift', _shift, _shifts, (v) => setState(() => _shift = v!), dark, Icons.schedule_rounded),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField('Password', _passwordCtrl, dark, Icons.lock_rounded, obscureText: true),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTextField('Phone Number', _phoneCtrl, dark, Icons.phone_rounded, keyboardType: TextInputType.phone, inputFormatters: [_PhoneFormatter()]),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDropdownField('Position', _position, _positions, (v) => setState(() => _position = v!), dark, Icons.work_rounded),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildTextField('Building', _buildingCtrl, dark, Icons.domain_rounded),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildDropdownField('Shift', _shift, _shifts, (v) => setState(() => _shift = v!), dark, Icons.schedule_rounded),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _saveUser,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366f1),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              appLanguage.value == 'es' ? 'Guardar Usuario' : 'Save User',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
                     ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _isLoading ? null : _saveUser,
+                  icon: _isLoading
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.check_rounded),
+                  label: Text(
+                    _isLoading ? 'Processing...' : (appLanguage.value == 'es' ? 'Guardar Usuario' : 'Save User'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
-                ],
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                  ),
+                ),
               ),
             ),
           ],
         );
 
         if (widget.isInline) {
-          return Container(
-            color: Colors.transparent,
-            padding: padding,
-            child: content,
-          );
+          return content;
         }
 
         return Scaffold(
@@ -364,27 +385,9 @@ class AddUserScreenState extends State<AddUserScreen> {
               style: TextStyle(color: textP, fontWeight: FontWeight.bold),
             ),
           ),
-          body: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 800),
-                decoration: BoxDecoration(
-                  color: bgCard,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: borderC),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(dark ? 50 : 10),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    )
-                  ],
-                ),
-                padding: padding,
-                child: content,
-              ),
-            ),
+          body: Padding(
+            padding: const EdgeInsets.all(24),
+            child: content,
           ),
         );
       },

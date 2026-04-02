@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode;
 import 'add_deliver_screen.dart';
@@ -117,6 +119,8 @@ class _DeliversModuleState extends State<DeliversModule> {
                     ),
                     child: TextField(
                       controller: _searchController,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
                       style: TextStyle(color: textP, fontSize: 13),
                       onChanged: (v) => setState(() {}),
                       decoration: InputDecoration(
@@ -197,6 +201,18 @@ class _DeliversModuleState extends State<DeliversModule> {
   
                         var items = snapshot.data ?? [];
                       
+                        items.sort((a, b) {
+                          final taStr = a['time-deliver']?.toString() ?? '';
+                          final tbStr = b['time-deliver']?.toString() ?? '';
+                          if (taStr.isEmpty && tbStr.isNotEmpty) return 1;
+                          if (taStr.isNotEmpty && tbStr.isEmpty) return -1;
+                          if (taStr.isEmpty && tbStr.isEmpty) return 0;
+                          
+                          final da = DateTime.tryParse(taStr) ?? DateTime(1970);
+                          final db = DateTime.tryParse(tbStr) ?? DateTime(1970);
+                          return da.compareTo(db);
+                        });
+
                       if (_searchController.text.isNotEmpty) {
                         final term = _searchController.text.toLowerCase();
                         items = items.where((u) => u.toString().toLowerCase().contains(term)).toList();
@@ -237,7 +253,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                                     String timeStr = '-';
                                     if (u['time-deliver'] != null) {
                                       final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
-                                      if (tdt != null) timeStr = '${tdt.hour.toString().padLeft(2, '0')}:${tdt.minute.toString().padLeft(2, '0')}';
+                                      if (tdt != null) timeStr = DateFormat('hh:mm a').format(tdt);
                                     }
 
                                     String awbsStr = '0';
@@ -297,8 +313,12 @@ class _DeliversModuleState extends State<DeliversModule> {
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-        final bg = dark ? const Color(0xFF0f172a) : Colors.white;
+        final Set<String> editingKeys = {};
+        final Map<String, dynamic> tempU = Map.from(u);
+        return StatefulBuilder(
+          builder: (context, setDrawerState) {
+            final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+            final bg = dark ? const Color(0xFF0f172a) : Colors.white;
         final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
         final textP = dark ? Colors.white : const Color(0xFF111827);
         final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
@@ -390,16 +410,22 @@ class _DeliversModuleState extends State<DeliversModule> {
                                   Row(children: [Icon(Icons.local_shipping_outlined, size: 16, color: textP), const SizedBox(width: 8), Text('Delivery Details', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
                                   const SizedBox(height: 12),
                                   Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(child: _buildInfoCard('Type', u['type']?.toString() ?? '-', Icons.local_shipping_outlined, textP, textS)),
-                                      Expanded(child: _buildInfoCard('Door', u['door']?.toString() ?? '-', Icons.door_front_door_outlined, textP, textS)),
-                                      Expanded(child: _buildInfoCard('Priority', u['isPriority'] == true ? 'High Priority' : 'Normal', Icons.star_outline, textP, textS, iconColor: u['isPriority'] == true ? Colors.orange : null)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Type', 'type', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.local_shipping_outlined, isTypeDropdown: true)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Door', 'door', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.door_front_door_outlined)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Priority', 'isPriority', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
                                     ],
                                   ),
-                                  if (u['remarks'] != null && u['remarks'].toString().isNotEmpty) ...[
-                                    const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                                    _buildInfoCard('Remarks', u['remarks'].toString(), Icons.notes, textP, textS),
-                                  ],
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(flex: 1, child: _buildDeliverEditableCard(context, 'Time', 'time-deliver', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.access_time_rounded, isTime: true)),
+                                      const SizedBox(width: 16),
+                                      Expanded(flex: 2, child: _buildDeliverEditableCard(context, 'Remarks', 'remarks', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.notes, isRemarks: true)),
+                                    ],
+                                  ),
                                ]
                              )
                           ),
@@ -442,6 +468,8 @@ class _DeliversModuleState extends State<DeliversModule> {
             ),
           ),
         );
+          },
+        );
       },
       transitionBuilder: (context, anim1, anim2, child) {
         return SlideTransition(
@@ -452,7 +480,7 @@ class _DeliversModuleState extends State<DeliversModule> {
     );
   }
 
-  Widget _buildInfoCard(String label, String val, IconData icon, Color textP, Color textS, {Color? iconColor}) {
+  Widget _buildInfoCard(String label, String val, IconData icon, Color textP, Color textS, {Color? iconColor, bool isEditable = false, VoidCallback? onEdit}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -464,10 +492,268 @@ class _DeliversModuleState extends State<DeliversModule> {
               Icon(icon, color: iconColor ?? textS, size: 14),
               const SizedBox(width: 6),
               Expanded(child: Text(label, style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
+              if (isEditable)
+                InkWell(
+                  onTap: onEdit,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Icon(Icons.edit_rounded, color: textS, size: 14),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 6),
           Text(val, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveDeliverField(dynamic id, String fieldKey, dynamic val, Map<String, dynamic> u, StateSetter setDrawerState) async {
+    if (id == null) return;
+    try {
+      await Supabase.instance.client.from('Delivers').update({fieldKey: val}).eq('id', id);
+      u[fieldKey] = val;
+      setDrawerState(() {});
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Error updating $fieldKey: $e');
+    }
+  }
+
+  Widget _buildDeliverEditableCard(
+    BuildContext context, 
+    String label, 
+    String key, 
+    Map<String, dynamic> u, 
+    Set<String> editingKeys, 
+    Map<String, dynamic> tempU,
+    StateSetter setDrawerState, 
+    bool dark, 
+    Color colorL, 
+    Color colorP, 
+    {IconData? icon, bool isTime = false, bool isRemarks = false, bool isPriority = false, bool isTypeDropdown = false}
+  ) {
+    final isEditingThisField = editingKeys.contains(key);
+
+    if (!isEditingThisField) {
+      String displayValue = '${u[key] ?? '-'}';
+      
+      if (isTime) {
+         displayValue = '-';
+         if (u['time-deliver'] != null) {
+           final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
+           if (tdt != null) displayValue = DateFormat('hh:mm a').format(tdt);
+         }
+      } else if (isPriority) {
+         displayValue = (u[key] == true) ? 'High Priority' : 'Normal';
+      } else if (isRemarks) {
+         displayValue = (u['remarks']?.toString() ?? '').isEmpty ? 'No remarks' : u['remarks'].toString();
+      }
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, color: colorL, size: 14),
+                        const SizedBox(width: 4),
+                      ],
+                      Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                    ],
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    tempU[key] = u[key];
+                    setDrawerState(() => editingKeys.add(key));
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Icon(Icons.edit_rounded, color: colorL, size: 12),
+                  ),
+                )
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(displayValue, style: TextStyle(color: colorP, fontSize: 13, fontWeight: FontWeight.bold), overflow: isRemarks ? null : TextOverflow.ellipsis),
+          ],
+        ),
+      );
+    }
+    
+    final inputBorderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+    Widget editor;
+
+    if (isTime) {
+      String tStr = '-';
+      if (tempU['time-deliver'] != null) {
+        final tdt = DateTime.tryParse(tempU['time-deliver'].toString())?.toLocal();
+        if (tdt != null) tStr = DateFormat('hh:mm a').format(tdt);
+      }
+      editor = InkWell(
+        onTap: () async {
+          final tdt = DateTime.tryParse(u['time-deliver']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+          final TimeOfDay? picked = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay(hour: tdt.hour, minute: tdt.minute),
+            builder: (context, child) => Theme(
+                data: ThemeData.dark().copyWith(
+                  colorScheme: const ColorScheme.dark(primary: Color(0xFF6366f1), surface: Color(0xFF1e293b)),
+                ),
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+                  child: child!,
+                ),
+            )
+          );
+          if (picked != null) {
+             final now = DateTime.now();
+             final newDate = DateTime(now.year, now.month, now.day, picked.hour, picked.minute).toUtc();
+             _saveDeliverField(u['id'], key, newDate.toIso8601String(), u, setDrawerState);
+             setDrawerState(() => editingKeys.remove(key));
+          }
+        },
+        child: Container(
+          width: double.infinity,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+          child: Text(tStr, style: TextStyle(color: colorP, fontSize: 12), textAlign: TextAlign.center),
+        ),
+      );
+    } else if (isTypeDropdown) {
+      String currentType = tempU[key]?.toString() ?? 'Walk-in';
+      if (!['Walk-in', 'Transfer', 'Priority Load'].contains(currentType)) currentType = 'Walk-in';
+      editor = Container(
+        height: 32,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: currentType,
+            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            isExpanded: true,
+            style: TextStyle(color: colorP, fontSize: 12),
+            items: const [
+              DropdownMenuItem(value: 'Walk-in', child: Text('Walk-in')),
+              DropdownMenuItem(value: 'Transfer', child: Text('Transfer')),
+              DropdownMenuItem(value: 'Priority Load', child: Text('Priority Load')),
+            ],
+            onChanged: (v) {
+              if (v != null) {
+                _saveDeliverField(u['id'], key, v, u, setDrawerState);
+                setDrawerState(() => editingKeys.remove(key));
+              }
+            },
+          ),
+        ),
+      );
+    } else if (isPriority) {
+      editor = Container(
+        height: 32,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<bool>(
+            value: tempU[key] == true,
+            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            isExpanded: true,
+            style: TextStyle(color: colorP, fontSize: 12),
+            items: const [
+              DropdownMenuItem(value: true, child: Text('High Priority')),
+              DropdownMenuItem(value: false, child: Text('Normal')),
+            ],
+            onChanged: (v) {
+              if (v != null) {
+                _saveDeliverField(u['id'], key, v, u, setDrawerState);
+                setDrawerState(() => editingKeys.remove(key));
+              }
+            },
+          ),
+        ),
+      );
+    } else {
+      final ctrl = TextEditingController(text: tempU[key]?.toString() ?? '')..selection = TextSelection.collapsed(offset: (tempU[key]?.toString() ?? '').length);
+      editor = TextField(
+        controller: ctrl,
+        style: TextStyle(color: colorP, fontSize: 12),
+        maxLines: isRemarks ? 3 : 1,
+        minLines: isRemarks ? 2 : 1,
+        decoration: InputDecoration(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          fillColor: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+          filled: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
+        ),
+        onChanged: (v) => tempU[key] = v,
+        onSubmitted: (v) {
+          _saveDeliverField(u['id'], key, tempU[key], u, setDrawerState);
+          setDrawerState(() => editingKeys.remove(key));
+        },
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: colorL, size: 14),
+                const SizedBox(width: 4),
+              ],
+              Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          editor,
+          if (!isTime && !isTypeDropdown && !isPriority) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                InkWell(
+                  onTap: () {
+                    tempU[key] = u[key];
+                    setDrawerState(() => editingKeys.remove(key));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
+                  )
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () {
+                    _saveDeliverField(u['id'], key, tempU[key], u, setDrawerState);
+                    setDrawerState(() => editingKeys.remove(key));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(20), borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.check_rounded, color: Color(0xFF6366f1), size: 16),
+                  )
+                ),
+              ],
+            )
+          ]
         ],
       ),
     );

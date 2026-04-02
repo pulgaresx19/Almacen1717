@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode;
 import 'add_awb_screen.dart';
@@ -113,6 +114,8 @@ class _AwbModuleState extends State<AwbModule> {
                     ),
                     child: TextField(
                       controller: _searchController,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
                       style: TextStyle(color: textP, fontSize: 13),
                       onChanged: (v) => setState(() {}),
                       decoration: InputDecoration(
@@ -160,26 +163,29 @@ class _AwbModuleState extends State<AwbModule> {
             ),
             const SizedBox(height: 30),
             
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: bgCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderCard),
+            if (_showAddForm)
+              Expanded(
+                child: AddAwbScreen(
+                  key: _addAwbKey,
+                  onPop: (didAdd) {
+                    setState(() {
+                      _showAddForm = false;
+                    });
+                  },
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: _showAddForm
-                      ? AddAwbScreen(
-                          key: _addAwbKey,
-                          onPop: (didAdd) {
-                            setState(() {
-                              _showAddForm = false;
-                            });
-                          },
-                        )
-                      : FutureBuilder<List<Map<String, dynamic>>>(
-                          future: Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true),
+              )
+            else
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: borderCard),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                      future: Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));

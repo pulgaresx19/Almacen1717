@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode;
@@ -127,6 +128,8 @@ class _UldModuleState extends State<UldModule> {
                 ),
                 child: TextField(
                   controller: _searchController,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
                   style: TextStyle(color: textP, fontSize: 13),
                   onChanged: (v) => setState(() {}),
                   decoration: InputDecoration(
@@ -175,23 +178,28 @@ class _UldModuleState extends State<UldModule> {
         ),
         const SizedBox(height: 30),
         
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderCard),
+        if (_showAddForm)
+          Expanded(
+            child: AddUldScreen(
+              key: _addUldKey,
+              isInline: true,
+              onPop: (didAdd) {
+                setState(() => _showAddForm = false);
+              },
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: _showAddForm 
-                  ? AddUldScreen(
-                      key: _addUldKey,
-                      isInline: true,
-                      onPop: (_) => setState(() => _showAddForm = false),
-                    )
-                  : StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _uldsStream,
+          )
+        else
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: bgCard,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderCard),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _uldsStream,
                       builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
@@ -209,6 +217,12 @@ class _UldModuleState extends State<UldModule> {
                   }
 
                   ulds.sort((a, b) {
+                    final bool breakA = a['isBreak'] == true || a['isBreak']?.toString().toLowerCase() == 'true';
+                    final bool breakB = b['isBreak'] == true || b['isBreak']?.toString().toLowerCase() == 'true';
+
+                    if (breakA && !breakB) return -1;
+                    if (!breakA && breakB) return 1;
+
                     final uldA = a['ULD-number']?.toString().toUpperCase() ?? '';
                     final uldB = b['ULD-number']?.toString().toUpperCase() ?? '';
                     
@@ -410,7 +424,7 @@ class _UldModuleState extends State<UldModule> {
                               )),
                               DataCell(Text(u['pieces']?.toString() ?? '0')),
                               DataCell(Text('${u['weight']?.toString() ?? '0'} kg')),
-                              DataCell(Text(u['isPriority'] == true ? 'Yes' : 'No', style: TextStyle(color: u['isPriority'] == true ? Colors.amber : const Color(0xFFcbd5e1), fontWeight: u['isPriority'] == true ? FontWeight.bold : FontWeight.normal))),
+                              DataCell(u['isPriority'] == true ? const Icon(Icons.star_rounded, color: Colors.orange, size: 20) : const Icon(Icons.star_border_rounded, color: Colors.grey, size: 20)),
                               DataCell(Text(u['isBreak'] == true ? 'BREAK' : 'NO BREAK', style: TextStyle(color: u['isBreak'] == true ? const Color(0xFF10b981) : const Color(0xFFef4444), fontWeight: FontWeight.bold))),
                               DataCell(SizedBox(
                                 width: 250,
@@ -608,19 +622,25 @@ class _UldModuleState extends State<UldModule> {
                      padding: const EdgeInsets.symmetric(horizontal: 8),
                      decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                           value: tempValues[key]?.toString() ?? val?.toString(),
-                           dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                           isExpanded: true,
-                           style: TextStyle(color: textP, fontSize: 12),
-                           items: options.map((String o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
-                           onChanged: (v) {
-                              if (v != null) {
-                                 setModalState(() {
-                                    tempValues[key] = v;
-                                 });
-                              }
-                           },
+                        child: Builder(
+                           builder: (context) {
+                              final currentVal = tempValues[key]?.toString() ?? val?.toString() ?? options.first;
+                              final safeOptions = options.contains(currentVal) ? options : [...options, currentVal];
+                              return DropdownButton<String>(
+                                 value: currentVal,
+                                 dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                 isExpanded: true,
+                                 style: TextStyle(color: textP, fontSize: 12),
+                                 items: safeOptions.map((String o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+                                 onChanged: (v) {
+                                    if (v != null) {
+                                       setModalState(() {
+                                          tempValues[key] = v;
+                                       });
+                                    }
+                                 },
+                              );
+                           }
                         ),
                      ),
                   );
@@ -780,7 +800,7 @@ class _UldModuleState extends State<UldModule> {
                                        ]),
                                        const SizedBox(height: 12),
                                        Row(children: [
-                                         Expanded(flex: 2, child: buildEditable('Status', 'status', options: ['Waiting', 'Received', 'Checked', 'Ready'])),
+                                         Expanded(flex: 2, child: buildEditable('Status', 'status', options: (u['isBreak'] == true || u['isBreak']?.toString().toLowerCase() == 'true') ? ['Waiting', 'Received', 'Checked', 'Ready'] : ['Waiting', 'Received', 'Delivered'])),
                                          const SizedBox(width: 12),
                                          Expanded(flex: 3, child: buildEditable('Remarks', 'remarks')),
                                        ])
