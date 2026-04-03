@@ -386,6 +386,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
   late TextEditingController _buildingCtrl;
   String? _shift;
   String? _position;
+  bool _masterDriver = false;
   Map<String, bool> _accessMap = {};
 
   @override
@@ -399,6 +400,8 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     
     _position = widget.user['position'];
     if (!_positions.contains(_position)) _position = 'Agent';
+    
+    _masterDriver = widget.user['master-driver'] == true;
     
     _accessMap = Map<String, bool>.from((widget.user['access-page'] as Map?)?.cast<String, bool>() ?? {});
   }
@@ -429,11 +432,13 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
         'building': _buildingCtrl.text.trim(),
         'shift': _shift,
         'position': _position,
+        'master-driver': _masterDriver,
       }).eq('id', widget.user['id']);
       setState(() {
         widget.user['building'] = _buildingCtrl.text.trim();
         widget.user['shift'] = _shift;
         widget.user['position'] = _position;
+        widget.user['master-driver'] = _masterDriver;
         _isEditingOp = false;
       });
       widget.onUpdate?.call();
@@ -657,6 +662,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                                 if (!_shifts.contains(_shift)) _shift = 'Morning';
                                 _position = widget.user['position'];
                                 if (!_positions.contains(_position)) _position = 'Agent';
+                                _masterDriver = widget.user['master-driver'] == true;
                               });
                             }, textP),
                           const SizedBox(height: 12),
@@ -669,6 +675,37 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                             const SizedBox(height: 12),
                             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Expanded(child: _buildDropdown(appLanguage.value == 'es' ? 'Posición' : 'Position', _position, _positions, (v) => setState(() => _position = v), dark, textP, borderC)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Master Driver', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 11)),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      height: 36,
+                                      padding: const EdgeInsets.only(left: 10, right: 2),
+                                      decoration: BoxDecoration(border: Border.all(color: borderC), borderRadius: BorderRadius.circular(8), color: dark ? Colors.white.withAlpha(10) : Colors.white),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(_masterDriver ? 'Yes' : 'No', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          Transform.scale(
+                                            scale: 0.7,
+                                            child: Switch(
+                                              value: _masterDriver,
+                                              onChanged: (v) => setState(() => _masterDriver = v),
+                                              activeTrackColor: const Color(0xFF6366f1),
+                                              inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF),
+                                              inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                            ),
+                                          ),
+                                        ]
+                                      )
+                                    )
+                                  ]
+                                )
+                              ),
                             ]),
                           ] else ...[
                             Row(children: [
@@ -678,6 +715,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                             const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                             Row(children: [
                               Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Posición' : 'Position', '${widget.user['position'] ?? '-'}', textS, textP, icon: Icons.badge_rounded)),
+                              Expanded(child: _buildInfoCard('Master Driver', widget.user['master-driver'] == true ? 'Yes' : 'No', textS, textP, icon: Icons.verified_user_rounded)),
                             ]),
                           ],
                         ]

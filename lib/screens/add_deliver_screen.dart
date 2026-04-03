@@ -353,10 +353,10 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
           }
           (mergedAwbs[num]!['data-AWB'] as List).add({
              'flightID': null,
-             'refCarrier': 'WAREHOUSE',
-             'refNumber': 'WAREHOUSE',
+             'refCarrier': 'WRHS',
+             'refNumber': 'IMP',
              'refDate': nowUtc.substring(0, 10),
-             'refULD': 'WAREHOUSE',
+             'refULD': 'IMPORT',
              'pieces': a['pieces'],
              'weight': a['weight'],
              'remarks': a['remarks'],

@@ -370,8 +370,10 @@ class _LoginScreenState extends State<LoginScreen>
                   _isPasswordObscured
                       ? Icons.visibility_off_rounded
                       : Icons.visibility_rounded,
-                  color: Colors.white.withAlpha(128),
+                  color: Colors.white.withAlpha(100),
+                  size: 18,
                 ),
+                splashRadius: 20,
                 onPressed: () {
                   setState(() {
                     _isPasswordObscured = !_isPasswordObscured;
