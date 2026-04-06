@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 
 class DashboardViewModule extends StatelessWidget {
   const DashboardViewModule({super.key});
@@ -21,12 +21,25 @@ class DashboardViewModule extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
+                      ValueListenableBuilder<bool>(
+                        valueListenable: isSidebarExpandedNotifier,
+                        builder: (context, expanded, child) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: expanded ? 0 : 44,
+                          );
+                        },
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       Text(appLanguage.value == 'es' ? 'Panel Principal' : 'Dashboard Overview', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 4),
                       Text(appLanguage.value == 'es' ? 'Resumen operativo del almacén y vuelos en tiempo real.' : 'Real-time operational overview of warehouse and flights.', style: TextStyle(color: textS, fontSize: 13)),
+                    ],
+                  ),
                     ],
                   ),
                   _buildQuickActionButton(context, dark),

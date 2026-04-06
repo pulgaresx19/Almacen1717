@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_uld_screen.dart';
 
 class UldModule extends StatefulWidget {
@@ -81,6 +81,15 @@ class _UldModuleState extends State<UldModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -162,18 +171,6 @@ class _UldModuleState extends State<UldModule> {
                 ),
               ),
             const SizedBox(width: 8),
-
-            // Refresh Button
-            if (!_showAddForm)
-              IconButton(
-                onPressed: _loadUlds,
-                icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-                tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-                style: IconButton.styleFrom(
-                  backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
           ],
         ),
         const SizedBox(height: 30),
@@ -1099,3 +1096,5 @@ class _UldModuleState extends State<UldModule> {
     );
   }
 }
+
+

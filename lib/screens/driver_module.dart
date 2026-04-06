@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 
 class DriverModule extends StatefulWidget {
   const DriverModule({super.key});
@@ -15,6 +15,13 @@ class _DriverModuleState extends State<DriverModule> {
   Map<String, dynamic>? _selectedDriver;
   List<Map<String, dynamic>> _driverAwbs = [];
   bool _isLoadingAwbs = false;
+  late Stream<List<Map<String, dynamic>>> _deliversStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _deliversStream = Supabase.instance.client.from('Delivers').stream(primaryKey: ['id']);
+  }
 
   @override
   void dispose() {
@@ -40,6 +47,15 @@ class _DriverModuleState extends State<DriverModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 if (_selectedDriver != null) ...[
                   IconButton(
                     onPressed: () => setState(() => _selectedDriver = null),
@@ -80,19 +96,6 @@ class _DriverModuleState extends State<DriverModule> {
               ),
             ),
             const SizedBox(width: 16),
-            
-
-
-            // Refresh Button
-            IconButton(
-              onPressed: () => setState(() {}),
-              icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-              tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-              style: IconButton.styleFrom(
-                backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                padding: const EdgeInsets.all(12),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 30),
@@ -110,7 +113,7 @@ class _DriverModuleState extends State<DriverModule> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: Supabase.instance.client.from('Delivers').stream(primaryKey: ['id']),
+                  stream: _deliversStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF10b981)));
@@ -230,7 +233,7 @@ class _DriverModuleState extends State<DriverModule> {
     
     final s = status.toLowerCase();
     if (s.contains('waiting') || s.contains('espera')) {
-      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
+      bg = const Color(0xFF334155).withAlpha(150); fg = const Color(0xFFcbd5e1);
     } else if (s.contains('process')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
     } else if (s.contains('completed') || s.contains('delivered')) {
@@ -267,13 +270,13 @@ class _DriverModuleState extends State<DriverModule> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           backgroundColor: Colors.transparent,
           child: Container(
-            width: 480,
+            width: 520,
             decoration: BoxDecoration(
               color: bgCard,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: borderC),
               boxShadow: [
-                BoxShadow(color: Colors.black.withAlpha(dark ? 120 : 20), blurRadius: 20, offset: const Offset(0, 10)),
+                BoxShadow(color: Colors.black.withAlpha(dark ? 150 : 30), blurRadius: 24, offset: const Offset(0, 12)),
               ]
             ),
             child: Column(
@@ -281,31 +284,64 @@ class _DriverModuleState extends State<DriverModule> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Header
-                Padding(
-                  padding: const EdgeInsets.only(left: 24, right: 16, top: 16, bottom: 8),
+                Container(
+                  padding: const EdgeInsets.only(left: 24, right: 16, top: 20, bottom: 20),
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(color: bgAccent, borderRadius: BorderRadius.circular(12)),
-                            child: Icon(Icons.local_shipping_rounded, color: accentC, size: 24),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(appLanguage.value == 'es' ? 'Detalles de Entrega' : 'Delivery Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(u['id-pickup']?.toString() ?? 'ID: N/A', style: TextStyle(color: textS, fontSize: 12)),
-                            ],
-                          ),
-                        ]
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: bgAccent, 
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: accentC.withAlpha(50))
+                        ),
+                        child: Icon(Icons.local_shipping_rounded, color: accentC, size: 28),
                       ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    u['truck-company']?.toString().isNotEmpty == true ? u['truck-company'].toString() : 'Unknown Company', 
+                                    style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
+                                    maxLines: 1, 
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (u['isPriority'] == true) ...[
+                                  const SizedBox(width: 8),
+                                  const Tooltip(
+                                    message: 'Priority',
+                                    child: Icon(Icons.star_rounded, color: Colors.orange, size: 20),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'ID: ${u['id-pickup']?.toString() ?? 'N/A'}', 
+                              style: TextStyle(color: textS, fontSize: 13),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      _buildStatusBadge(u['status']?.toString() ?? 'Waiting'),
+                      const SizedBox(width: 16),
                       IconButton(
+                        style: IconButton.styleFrom(backgroundColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
                         onPressed: () => Navigator.pop(context), 
-                        icon: Icon(Icons.close_rounded, color: textS),
+                        icon: Icon(Icons.close_rounded, color: textP, size: 20),
                       ),
                     ],
                   ),
@@ -398,11 +434,24 @@ class _DriverModuleState extends State<DriverModule> {
                 
                 // Footer
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                   decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB), borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)), border: Border(top: BorderSide(color: borderC))),
                   child: Row(
                     children: [
-                      _buildStatusBadge(u['status']?.toString() ?? 'Waiting'),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          // En un futuro aqui se mandara a guardar el No Show
+                        },
+                        icon: const Icon(Icons.person_off_rounded, size: 18),
+                        label: const Text('No Show', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
                       const Spacer(),
                       ElevatedButton.icon(
                         onPressed: () {
@@ -629,4 +678,5 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 }
+
 

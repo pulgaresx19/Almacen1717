@@ -18,6 +18,13 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
   final _remarksController = TextEditingController();
   final Set<int> _selectedUldIds = {};
   bool _isSubmitting = false;
+  late Stream<List<Map<String, dynamic>>> _uldStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _uldStream = Supabase.instance.client.from('ULD').stream(primaryKey: ['id']);
+  }
 
   Widget _buildDeliveryTextField(
     String label,
@@ -239,30 +246,12 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedUldIds.clear();
-                    });
-                  },
-                  icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-                  tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-                  style: IconButton.styleFrom(
-                    backgroundColor: dark
-                        ? Colors.white.withAlpha(25)
-                        : const Color(0xFFF3F4F6),
-                    padding: const EdgeInsets.all(12),
-                  ),
-                ),
               ],
             ),
             const SizedBox(height: 30),
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: Supabase.instance.client
-                    .from('ULD')
-                    .stream(primaryKey: ['id']),
+                stream: _uldStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {

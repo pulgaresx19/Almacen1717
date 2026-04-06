@@ -31,6 +31,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 // Global settings
 final ValueNotifier<String> appLanguage = ValueNotifier<String>('en');
 final ValueNotifier<bool> isDarkMode = ValueNotifier<bool>(true);
+final ValueNotifier<bool> isSidebarExpandedNotifier = ValueNotifier<bool>(true);
 
 class AlmacenApp extends StatelessWidget {
   const AlmacenApp({super.key});
@@ -456,17 +457,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
               return Row(
                 children: [
                   // Sidebar
-                  Container(
-                    width: 260,
-                    decoration: BoxDecoration(
-                      color: bgSidebar,
-                      border: Border(
-                        right: BorderSide(color: borderWhite, width: 1),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 40),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: isSidebarExpandedNotifier,
+                    builder: (context, isSidebarExpanded, _) {
+                      if (!isSidebarExpanded) return const SizedBox.shrink();
+                      return Container(
+                        width: 260,
+                        decoration: BoxDecoration(
+                          color: bgSidebar,
+                          border: Border(
+                            right: BorderSide(color: borderWhite, width: 1),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              alignment: Alignment.topRight,
+                              padding: const EdgeInsets.only(right: 16, top: 16, bottom: 4),
+                              child: IconButton(
+                                icon: const Icon(Icons.menu_open_rounded, color: Color(0xFF64748b), size: 20),
+                                onPressed: () {
+                                  isSidebarExpandedNotifier.value = false;
+                                },
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Collapse sidebar',
+                              ),
+                            ),
                         // Logo Area
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -485,12 +502,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Text(
-                                'Warehouse 1717',
-                                style: TextStyle(
-                                  color: textP,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
+                              Expanded(
+                                child: Text(
+                                  'Warehouse 1717',
+                                  style: TextStyle(
+                                    color: textP,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -722,26 +741,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  );
+                },
+              ),
 
                   // Main Content Area
                   Expanded(
-                    child: Container(
-                      color:
-                          bgMain, // Dynamically changes to light or dark background
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Page Body - dynamically rendered per module
-                          Expanded(
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(40),
-                              child: _buildBodyContent(),
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: isSidebarExpandedNotifier,
+                      builder: (context, expanded, _) {
+                        return Stack(
+                          children: [
+                            Container(
+                              color:
+                                  bgMain, // Dynamically changes to light or dark background
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Page Body - dynamically rendered per module
+                                  Expanded(
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(40),
+                                      child: _buildBodyContent(),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                            if (!expanded)
+                              Positioned(
+                                top: 40,
+                                left: 24,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(24),
+                                    onTap: () {
+                                      isSidebarExpandedNotifier.value = true;
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: borderWhite),
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, offset: const Offset(0, 4)),
+                                        ],
+                                      ),
+                                      child: Icon(Icons.menu_rounded, color: textP, size: 22),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],

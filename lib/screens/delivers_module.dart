@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_deliver_screen.dart';
 
 class DeliversModule extends StatefulWidget {
@@ -17,12 +17,12 @@ class _DeliversModuleState extends State<DeliversModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddDeliverScreenState> _addDeliverKey = GlobalKey<AddDeliverScreenState>();
-  late Future<List<Map<String, dynamic>>> _dataFuture;
+  late Stream<List<Map<String, dynamic>>> _deliversStream;
 
   @override
   void initState() {
     super.initState();
-    _dataFuture = _fetchData();
+    _deliversStream = Supabase.instance.client.from('Delivers').stream(primaryKey: ['id']).order('time-deliver', ascending: true);
   }
 
   @override
@@ -34,16 +34,6 @@ class _DeliversModuleState extends State<DeliversModule> {
           setState(() => _showAddForm = false);
         }
       }
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchData() async {
-    try {
-      // Intenta consultar la tabla 'Delivers', si falla o no existe devolverá un array vacío para no quebrar la UI
-      final res = await Supabase.instance.client.from('Delivers').select().order('time-deliver', ascending: true);
-      return List<Map<String, dynamic>>.from(res);
-    } catch (_) {
-      return [];
     }
   }
 
@@ -71,6 +61,15 @@ class _DeliversModuleState extends State<DeliversModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -160,18 +159,6 @@ class _DeliversModuleState extends State<DeliversModule> {
                     ),
                   ),
                 const SizedBox(width: 8),
-
-                // Refresh Button
-                if (!_showAddForm)
-                  IconButton(
-                    onPressed: () => setState(() { _dataFuture = _fetchData(); }),
-                    icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-                    tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-                    style: IconButton.styleFrom(
-                      backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 30),
@@ -183,7 +170,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                   onPop: (didAdd) {
                     setState(() {
                       _showAddForm = false;
-                      _dataFuture = _fetchData(); // reload list of delivers on close
+                      // stream autoupdates
                     });
                   },
                 ),
@@ -198,10 +185,10 @@ class _DeliversModuleState extends State<DeliversModule> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: FutureBuilder<List<Map<String, dynamic>>>(
-                      future: _dataFuture,
+                    child: StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _deliversStream,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                           return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
                         }
                         
@@ -225,7 +212,13 @@ class _DeliversModuleState extends State<DeliversModule> {
 
                       if (_searchController.text.isNotEmpty) {
                         final term = _searchController.text.toLowerCase();
-                        items = items.where((u) => u.toString().toLowerCase().contains(term)).toList();
+                        items = items.where((u) {
+                           final comp = (u['truck-company']?.toString() ?? '').toLowerCase();
+                           final dr = (u['driver']?.toString() ?? '').toLowerCase();
+                           final dr2 = (u['door']?.toString() ?? '').toLowerCase();
+                           final pId = (u['id-pickup']?.toString() ?? '').toLowerCase();
+                           return comp.contains(term) || dr.contains(term) || dr2.contains(term) || pId.contains(term);
+                        }).toList();
                       }
 
                       if (items.isEmpty) return Center(child: Text(appLanguage.value == 'es' ? 'No se encontraron registros.' : 'No records found.', style: const TextStyle(color: Color(0xFF94a3b8))));
@@ -738,3 +731,5 @@ class _DeliversModuleState extends State<DeliversModule> {
     );
   }
 }
+
+

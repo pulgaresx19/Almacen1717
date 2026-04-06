@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_user_screen.dart';
 
 class UsersModule extends StatefulWidget {
@@ -16,6 +16,13 @@ class _UsersModuleState extends State<UsersModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddUserScreenState> _addUserKey = GlobalKey<AddUserScreenState>();
+  late Stream<List<Map<String, dynamic>>> _usersStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _usersStream = Supabase.instance.client.from('Users').stream(primaryKey: ['id']).order('full-name', ascending: true);
+  }
 
   @override
   void didUpdateWidget(covariant UsersModule oldWidget) {
@@ -53,6 +60,15 @@ class _UsersModuleState extends State<UsersModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -134,18 +150,6 @@ class _UsersModuleState extends State<UsersModule> {
                 ),
               ),
             const SizedBox(width: 8),
-
-            // Refresh Button
-            if (!_showAddForm)
-              IconButton(
-                onPressed: () => setState(() {}),
-                icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-                tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-                style: IconButton.styleFrom(
-                  backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                  padding: const EdgeInsets.all(12),
-                ),
-              ),
           ],
         ),
         const SizedBox(height: 30),
@@ -169,10 +173,10 @@ class _UsersModuleState extends State<UsersModule> {
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(
                   children: [
-                  FutureBuilder<List<Map<String, dynamic>>>(
-                    future: Supabase.instance.client.from('Users').select().order('full-name', ascending: true),
+                  StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _usersStream,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                         return const Center(
                           child: CircularProgressIndicator(color: Color(0xFF6366f1)),
                         );
@@ -809,3 +813,5 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     );
   }
 }
+
+

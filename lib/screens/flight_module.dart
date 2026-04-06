@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_flight_screen.dart';
 
 class FlightModule extends StatefulWidget {
@@ -29,6 +29,13 @@ class _FlightModuleState extends State<FlightModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddFlightScreenState> _addFlightKey = GlobalKey<AddFlightScreenState>();
+  late Stream<List<Map<String, dynamic>>> _flightStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _flightStream = Supabase.instance.client.from('Flight').stream(primaryKey: ['id']).order('date-arrived', ascending: false).order('time-arrived', ascending: true);
+  }
 
   @override
   void dispose() {
@@ -55,6 +62,15 @@ class _FlightModuleState extends State<FlightModule> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
 
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -137,20 +153,6 @@ class _FlightModuleState extends State<FlightModule> {
                   ),
                 ),
               ),
-            if (!_showAddForm)
-              const SizedBox(width: 8),
-
-            // Refresh Button
-            if (!_showAddForm)
-            IconButton(
-              onPressed: () => setState(() {}),
-              icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-              tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-              style: IconButton.styleFrom(
-                backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                padding: const EdgeInsets.all(12),
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 30),
@@ -190,7 +192,7 @@ class _FlightModuleState extends State<FlightModule> {
 
   Widget _buildFlightList(bool dark) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client.from('Flight').stream(primaryKey: ['id']).order('date-arrived', ascending: false).order('time-arrived', ascending: true),
+      stream: _flightStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
@@ -1570,3 +1572,5 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
     );
   }
 }
+
+

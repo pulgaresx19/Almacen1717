@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 
 class LocationModule extends StatefulWidget {
   final bool singlePanelMode;
@@ -4192,6 +4192,15 @@ class _LocationModuleState extends State<LocationModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4276,20 +4285,6 @@ class _LocationModuleState extends State<LocationModule> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                IconButton(
-                  onPressed: () {
-                    setState(() {});
-                    if (_dateLeft != null) _fetchFlights(true, _dateLeft!);
-                    if (_dateRight != null) _fetchFlights(false, _dateRight!);
-                  },
-                  icon: Icon(Icons.refresh_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), size: 18),
-                  tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-                  style: IconButton.styleFrom(
-                    backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                    padding: const EdgeInsets.all(12),
                   ),
                 ),
               ],

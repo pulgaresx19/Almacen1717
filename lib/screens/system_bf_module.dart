@@ -10,6 +10,21 @@ class SystemBfModule extends StatefulWidget {
 }
 
 class _SystemBfModuleState extends State<SystemBfModule> {
+  late Stream<List<Map<String, dynamic>>> _system1Stream;
+  late Stream<List<Map<String, dynamic>>> _system2Stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _system1Stream = Supabase.instance.client.from('System1').stream(primaryKey: ['id']).eq('id', 1).limit(1);
+    _system2Stream = Supabase.instance.client.from('System2').stream(primaryKey: ['id']).eq('id', 1).limit(1);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -29,6 +44,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     context: context,
                     systemName: 'System 1',
                     tableName: 'System1',
+                    stream: _system1Stream,
                     dark: dark,
                     index: 1,
                   ),
@@ -43,6 +59,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     context: context,
                     systemName: 'System 2',
                     tableName: 'System2',
+                    stream: _system2Stream,
                     dark: dark,
                     index: 2,
                   ),
@@ -73,6 +90,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
     required BuildContext context,
     required String systemName,
     required String tableName,
+    required Stream<List<Map<String, dynamic>>> stream,
     required bool dark,
     required int index,
   }) {
@@ -84,11 +102,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
         : Colors.black.withAlpha(20);
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Supabase.instance.client
-          .from(tableName)
-          .stream(primaryKey: ['id'])
-          .eq('id', 1)
-          .limit(1),
+      stream: stream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {

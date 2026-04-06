@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_awb_screen.dart';
 
 class AwbModule extends StatefulWidget {
@@ -16,6 +16,13 @@ class _AwbModuleState extends State<AwbModule> {
   final _searchController = TextEditingController();
   final GlobalKey<AddAwbScreenState> _addAwbKey = GlobalKey<AddAwbScreenState>();
   bool _showAddForm = false;
+  late Stream<List<Map<String, dynamic>>> _awbStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _awbStream = Supabase.instance.client.from('AWB').stream(primaryKey: ['id']).order('AWB-number', ascending: true);
+  }
 
   @override
   void didUpdateWidget(AwbModule oldWidget) {
@@ -55,6 +62,15 @@ class _AwbModuleState extends State<AwbModule> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: isSidebarExpandedNotifier,
+                  builder: (context, expanded, child) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: expanded ? 0 : 44,
+                    );
+                  },
+                ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -102,8 +118,26 @@ class _AwbModuleState extends State<AwbModule> {
                     ),
                     child: TextField(
                       controller: _searchController,
-                      textCapitalization: TextCapitalization.characters,
-                      inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        TextInputFormatter.withFunction((oldValue, newValue) {
+                          var text = newValue.text;
+                          text = text.replaceAll(RegExp(r'[^0-9]'), '');
+                          if (text.length > 11) text = text.substring(0, 11);
+
+                          var formatted = '';
+                          for (int i = 0; i < text.length; i++) {
+                            if (i == 3) formatted += '-';
+                            if (i == 7) formatted += ' ';
+                            formatted += text[i];
+                          }
+
+                          return TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(offset: formatted.length),
+                          );
+                        })
+                      ],
                       style: TextStyle(color: textP, fontSize: 13),
                       onChanged: (v) => setState(() {}),
                       decoration: InputDecoration(
@@ -135,17 +169,6 @@ class _AwbModuleState extends State<AwbModule> {
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // Refresh Button
-                  IconButton(
-                    onPressed: () => setState(() {}),
-                    icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
-                    tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
-                    style: IconButton.styleFrom(
-                      backgroundColor: dark ? Colors.white.withAlpha(25) : const Color(0xFFF3F4F6),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                  ),
                 ],
               ],
             ),
@@ -172,10 +195,10 @@ class _AwbModuleState extends State<AwbModule> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: FutureBuilder<List<Map<String, dynamic>>>(
-                      future: Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true),
+                    child: StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _awbStream,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
                   }
                   
@@ -742,3 +765,5 @@ class _AwbModuleState extends State<AwbModule> {
     );
   }
 }
+
+
