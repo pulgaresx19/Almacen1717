@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -35,11 +36,49 @@ class AddAwbScreenState extends State<AddAwbScreen> {
   String _refUld = '';
   bool _isSavingAll = false;
   late final TextEditingController _refUldCtrl;
+  bool _refUldCheck = false;
+  bool _refFlightCheck = true;
+  bool _isBreak = false;
 
   List<Map<String, dynamic>> _flights = [];
   final List<Map<String, dynamic>> _localAwbs = [];
   final Set<String> _collapsedGroups = {};
   bool _totalLocked = false;
+  Timer? _uldDebounce;
+
+  void _checkUldBreakStatus() {
+    if (_uldDebounce?.isActive ?? false) _uldDebounce!.cancel();
+    _uldDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final uld = _refUldCtrl.text.trim();
+      final flightId = _selectedFlight;
+      if (uld.isEmpty) return;
+
+      try {
+        var query = Supabase.instance.client
+            .from('ULD')
+            .select('isBreak')
+            .eq('ULD-number', uld);
+
+        if (flightId != null) {
+          final fMatch = _flights.where((f) => f['id'].toString() == flightId);
+          if (fMatch.isNotEmpty) {
+            query = query.eq('refCarrier', fMatch.first['carrier']).eq('refNumber', fMatch.first['number']);
+          }
+        } else {
+            query = query.eq('refCarrier', 'WRHS');
+        }
+
+        final res = await query.order('created_at', ascending: false).limit(1).maybeSingle();
+        if (res != null && res['isBreak'] != null) {
+          if (mounted) {
+            setState(() {
+              _isBreak = res['isBreak'];
+            });
+          }
+        }
+      } catch (_) {}
+    });
+  }
 
   void _showCustomListDialog(String title, List<String> items) {
     showDialog(
@@ -239,6 +278,7 @@ class AddAwbScreenState extends State<AddAwbScreen> {
 
   @override
   void dispose() {
+    _uldDebounce?.cancel();
     _awbNumberCtrl.dispose();
     _piecesCtrl.dispose();
     _totalCtrl.dispose();
@@ -269,6 +309,9 @@ class AddAwbScreenState extends State<AddAwbScreen> {
 
     setState(() {
       String? flightLabel;
+      String refCarrierOut = 'WRHS';
+      String refNumberOut = 'LOCAL';
+
       if (_selectedFlight != null) {
         final f = _flights.firstWhere(
           (x) => x['id'].toString() == _selectedFlight,
@@ -276,6 +319,8 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         );
         if (f.isNotEmpty) {
           flightLabel = '${f['carrier']} ${f['number']}';
+          refCarrierOut = f['carrier'];
+          refNumberOut = f['number'];
         }
       }
 
@@ -292,7 +337,10 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         'location': _showExtraData && _locationCtrl.text.trim().isNotEmpty ? _locationCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
         'flight_id': _selectedFlight,
         'flightLabel': flightLabel,
+        'refCarrier': refCarrierOut,
+        'refNumber': refNumberOut,
         'refUld': _refUld.trim().toUpperCase(),
+        'isBreak': _isBreak,
       });
 
       _awbNumberCtrl.clear();
@@ -304,8 +352,16 @@ class AddAwbScreenState extends State<AddAwbScreen> {
       _coordinatorCtrl.clear();
       _locationCtrl.clear();
       _showExtraData = false;
-      _refUldCtrl.clear();
-      _refUld = '';
+      
+      if (!_refUldCheck) {
+        _refUldCtrl.clear();
+        _refUld = '';
+        _isBreak = false;
+      }
+      
+      if (!_refFlightCheck) {
+        _selectedFlight = null;
+      }
     });
   }
 
@@ -368,10 +424,11 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         
         final dataAwbItem = {
           'flightID': a['flight_id'] ?? '0',
-          'refCarrier': 'WRHS',
-          'refNumber': 'LOCAL',
+          'refCarrier': a['refCarrier'] ?? 'WRHS',
+          'refNumber': a['refNumber'] ?? 'LOCAL',
           'refDate': dateStr,
           'refULD': a['refUld'],
+          'isBreak': a['isBreak'],
           'pieces': a['pieces'],
           'weight': a['weight'],
           'house_number': a['house'],
@@ -414,6 +471,79 @@ class AddAwbScreenState extends State<AddAwbScreen> {
          }).toList();
          
          await Supabase.instance.client.from('AWB').upsert(finalAwbPayloads, onConflict: 'AWB-number');
+         
+         // After AWBs are upserted, update their corresponding ULD rows if a Ref ULD is provided
+         Map<String, Map<String, dynamic>> uldUpdates = {};
+
+         for (var a in _localAwbs) {
+           final uldNum = a['refUld']?.toString().trim() ?? '';
+           final car = a['refCarrier'];
+           final num = a['refNumber'];
+           if (uldNum.isNotEmpty) {
+             final key = '${car}_${num}_$uldNum';
+             if (!uldUpdates.containsKey(key)) {
+               uldUpdates[key] = {
+                 'refCarrier': car,
+                 'refNumber': num,
+                 'uldNumber': uldNum,
+                 'isBreak': a['isBreak'],
+                 'awbsToAdd': [],
+               };
+             }
+             uldUpdates[key]!['awbsToAdd'].add({
+               'awb_number': a['awbNumber'],
+               'pieces': a['pieces'],
+               'weight': a['weight'],
+               'total': a['total'],
+               'house_number': a['house'],
+               'remarks': a['remarks'],
+               'isBreak': a['isBreak'],
+             });
+           }
+         }
+
+         for (final val in uldUpdates.values) {
+           final uldNum = val['uldNumber'];
+           final car = val['refCarrier'];
+           final num = val['refNumber'];
+
+           try {
+             var query = Supabase.instance.client
+                 .from('ULD')
+                 .select('id, data-ULD')
+                 .eq('ULD-number', uldNum);
+
+             if (car != 'WRHS') {
+               query = query.eq('refCarrier', car).eq('refNumber', num);
+             }
+
+             final uldRecords = await query.order('created_at', ascending: false).limit(1);
+
+             if (uldRecords.isNotEmpty) {
+               final uldRow = uldRecords.first;
+               List currentAwbs = [];
+               if (uldRow['data-ULD'] is List) {
+                 currentAwbs = List.from(uldRow['data-ULD']);
+               }
+
+               bool changed = false;
+               for (var newAwb in val['awbsToAdd']) {
+                 bool exists = currentAwbs.any((existing) => existing['awb_number'] == newAwb['awb_number']);
+                 if (!exists) {
+                   currentAwbs.add(newAwb);
+                   changed = true;
+                 }
+               }
+               
+               if (changed) {
+                 await Supabase.instance.client
+                     .from('ULD')
+                     .update({'data-ULD': currentAwbs})
+                     .eq('id', uldRow['id']);
+               }
+             }
+           } catch (_) {}
+         }
       }
 
       if (mounted) {
@@ -680,11 +810,11 @@ class AddAwbScreenState extends State<AddAwbScreen> {
 
               LayoutBuilder(
                 builder: (context, constraints) {
-                  double baseWidth = _showExtraData ? 1435 : 1111;
+                  double baseWidth = _showExtraData ? 1225 : 1087;
                   double rWidth = constraints.maxWidth - baseWidth - 1;
-                  if (rWidth < 180) rWidth = 180;
+                  if (rWidth < 70) rWidth = 70;
                   return Wrap(
-                    spacing: 12,
+                    spacing: 8,
                     runSpacing: 12,
                     crossAxisAlignment: WrapCrossAlignment.end,
                     children: [
@@ -692,61 +822,148 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                         width: 135,
                         child: _buildTextField('AWB Number', _awbNumberCtrl, '123-1234 5678', dark: dark, textP: textP, maxLen: 13, inputFormatters: [AwbNumberFormatter()]),
                       ),
-                      SizedBox(width: 160, child: _buildFlightDropdown(dark, textP, borderC)),
+                      SizedBox(width: 170, child: _buildFlightDropdown(
+                        dark, textP, borderC,
+                        titleTrailing: SizedBox(
+                          width: 20, height: 20,
+                          child: Checkbox(
+                            value: _refFlightCheck,
+                            activeColor: const Color(0xFF6366f1),
+                            side: const BorderSide(color: Color(0xFF94a3b8)),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (v) => setState(() => _refFlightCheck = v ?? true),
+                          ),
+                        ),
+                      )),
                       SizedBox(
-                        width: 130,
-                        child: _buildTextField('Ref ULD', _refUldCtrl, 'AKE12345AA', dark: dark, textP: textP, maxLen: 10, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters),
+                        width: 135,
+                        child: _buildTextField(
+                          'Ref ULD', _refUldCtrl, 'AKE12345AA',
+                          dark: dark, textP: textP, maxLen: 10,
+                          inputFormatters: [UpperCaseTextFormatter()],
+                          textCapitalization: TextCapitalization.characters,
+                          titleTrailing: _refUld.trim().isNotEmpty ? SizedBox(
+                            width: 20, height: 20,
+                            child: Checkbox(
+                              value: _refUldCheck,
+                              activeColor: const Color(0xFF6366f1),
+                              side: const BorderSide(color: Color(0xFF94a3b8)),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              onChanged: (v) => setState(() => _refUldCheck = v ?? false),
+                            )
+                          ) : null,
+                        ),
                       ),
                       SizedBox(
-                        width: 90,
+                        width: 100,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Break?', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 8),
+                            Container(
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: borderC),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Icon(Icons.broken_image_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                                  Switch(
+                                    value: _isBreak,
+                                    onChanged: (v) => setState(() => _isBreak = v),
+                                    activeThumbColor: Colors.white,
+                                    activeTrackColor: const Color(0xFF22c55e),
+                                    inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF),
+                                    inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                    trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                      if (states.contains(WidgetState.selected)) return Colors.transparent;
+                                      return const Color(0xFFef4444).withAlpha(180);
+                                    }),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(
+                        width: 75,
                         child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
                       ),
                       SizedBox(
-                        width: 90,
+                        width: 75,
                         child: _buildTextField('Total', _totalCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly], readOnly: _totalLocked),
                       ),
                       SizedBox(
-                        width: 90,
+                        width: 75,
                         child: _buildTextField('Weight', _weightCtrl, '0.0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]),
                       ),
                       SizedBox(
                         width: rWidth,
-                        child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...', dark: dark, textP: textP),
+                        child: _buildTextField('Remarks', _remarksCtrl, 'Additional remarks...', dark: dark, textP: textP, textCapitalization: TextCapitalization.sentences, inputFormatters: [SentenceCaseTextFormatter()]),
                       ),
                       SizedBox(
-                        width: 180,
+                        width: 140,
                         child: _buildTextField('House Number', _houseCtrl, 'HAWB', dark: dark, textP: textP, maxLines: 3, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters),
                       ),
                       if (_showExtraData) ...[
                         SizedBox(
-                          width: 150,
-                          child: _buildTextField('Data Coordinator', _coordinatorCtrl, 'Details...', dark: dark, textP: textP, maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.sentences, inputFormatters: [SentenceCaseTextFormatter()]),
+                          width: 120,
+                          child: _buildTextField('Data Coordinator', _coordinatorCtrl, 'Details...', dark: dark, textP: textP, maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.characters, inputFormatters: [UpperCaseTextFormatter()]),
                         ),
                         SizedBox(
-                          width: 150,
-                          child: _buildTextField('Data Location', _locationCtrl, 'Details...', dark: dark, textP: textP, maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.sentences, inputFormatters: [SentenceCaseTextFormatter()]),
+                          width: 120,
+                          child: _buildTextField('Data Location', _locationCtrl, 'Details...', dark: dark, textP: textP, maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.characters, inputFormatters: [UpperCaseTextFormatter()]),
                         ),
                       ],
-                      SizedBox(
-                        width: 120,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _addLocalAwb,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
-                            foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            elevation: 0,
-                            side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      if (!_showExtraData)
+                        SizedBox(
+                          width: 110,
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: _addLocalAwb,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                              foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              elevation: 0,
+                              side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('+ Add AWB', style: TextStyle(fontWeight: FontWeight.w600)),
                           ),
-                          child: const Text('+ Add AWB', style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
-                      ),
                     ],
                   );
                 }
               ),
+              if (_showExtraData) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: 120,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _addLocalAwb,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                        foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        elevation: 0,
+                        side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('+ Add AWB', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -940,10 +1157,27 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                                                                 Padding(
                                                                   padding: const EdgeInsets.only(top: 4),
                                                                   child: Row(
+                                                                    mainAxisSize: MainAxisSize.min,
                                                                     children: [
                                                                       Icon(Icons.inventory_2_outlined, size: 12, color: textS),
                                                                       const SizedBox(width: 4),
                                                                       Text(a['refUld'], style: TextStyle(color: textS, fontSize: 12)),
+                                                                      const SizedBox(width: 6),
+                                                                      Container(
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                                        decoration: BoxDecoration(
+                                                                          color: (a['isBreak'] == true) ? const Color(0xFF22c55e).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
+                                                                          borderRadius: BorderRadius.circular(4),
+                                                                        ),
+                                                                        child: Text(
+                                                                          (a['isBreak'] == true) ? 'BREAK' : 'NO BREAK',
+                                                                          style: TextStyle(
+                                                                            color: (a['isBreak'] == true) ? const Color(0xFF22c55e) : const Color(0xFFef4444),
+                                                                            fontSize: 9,
+                                                                            fontWeight: FontWeight.bold,
+                                                                          ),
+                                                                        ),
+                                                                      ),
                                                                     ],
                                                                   ),
                                                                 ),
@@ -1131,18 +1365,41 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     );
   }
 
-  Widget _buildFlightDropdown(bool dark, Color textP, Color borderC) {
+  Widget _buildFlightDropdown(bool dark, Color textP, Color borderC, {Widget? titleTrailing}) {
+    String formatFlightDate(String? d) {
+       if (d == null || d.trim().isEmpty) return '';
+       final parts = d.split('-');
+       if (parts.length >= 3) return '${parts[1]}/${parts[2]}';
+       return d;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Reference Flight',
-          style: TextStyle(
-            color: Color(0xFFcbd5e1),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        if (titleTrailing != null)
+           Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                 const Text(
+                   'Reference Flight',
+                   style: TextStyle(
+                     color: Color(0xFFcbd5e1),
+                     fontSize: 13,
+                     fontWeight: FontWeight.w500,
+                   ),
+                 ),
+                 titleTrailing,
+              ],
+           )
+        else
+           const Text(
+             'Reference Flight',
+             style: TextStyle(
+               color: Color(0xFFcbd5e1),
+               fontSize: 13,
+               fontWeight: FontWeight.w500,
+             ),
+           ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1172,13 +1429,16 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                   (f) => DropdownMenuItem<String?>(
                     value: f['id'].toString(),
                     child: Text(
-                      '${f['carrier']} ${f['number']} (${f['date-arrived']})',
+                      '${f['carrier']} ${f['number']} (${formatFlightDate(f['date-arrived']?.toString())})',
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
               ],
-              onChanged: (v) => setState(() => _selectedFlight = v),
+              onChanged: (v) {
+                setState(() => _selectedFlight = v);
+                _checkUldBreakStatus();
+              },
             ),
           ),
         ),
@@ -1199,6 +1459,7 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     bool readOnly = false,
     int? maxLines = 1,
     int? minLines = 1,
+    Widget? titleTrailing,
   }) {
     Widget field = TextField(
       controller: ctrl,
@@ -1213,7 +1474,10 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         color: readOnly ? (dark ? const Color(0xFFcbd5e1) : const Color(0xFF6B7280)) : textP,
         fontSize: 13,
       ),
-      onChanged: (ctrl == _refUldCtrl) ? (v) => _refUld = v : null,
+      onChanged: (ctrl == _refUldCtrl) ? (v) {
+        setState(() => _refUld = v);
+        _checkUldBreakStatus();
+      } : null,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(
@@ -1244,14 +1508,30 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
+        if (titleTrailing != null)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              titleTrailing,
+            ],
+          )
+        else
+          Text(
+            label,
+            style: TextStyle(
+              color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
         const SizedBox(height: 8),
         field,
       ],

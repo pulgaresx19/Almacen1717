@@ -485,6 +485,10 @@ class _UldModuleState extends State<UldModule> {
       case 'ready':
         bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
         break;
+      case 'delivered':
+      case 'entregado':
+        bg = const Color(0xFF047857).withAlpha(51); fg = const Color(0xFF34d399); 
+        break;
       case 'pending':
         bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
         break;
@@ -524,7 +528,7 @@ class _UldModuleState extends State<UldModule> {
         List dataUld = [];
         if (u['data-ULD'] is List) dataUld = u['data-ULD'];
 
-        Set<String> editingKeys = {};
+        bool isEditingGlobal = false;
         Map<String, dynamic> tempValues = {};
 
         return StatefulBuilder(
@@ -532,7 +536,7 @@ class _UldModuleState extends State<UldModule> {
 
             Widget buildEditable(String label, String key, {bool isBool = false, String trueText = '', String falseText = '', bool isNum = false, List<String>? options}) {
                dynamic val = u[key];
-               final bool isEditing = editingKeys.contains(key);
+               final bool isEditing = isEditingGlobal;
 
                if (!isEditing) {
                   String displayStr = '';
@@ -556,19 +560,8 @@ class _UldModuleState extends State<UldModule> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                  Text(label, style: TextStyle(color: textS, fontSize: 11)),
-                                 InkWell(
-                                    onTap: () => setModalState(() {
-                                       editingKeys.add(key);
-                                       tempValues[key] = val;
-                                    }),
-                                    child: const Padding(
-                                      padding: EdgeInsets.only(left: 8),
-                                      child: Icon(Icons.edit_rounded, color: Color(0xFF94a3b8), size: 12),
-                                    ),
-                                 )
                               ],
                            ),
                            const SizedBox(height: 6),
@@ -580,7 +573,8 @@ class _UldModuleState extends State<UldModule> {
 
                final inputBorderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
                Widget editor;
-               final ctrl = TextEditingController(text: val?.toString() ?? '')..selection = TextSelection.collapsed(offset: (val?.toString() ?? '').length);
+               final currentVal = tempValues.containsKey(key) ? tempValues[key] : val;
+               final ctrl = TextEditingController(text: currentVal?.toString() ?? '')..selection = TextSelection.collapsed(offset: (currentVal?.toString() ?? '').length);
 
                if (isBool) {
                   editor = Container(
@@ -590,7 +584,7 @@ class _UldModuleState extends State<UldModule> {
                      decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
                      child: DropdownButtonHideUnderline(
                         child: DropdownButton<bool>(
-                           value: val == true,
+                           value: currentVal == true,
                            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
                            isExpanded: true,
                            style: TextStyle(color: textP, fontSize: 12),
@@ -598,18 +592,11 @@ class _UldModuleState extends State<UldModule> {
                               DropdownMenuItem(value: true, child: Text(trueText)),
                               DropdownMenuItem(value: false, child: Text(falseText)),
                            ],
-                           onChanged: (v) async {
+                           onChanged: (v) {
                               if (v != null) {
-                                  try {
-                                     await Supabase.instance.client.from('ULD').update({key: v}).eq('id', u['id']);
-                                     setModalState(() {
-                                        u[key] = v;
-                                        editingKeys.remove(key);
-                                     });
-                                     if (mounted) setState(() {});
-                                  } catch (e) {
-                                     debugPrint('Error updating bool $key: $e');
-                                  }
+                                  setModalState(() {
+                                     tempValues[key] = v;
+                                  });
                               }
                            },
                         ),
@@ -651,6 +638,13 @@ class _UldModuleState extends State<UldModule> {
                         controller: ctrl,
                         keyboardType: isNum ? TextInputType.number : TextInputType.text,
                         style: TextStyle(color: textP, fontSize: 12),
+                        onChanged: (v) {
+                           if (isNum) {
+                              tempValues[key] = int.tryParse(v) ?? 0;
+                           } else {
+                              tempValues[key] = v;
+                           }
+                        },
                         decoration: InputDecoration(
                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                            fillColor: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
@@ -670,49 +664,6 @@ class _UldModuleState extends State<UldModule> {
                         Text(label, style: TextStyle(color: textS, fontSize: 11)),
                         const SizedBox(height: 8),
                         editor,
-                        if (!isBool) ...[
-                           const SizedBox(height: 8),
-                           Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                 InkWell(
-                                    onTap: () => setModalState(() => editingKeys.remove(key)),
-                                    child: Container(
-                                       padding: const EdgeInsets.all(4),
-                                       decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(6)),
-                                       child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
-                                    )
-                                 ),
-                                 const SizedBox(width: 8),
-                                 InkWell(
-                                    onTap: () async {
-                                       try {
-                                          dynamic parsedVal;
-                                          if (options != null) {
-                                             parsedVal = tempValues[key] ?? val;
-                                          } else {
-                                             parsedVal = ctrl.text;
-                                             if (isNum) parsedVal = int.tryParse(ctrl.text) ?? 0;
-                                          }
-                                          await Supabase.instance.client.from('ULD').update({key: parsedVal}).eq('id', u['id']);
-                                          setModalState(() {
-                                             u[key] = parsedVal;
-                                             editingKeys.remove(key);
-                                          });
-                                          if (mounted) setState(() {});
-                                       } catch (e) {
-                                          debugPrint('Error: $e');
-                                       }
-                                    },
-                                    child: Container(
-                                       padding: const EdgeInsets.all(4),
-                                       decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(20), borderRadius: BorderRadius.circular(6)),
-                                       child: const Icon(Icons.check_rounded, color: Color(0xFF6366f1), size: 16),
-                                    )
-                                 ),
-                              ]
-                           )
-                        ]
                      ]
                   )
                );
@@ -771,10 +722,76 @@ class _UldModuleState extends State<UldModule> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                        Row(
+                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                          children: [
-                                            Icon(Icons.flight_takeoff, size: 16, color: textP),
-                                            const SizedBox(width: 8),
-                                            Text('Flight Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                           Row(
+                                             children: [
+                                                Icon(Icons.flight_takeoff, size: 16, color: textP),
+                                                const SizedBox(width: 8),
+                                                Text('Flight Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                             ]
+                                           ),
+                                           if (!isEditingGlobal)
+                                             InkWell(
+                                               onTap: () => setModalState(() {
+                                                 isEditingGlobal = true;
+                                                 tempValues = {
+                                                   'pieces': u['pieces'],
+                                                   'weight': u['weight'],
+                                                   'isBreak': u['isBreak'],
+                                                   'isPriority': u['isPriority'],
+                                                   'status': u['status'],
+                                                   'remarks': u['remarks'],
+                                                 };
+                                               }),
+                                               child: Container(
+                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                 decoration: BoxDecoration(color: textP.withAlpha(10), borderRadius: BorderRadius.circular(6)),
+                                                 child: Icon(Icons.edit_rounded, color: textP.withAlpha(200), size: 14),
+                                               ),
+                                             )
+                                           else
+                                             Row(
+                                               children: [
+                                                 InkWell(
+                                                   onTap: () => setModalState(() {
+                                                     isEditingGlobal = false;
+                                                     tempValues.clear();
+                                                   }), 
+                                                   child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20)
+                                                 ),
+                                                 const SizedBox(width: 16),
+                                                 InkWell(
+                                                   onTap: () async {
+                                                     try {
+                                                       final updates = {
+                                                         'pieces': tempValues.containsKey('pieces') ? tempValues['pieces'] : u['pieces'],
+                                                         'weight': tempValues.containsKey('weight') ? tempValues['weight'] : u['weight'],
+                                                         'isBreak': tempValues.containsKey('isBreak') ? tempValues['isBreak'] : u['isBreak'],
+                                                         'isPriority': tempValues.containsKey('isPriority') ? tempValues['isPriority'] : u['isPriority'],
+                                                         'status': tempValues.containsKey('status') ? tempValues['status'] : u['status'],
+                                                         'remarks': tempValues.containsKey('remarks') ? tempValues['remarks'] : u['remarks'],
+                                                       };
+                                                       await Supabase.instance.client.from('ULD').update(updates).eq('id', u['id']);
+                                                       setModalState(() {
+                                                         u['pieces'] = updates['pieces'];
+                                                         u['weight'] = updates['weight'];
+                                                         u['isBreak'] = updates['isBreak'];
+                                                         u['isPriority'] = updates['isPriority'];
+                                                         u['status'] = updates['status'];
+                                                         u['remarks'] = updates['remarks'];
+                                                         isEditingGlobal = false;
+                                                         tempValues.clear();
+                                                       });
+                                                       if (mounted) setState(() {});
+                                                     } catch (e) {
+                                                       debugPrint('Error: $e');
+                                                     }
+                                                   }, 
+                                                   child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)
+                                                 ),
+                                               ],
+                                             ),
                                          ]
                                        ),
                                        const SizedBox(height: 12),
@@ -1035,6 +1052,16 @@ class _UldModuleState extends State<UldModule> {
                ),
                const SizedBox(width: 8),
                Text(title, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+               if (title == 'Delivered') ...[
+                 const Spacer(),
+                 Icon(Icons.business_rounded, size: 14, color: textS),
+                 const SizedBox(width: 4),
+                 Text(data['company']?.toString() ?? 'Unknown', style: TextStyle(color: textP, fontSize: 11)),
+                 const SizedBox(width: 8),
+                 Icon(Icons.door_front_door_rounded, size: 14, color: textS),
+                 const SizedBox(width: 4),
+                 Text('Door: ${data['door']?.toString() ?? '-'}', style: TextStyle(color: textP, fontSize: 11)),
+               ]
              ]
            ),
            const SizedBox(height: 8),
@@ -1042,13 +1069,31 @@ class _UldModuleState extends State<UldModule> {
              children: [
                Icon(Icons.person_outline, size: 14, color: textS),
                const SizedBox(width: 6),
-               Text(data['user']?.toString() ?? 'System', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13)),
+               Text(data['fullname']?.toString() ?? data['user']?.toString() ?? 'System', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13)),
                const Spacer(),
                Icon(Icons.access_time, size: 14, color: textS),
                const SizedBox(width: 6),
                Text(data['time'] != null ? DateFormat('hh:mm a • MM/dd/yyyy').format(DateTime.parse(data['time']).toLocal()) : '-', style: TextStyle(color: textS, fontSize: 12)),
              ]
-           )
+           ),
+           if (title == 'Delivered') ...[
+             if (data['remarks'] != null && data['remarks'].toString().trim().isNotEmpty) ...[
+               const SizedBox(height: 6),
+               Row(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                   Icon(Icons.notes_rounded, size: 14, color: textS),
+                   const SizedBox(width: 6),
+                   Expanded(
+                     child: Text(
+                       data['remarks'].toString(), 
+                       style: TextStyle(color: textS, fontSize: 12)
+                     )
+                   ),
+                 ],
+               ),
+             ]
+           ]
         ]
       )
     );

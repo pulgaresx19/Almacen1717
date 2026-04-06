@@ -17,6 +17,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
   final _doorController = TextEditingController();
   final _remarksController = TextEditingController();
   final Set<int> _selectedUldIds = {};
+  bool _isSubmitting = false;
 
   Widget _buildDeliveryTextField(
     String label,
@@ -112,6 +113,11 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
         bg = const Color(0xFF166534).withAlpha(51);
         fg = const Color(0xFF86efac);
         break;
+      case 'delivered':
+      case 'entregado':
+        bg = const Color(0xFF047857).withAlpha(51);
+        fg = const Color(0xFF34d399); 
+        break;
       case 'pending':
         bg = const Color(0xFF854d0e).withAlpha(51);
         fg = const Color(0xFFfde047);
@@ -202,6 +208,15 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                   child: TextField(
                     controller: _searchController,
                     style: TextStyle(color: textP, fontSize: 13),
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [
+                      TextInputFormatter.withFunction(
+                        (oldValue, newValue) => TextEditingValue(
+                          text: newValue.text.toUpperCase(),
+                          selection: newValue.selection,
+                        ),
+                      ),
+                    ],
                     onChanged: (v) => setState(() {}),
                     decoration: InputDecoration(
                       hintText: appLanguage.value == 'es'
@@ -275,7 +290,9 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                     final bool isBreak =
                         u['isBreak'] == true ||
                         u['isBreak']?.toString().toLowerCase() == 'true';
-                    return !isBreak;
+                    final status = (u['status']?.toString() ?? '').toLowerCase();
+                    final isDelivered = status == 'delivered' || status == 'entregado';
+                    return !isBreak && !isDelivered;
                   }).toList();
 
                   if (_searchController.text.isNotEmpty) {
@@ -285,6 +302,32 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                       return str.contains(term);
                     }).toList();
                   }
+
+                  ulds.sort((a, b) {
+                    final statusA = (a['status']?.toString() ?? '').toLowerCase();
+                    final statusB = (b['status']?.toString() ?? '').toLowerCase();
+                    
+                    int weight(String s) {
+                      if (s == 'waiting') return 1;
+                      if (s == 'received') return 2;
+                      if (s == 'checked') return 3;
+                      if (s == 'ready') return 4;
+                      if (s == 'pending') return 5;
+                      if (s == 'delivered' || s == 'entregado') return 7;
+                      return 6;
+                    }
+
+                    final wA = weight(statusA);
+                    final wB = weight(statusB);
+
+                    if (wA != wB) {
+                      return wA.compareTo(wB);
+                    }
+                    
+                    final uldA = a['ULD-number']?.toString() ?? '';
+                    final uldB = b['ULD-number']?.toString() ?? '';
+                    return uldA.compareTo(uldB);
+                  });
 
                   final selectedUlds = ulds
                       .where((u) => _selectedUldIds.contains(u['id'] as int))
@@ -525,9 +568,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                                                     ),
                                                     DataCell(
                                                       _buildStatusBadge(
-                                                        u['status']
-                                                                ?.toString() ??
-                                                            'Received',
+                                                        u['status']?.toString() ?? 'Received',
                                                       ),
                                                     ),
                                                   ],
@@ -769,18 +810,147 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                                 width: double.infinity,
                                 height: 48,
                                 child: ElevatedButton.icon(
-                                  onPressed:
-                                      selectedUlds.isEmpty ||
-                                          _companyController.text
-                                              .trim()
-                                              .isEmpty ||
-                                          _doorController.text.trim().isEmpty
+                                  onPressed: (_isSubmitting ||
+                                          selectedUlds.isEmpty ||
+                                          _companyController.text.trim().isEmpty ||
+                                          _doorController.text.trim().isEmpty)
                                       ? null
-                                      : () {},
-                                  icon: const Icon(
-                                    Icons.outbox_rounded,
-                                    size: 20,
-                                  ),
+                                      : () async {
+                                          setState(() => _isSubmitting = true);
+                                          final company = _companyController.text.trim();
+                                          final door = _doorController.text.trim();
+                                          final remarks = _remarksController.text.trim();
+                                          
+                                          String fullname = Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
+                                          try {
+                                              final uUser = Supabase.instance.client.auth.currentUser;
+                                              if (uUser != null) {
+                                                final profile = await Supabase.instance.client.from('Users').select('full-name').eq('email', uUser.email!).maybeSingle();
+                                                if (profile != null && profile['full-name'] != null) {
+                                                  fullname = profile['full-name'].toString();
+                                                }
+                                              }
+                                          } catch (_) {}
+
+                                          final now = DateTime.now().toIso8601String();
+
+                                          final deliveryData = {
+                                              'company': company,
+                                              'door': door,
+                                              'remarks': remarks,
+                                              'time': now,
+                                              'fullname': fullname,
+                                          };
+
+                                          try {
+                                            for(int uId in _selectedUldIds) {
+                                                await Supabase.instance.client.from('ULD').update({
+                                                   'data-delivery': deliveryData,
+                                                   'status': 'Delivered'
+                                                }).eq('id', uId);
+                                            }
+
+                                            if (!context.mounted) return;
+                                            setState(() {
+                                                _selectedUldIds.clear();
+                                                _companyController.clear();
+                                                _doorController.clear();
+                                                _remarksController.clear();
+                                                _isSubmitting = false;
+                                            });
+                                            
+                                            bool dialogOpen = true;
+                                            showGeneralDialog(
+                                              context: context,
+                                              barrierDismissible: false,
+                                              barrierColor: Colors.black54,
+                                              transitionDuration: const Duration(milliseconds: 350),
+                                              pageBuilder: (ctx, anim1, anim2) {
+                                                final dark = isDarkMode.value;
+                                                return Center(
+                                                  child: Material(
+                                                    color: Colors.transparent,
+                                                    child: Container(
+                                                      width: 320,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                                      decoration: BoxDecoration(
+                                                        color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                        borderRadius: BorderRadius.circular(24),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: const Color(0xFF10b981).withAlpha(40),
+                                                            blurRadius: 40,
+                                                            offset: const Offset(0, 10),
+                                                          ),
+                                                        ],
+                                                        border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                                                      ),
+                                                      child: Column(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Container(
+                                                            padding: const EdgeInsets.all(20),
+                                                            decoration: BoxDecoration(
+                                                              color: const Color(0xFF10b981).withAlpha(20),
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                            child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48),
+                                                          ),
+                                                          const SizedBox(height: 24),
+                                                          Text(
+                                                            appLanguage.value == 'es' ? '¡ULDs Entregados!' : 'ULDs Delivered!',
+                                                            style: TextStyle(
+                                                              color: dark ? Colors.white : const Color(0xFF111827),
+                                                              fontSize: 22,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                            textAlign: TextAlign.center,
+                                                          ),
+                                                          const SizedBox(height: 8),
+                                                          Text(
+                                                            appLanguage.value == 'es'
+                                                                ? 'La entrega se ha registrado exitosamente.'
+                                                                : 'The delivery has been recorded successfully.',
+                                                            style: TextStyle(
+                                                              color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b),
+                                                              fontSize: 14,
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                            textAlign: TextAlign.center,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              transitionBuilder: (ctx, anim1, anim2, child) {
+                                                return Transform.scale(
+                                                  scale: Curves.easeOutBack.transform(anim1.value),
+                                                  child: FadeTransition(
+                                                    opacity: anim1,
+                                                    child: child,
+                                                  ),
+                                                );
+                                              },
+                                            ).then((_) => dialogOpen = false);
+
+                                            Future.delayed(const Duration(milliseconds: 2000), () {
+                                              if (context.mounted && dialogOpen) {
+                                                Navigator.of(context).pop();
+                                              }
+                                            });
+                                          } catch (e) {
+                                            if (!context.mounted) return;
+                                            setState(() => _isSubmitting = false);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red)
+                                            );
+                                          }
+                                      },
+                                  icon: _isSubmitting 
+                                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                                      : const Icon(Icons.outbox_rounded, size: 20),
                                   label: Text(
                                     appLanguage.value == 'es'
                                         ? 'Entregar ULDs'

@@ -17,6 +17,13 @@ class _DeliversModuleState extends State<DeliversModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddDeliverScreenState> _addDeliverKey = GlobalKey<AddDeliverScreenState>();
+  late Future<List<Map<String, dynamic>>> _dataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _dataFuture = _fetchData();
+  }
 
   @override
   void didUpdateWidget(covariant DeliversModule oldWidget) {
@@ -157,7 +164,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                 // Refresh Button
                 if (!_showAddForm)
                   IconButton(
-                    onPressed: () => setState(() {}),
+                    onPressed: () => setState(() { _dataFuture = _fetchData(); }),
                     icon: Icon(Icons.refresh_rounded, color: iconColor, size: 18),
                     tooltip: appLanguage.value == 'es' ? 'Refrescar' : 'Refresh',
                     style: IconButton.styleFrom(
@@ -174,7 +181,10 @@ class _DeliversModuleState extends State<DeliversModule> {
                 child: AddDeliverScreen(
                   key: _addDeliverKey,
                   onPop: (didAdd) {
-                    setState(() => _showAddForm = false);
+                    setState(() {
+                      _showAddForm = false;
+                      _dataFuture = _fetchData(); // reload list of delivers on close
+                    });
                   },
                 ),
               )
@@ -189,7 +199,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: FutureBuilder<List<Map<String, dynamic>>>(
-                      future: _fetchData(),
+                      future: _dataFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
@@ -313,7 +323,7 @@ class _DeliversModuleState extends State<DeliversModule> {
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        final Set<String> editingKeys = {};
+        bool isEditing = false;
         final Map<String, dynamic> tempU = Map.from(u);
         return StatefulBuilder(
           builder: (context, setDrawerState) {
@@ -368,7 +378,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                             const SizedBox(width: 8),
                             IconButton(
                               onPressed: () => Navigator.pop(ctx),
-                              icon: Icon(Icons.close_rounded, color: textP),
+                              icon: Icon(Icons.close_rounded, color: textP, size: 20),
                             ),
                           ],
                         )
@@ -387,43 +397,76 @@ class _DeliversModuleState extends State<DeliversModule> {
                              child: Column(
                                crossAxisAlignment: CrossAxisAlignment.start,
                                children: [
-                                  Row(children: [Icon(Icons.badge_outlined, size: 16, color: textP), const SizedBox(width: 8), Text('Driver Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
-                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(children: [Icon(Icons.badge_outlined, size: 16, color: textP), const SizedBox(width: 8), Text('Driver Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
+                                      if (!isEditing)
+                                        IconButton(
+                                          onPressed: () {
+                                            setDrawerState(() {
+                                              isEditing = true;
+                                              tempU.clear();
+                                              tempU.addAll(u);
+                                            });
+                                          },
+                                          tooltip: appLanguage.value == 'es' ? 'Editar' : 'Edit',
+                                          icon: Icon(Icons.edit_rounded, color: textP, size: 20),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        )
+                                      else
+                                        Row(
+                                          children: [
+                                            IconButton(
+                                              onPressed: () => setDrawerState(() => isEditing = false),
+                                              tooltip: appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
+                                              icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            IconButton(
+                                              onPressed: () async {
+                                                try {
+                                                  await Supabase.instance.client.from('Delivers').update(tempU).eq('id', u['id']);
+                                                  u.addAll(tempU);
+                                                  setDrawerState(() => isEditing = false);
+                                                  if (mounted) setState(() {});
+                                                } catch (_) {}
+                                              },
+                                              tooltip: appLanguage.value == 'es' ? 'Guardar Cambios' : 'Save Changes',
+                                              icon: const Icon(Icons.check_rounded, color: Color(0xFF22c55e), size: 20),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                          ],
+                                        )
+                                    ]
+                                  ),
+                                  const SizedBox(height: 16),
                                   Row(
                                     children: [
-                                      Expanded(child: _buildInfoCard('Driver Name', u['driver']?.toString() ?? '-', Icons.person_outline, textP, textS)),
-                                      Expanded(child: _buildInfoCard('ID Pickup', u['id-pickup']?.toString() ?? '-', Icons.badge_outlined, textP, textS)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Driver Name', 'driver', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.person_outline)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'ID Pickup', 'id-pickup', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.badge_outlined)),
                                     ],
                                   ),
-                               ]
-                             )
-                          ),
-                          
-                          const SizedBox(height: 16),
-                          
-                          Container(
-                             padding: const EdgeInsets.all(16),
-                             decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
-                             child: Column(
-                               crossAxisAlignment: CrossAxisAlignment.start,
-                               children: [
-                                  Row(children: [Icon(Icons.local_shipping_outlined, size: 16, color: textP), const SizedBox(width: 8), Text('Delivery Details', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold))]),
                                   const SizedBox(height: 12),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(child: _buildDeliverEditableCard(context, 'Type', 'type', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.local_shipping_outlined, isTypeDropdown: true)),
-                                      Expanded(child: _buildDeliverEditableCard(context, 'Door', 'door', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.door_front_door_outlined)),
-                                      Expanded(child: _buildDeliverEditableCard(context, 'Priority', 'isPriority', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Type', 'type', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.local_shipping_outlined, isTypeDropdown: true)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Door', 'door', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.door_front_door_outlined)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Priority', 'isPriority', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
                                     ],
                                   ),
                                   const SizedBox(height: 12),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(flex: 1, child: _buildDeliverEditableCard(context, 'Time', 'time-deliver', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.access_time_rounded, isTime: true)),
+                                      Expanded(flex: 1, child: _buildDeliverEditableCard(context, 'Time', 'time-deliver', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.access_time_rounded, isTime: true)),
                                       const SizedBox(width: 16),
-                                      Expanded(flex: 2, child: _buildDeliverEditableCard(context, 'Remarks', 'remarks', u, editingKeys, tempU, setDrawerState, dark, textS, textP, icon: Icons.notes, isRemarks: true)),
+                                      Expanded(flex: 2, child: _buildDeliverEditableCard(context, 'Remarks', 'remarks', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.notes, isRemarks: true)),
                                     ],
                                   ),
                                ]
@@ -480,54 +523,13 @@ class _DeliversModuleState extends State<DeliversModule> {
     );
   }
 
-  Widget _buildInfoCard(String label, String val, IconData icon, Color textP, Color textS, {Color? iconColor, bool isEditable = false, VoidCallback? onEdit}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: iconColor ?? textS, size: 14),
-              const SizedBox(width: 6),
-              Expanded(child: Text(label, style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
-              if (isEditable)
-                InkWell(
-                  onTap: onEdit,
-                  borderRadius: BorderRadius.circular(4),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: Icon(Icons.edit_rounded, color: textS, size: 14),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(val, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _saveDeliverField(dynamic id, String fieldKey, dynamic val, Map<String, dynamic> u, StateSetter setDrawerState) async {
-    if (id == null) return;
-    try {
-      await Supabase.instance.client.from('Delivers').update({fieldKey: val}).eq('id', id);
-      u[fieldKey] = val;
-      setDrawerState(() {});
-      if (mounted) setState(() {});
-    } catch (e) {
-      debugPrint('Error updating $fieldKey: $e');
-    }
-  }
 
   Widget _buildDeliverEditableCard(
     BuildContext context, 
     String label, 
     String key, 
     Map<String, dynamic> u, 
-    Set<String> editingKeys, 
+    bool isEditing, 
     Map<String, dynamic> tempU,
     StateSetter setDrawerState, 
     bool dark, 
@@ -535,9 +537,7 @@ class _DeliversModuleState extends State<DeliversModule> {
     Color colorP, 
     {IconData? icon, bool isTime = false, bool isRemarks = false, bool isPriority = false, bool isTypeDropdown = false}
   ) {
-    final isEditingThisField = editingKeys.contains(key);
-
-    if (!isEditingThisField) {
+    if (!isEditing) {
       String displayValue = '${u[key] ?? '-'}';
       
       if (isTime) {
@@ -559,29 +559,12 @@ class _DeliversModuleState extends State<DeliversModule> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      if (icon != null) ...[
-                        Icon(icon, color: colorL, size: 14),
-                        const SizedBox(width: 4),
-                      ],
-                      Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
-                    ],
-                  ),
-                ),
-                InkWell(
-                  onTap: () {
-                    tempU[key] = u[key];
-                    setDrawerState(() => editingKeys.add(key));
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: Icon(Icons.edit_rounded, color: colorL, size: 12),
-                  ),
-                )
+                if (icon != null) ...[
+                  Icon(icon, color: colorL, size: 14),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
               ],
             ),
             const SizedBox(height: 6),
@@ -602,7 +585,7 @@ class _DeliversModuleState extends State<DeliversModule> {
       }
       editor = InkWell(
         onTap: () async {
-          final tdt = DateTime.tryParse(u['time-deliver']?.toString() ?? '')?.toLocal() ?? DateTime.now();
+          final tdt = DateTime.tryParse(tempU['time-deliver']?.toString() ?? '')?.toLocal() ?? DateTime.now();
           final TimeOfDay? picked = await showTimePicker(
             context: context,
             initialTime: TimeOfDay(hour: tdt.hour, minute: tdt.minute),
@@ -619,8 +602,7 @@ class _DeliversModuleState extends State<DeliversModule> {
           if (picked != null) {
              final now = DateTime.now();
              final newDate = DateTime(now.year, now.month, now.day, picked.hour, picked.minute).toUtc();
-             _saveDeliverField(u['id'], key, newDate.toIso8601String(), u, setDrawerState);
-             setDrawerState(() => editingKeys.remove(key));
+             setDrawerState(() => tempU[key] = newDate.toIso8601String());
           }
         },
         child: Container(
@@ -652,8 +634,7 @@ class _DeliversModuleState extends State<DeliversModule> {
             ],
             onChanged: (v) {
               if (v != null) {
-                _saveDeliverField(u['id'], key, v, u, setDrawerState);
-                setDrawerState(() => editingKeys.remove(key));
+                setDrawerState(() => tempU[key] = v);
               }
             },
           ),
@@ -677,8 +658,7 @@ class _DeliversModuleState extends State<DeliversModule> {
             ],
             onChanged: (v) {
               if (v != null) {
-                _saveDeliverField(u['id'], key, v, u, setDrawerState);
-                setDrawerState(() => editingKeys.remove(key));
+                setDrawerState(() => tempU[key] = v);
               }
             },
           ),
@@ -689,6 +669,8 @@ class _DeliversModuleState extends State<DeliversModule> {
       editor = TextField(
         controller: ctrl,
         style: TextStyle(color: colorP, fontSize: 12),
+        textCapitalization: TextCapitalization.characters,
+        inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
         maxLines: isRemarks ? 3 : 1,
         minLines: isRemarks ? 2 : 1,
         decoration: InputDecoration(
@@ -699,10 +681,6 @@ class _DeliversModuleState extends State<DeliversModule> {
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: inputBorderC)),
         ),
         onChanged: (v) => tempU[key] = v,
-        onSubmitted: (v) {
-          _saveDeliverField(u['id'], key, tempU[key], u, setDrawerState);
-          setDrawerState(() => editingKeys.remove(key));
-        },
       );
     }
 
@@ -723,37 +701,6 @@ class _DeliversModuleState extends State<DeliversModule> {
           ),
           const SizedBox(height: 8),
           editor,
-          if (!isTime && !isTypeDropdown && !isPriority) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                InkWell(
-                  onTap: () {
-                    tempU[key] = u[key];
-                    setDrawerState(() => editingKeys.remove(key));
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(6)),
-                    child: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 16),
-                  )
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () {
-                    _saveDeliverField(u['id'], key, tempU[key], u, setDrawerState);
-                    setDrawerState(() => editingKeys.remove(key));
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(20), borderRadius: BorderRadius.circular(6)),
-                    child: const Icon(Icons.check_rounded, color: Color(0xFF6366f1), size: 16),
-                  )
-                ),
-              ],
-            )
-          ]
         ],
       ),
     );
