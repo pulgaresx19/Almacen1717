@@ -417,9 +417,31 @@ class AddAwbScreenState extends State<AddAwbScreen> {
              'AWB-number': num,
              'total': a['total'],
              'data-AWB': [],
-             'data-coordinator': a['coordinator'] != null ? {'manual_entry': a['coordinator'], 'user': userName, 'time': nowUtc} : {},
-             'data-location': a['location'] != null ? {'manual_entry': a['location'], 'user': userName, 'time': nowUtc} : {},
+             'data-coordinator': [],
+             'data-location': [],
            };
+        }
+        
+        if (a['coordinator'] != null && a['coordinator'].toString().isNotEmpty) {
+           (mergedAwbs[num]!['data-coordinator'] as List).add({
+             'manual_entry': a['coordinator'],
+             'refULD': a['refUld'],
+             'refCarrier': a['refCarrier'],
+             'refNumber': a['refNumber'],
+             'user': userName,
+             'time': nowUtc
+           });
+        }
+        
+        if (a['location'] != null && a['location'].toString().isNotEmpty) {
+           (mergedAwbs[num]!['data-location'] as List).add({
+             'manual_entry': a['location'],
+             'refULD': a['refUld'],
+             'refCarrier': a['refCarrier'],
+             'refNumber': a['refNumber'],
+             'user': userName,
+             'time': nowUtc
+           });
         }
         
         final dataAwbItem = {
@@ -441,17 +463,44 @@ class AddAwbScreenState extends State<AddAwbScreen> {
 
       if (mergedAwbs.isNotEmpty) {
          final awbNumbers = mergedAwbs.keys.toList();
-         final existingDbAwbs = await Supabase.instance.client.from('AWB').select('AWB-number, data-AWB').inFilter('AWB-number', awbNumbers);
-         final existingAwbMap = { for (var e in existingDbAwbs) e['AWB-number'] : e['data-AWB'] };
+         final existingDbAwbs = await Supabase.instance.client.from('AWB').select('AWB-number, data-AWB, data-coordinator, data-location').inFilter('AWB-number', awbNumbers);
+         final existingAwbMap = { for (var e in existingDbAwbs) e['AWB-number'] : e };
          
-         for (var awbNum in mergedAwbs.keys) {
+          for (var awbNum in mergedAwbs.keys) {
             if (existingAwbMap.containsKey(awbNum)) {
-               var dbData = existingAwbMap[awbNum];
-               if (dbData is List) {
-                  (mergedAwbs[awbNum]!['data-AWB'] as List).insertAll(0, dbData);
-               } else if (dbData is Map) {
-                  (mergedAwbs[awbNum]!['data-AWB'] as List).insert(0, dbData);
+               final dbRow = existingAwbMap[awbNum] as Map<String, dynamic>;
+               
+               if (dbRow['data-AWB'] is List) {
+                  (mergedAwbs[awbNum]!['data-AWB'] as List).insertAll(0, dbRow['data-AWB']);
+               } else if (dbRow['data-AWB'] is Map) {
+                  (mergedAwbs[awbNum]!['data-AWB'] as List).insert(0, dbRow['data-AWB']);
                }
+               
+               List dbCoord = [];
+               if (dbRow['data-coordinator'] is List) {
+                   dbCoord = List.from(dbRow['data-coordinator']);
+               } else if (dbRow['data-coordinator'] is Map && dbRow['data-coordinator'].isNotEmpty) {
+                   dbCoord = [dbRow['data-coordinator']];
+               }
+               if ((mergedAwbs[awbNum]!['data-coordinator'] as List).isNotEmpty) {
+                   dbCoord.addAll(mergedAwbs[awbNum]!['data-coordinator']);
+               }
+               mergedAwbs[awbNum]!['data-coordinator'] = dbCoord.isEmpty ? {} : dbCoord;
+               
+               List dbLoc = [];
+               if (dbRow['data-location'] is List) {
+                   dbLoc = List.from(dbRow['data-location']);
+               } else if (dbRow['data-location'] is Map && dbRow['data-location'].isNotEmpty) {
+                   dbLoc = [dbRow['data-location']];
+               }
+               if ((mergedAwbs[awbNum]!['data-location'] as List).isNotEmpty) {
+                   dbLoc.addAll(mergedAwbs[awbNum]!['data-location']);
+               }
+               mergedAwbs[awbNum]!['data-location'] = dbLoc.isEmpty ? {} : dbLoc;
+               
+            } else {
+               if ((mergedAwbs[awbNum]!['data-coordinator'] as List).isEmpty) mergedAwbs[awbNum]!['data-coordinator'] = {};
+               if ((mergedAwbs[awbNum]!['data-location'] as List).isEmpty) mergedAwbs[awbNum]!['data-location'] = {};
             }
          }
          

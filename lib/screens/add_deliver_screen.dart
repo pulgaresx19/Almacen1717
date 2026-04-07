@@ -339,7 +339,13 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         'time-deliver': timeDeliverDate.toUtc().toIso8601String(),
         'remarks': _remarksCtrl.text.trim(),
         'isPriority': _isPriority,
-        'list-pickup': _typeCtrl.text == 'Import' ? _importAwbs.map((e) => e['awbNumber']?.toString() ?? '').toList() : _selectedAwbs.map((e) => e['AWB-number']?.toString() ?? '').toList(),
+        'list-pickup': _typeCtrl.text == 'Import' 
+            ? _importAwbs.map((e) => '${e['awbNumber']?.toString() ?? ''} - ${e['pieces'] ?? 0} Pcs').toList() 
+            : _selectedAwbs.map((e) {
+                final awbNum = e['AWB-number']?.toString() ?? '';
+                final pcs = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+                return '$awbNum - $pcs Pcs';
+              }).toList(),
       };
 
       await Supabase.instance.client.from('Delivers').insert(payload);

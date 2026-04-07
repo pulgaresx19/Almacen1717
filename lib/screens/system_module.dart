@@ -22,6 +22,35 @@ class _SystemModuleState extends State<SystemModule> {
   final _searchController = TextEditingController();
   DateTime? _dateLeft;
   DateTime? _dateRight;
+  String _cachedAuthorName = 'Usuario';
+
+  @override
+  void initState() {
+    super.initState();
+    _initAuthorName();
+  }
+
+  Future<void> _initAuthorName() async {
+    String userName = Supabase.instance.client.auth.currentUser?.email?.split('@')[0] ?? 'Usuario';
+    try {
+      final uUser = Supabase.instance.client.auth.currentUser;
+      if (uUser != null) {
+        final userRow = await Supabase.instance.client
+            .from('Users')
+            .select('full-name')
+            .eq('id', uUser.id)
+            .maybeSingle();
+        if (userRow != null && userRow['full-name'] != null) {
+          userName = userRow['full-name'];
+        }
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _cachedAuthorName = userName;
+      });
+    }
+  }
 
   Map<String, dynamic>? _activeAwbOverlayLeft;
   Map<String, dynamic>? _activeAwbOverlayRight;
@@ -89,26 +118,6 @@ class _SystemModuleState extends State<SystemModule> {
       }
     }
   }
-
-  Future<String> _getAuthorName() async {
-    String userName =
-        Supabase.instance.client.auth.currentUser?.email ?? 'Unknown';
-    try {
-      final uUser = Supabase.instance.client.auth.currentUser;
-      if (uUser != null) {
-        final userRow = await Supabase.instance.client
-            .from('Users')
-            .select('full-name')
-            .eq('id', uUser.id)
-            .maybeSingle();
-        if (userRow != null && userRow['full-name'] != null) {
-          userName = userRow['full-name'];
-        }
-      }
-    } catch (_) {}
-    return userName;
-  }
-
   StreamSubscription<List<Map<String, dynamic>>>? _uldSubLeft;
   StreamSubscription<List<Map<String, dynamic>>>? _uldSubRight;
   StreamSubscription<List<Map<String, dynamic>>>? _flightSubLeft;
@@ -702,27 +711,7 @@ class _SystemModuleState extends State<SystemModule> {
                         itemCount: (isLeft ? _uldsLeft : _uldsRight).length,
                         itemBuilder: (context, index) {
                           final uld = (isLeft ? _uldsLeft : _uldsRight)[index];
-                          String? indTime;
-                          String? receivedUser;
-                          if (uld['data-received'] != null &&
-                              uld['data-received'] is Map) {
-                            indTime = uld['data-received']['time'];
-                            receivedUser = uld['data-received']['user'];
-                          }
-                          String toAmPmFormat(String t) {
-                            if (t.isEmpty) return t;
-                            try {
-                              if (t.contains('T')) {
-                                final dt = DateTime.parse(t).toLocal();
-                                int h = dt.hour;
-                                int m = dt.minute;
-                                bool pm = h >= 12;
-                                int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-                                return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-                              }
-                            } catch (_) {}
-                            return t;
-                          }
+
 
                           return Stack(
                             clipBehavior: Clip.none,
@@ -935,112 +924,7 @@ class _SystemModuleState extends State<SystemModule> {
                                     const SizedBox(width: 12),
                                     Row(
                                       children: [
-                                        if (indTime != null) ...[
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.info_outline,
-                                              color: Color(0xFF6366f1),
-                                              size: 20,
-                                            ),
-                                            tooltip: appLanguage.value == 'es'
-                                                ? 'Info Recepción'
-                                                : 'Receipt Info',
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                            onPressed: () {
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) {
-                                                  return AlertDialog(
-                                                    alignment: isLeft
-                                                        ? const Alignment(
-                                                            -0.5,
-                                                            0.0,
-                                                          )
-                                                        : const Alignment(
-                                                            0.5,
-                                                            0.0,
-                                                          ),
-                                                    backgroundColor: dark
-                                                        ? const Color(
-                                                            0xFF1e293b,
-                                                          )
-                                                        : Colors.white,
-                                                    title: Text(
-                                                      appLanguage.value == 'es'
-                                                          ? 'Detalles de Recepción'
-                                                          : 'Receipt Details',
-                                                      style: TextStyle(
-                                                        color: textP,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    content: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          'ULD: ${uld['ULD-number'] ?? '-'}',
-                                                          style: TextStyle(
-                                                            color: textP,
-                                                            fontSize: 14,
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 12,
-                                                        ),
-                                                        Text(
-                                                          '${appLanguage.value == 'es' ? 'Usuario' : 'User'}: ${receivedUser ?? '-'}',
-                                                          style: TextStyle(
-                                                            color: textP,
-                                                            fontSize: 14,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(
-                                                          height: 8,
-                                                        ),
-                                                        Text(
-                                                          '${appLanguage.value == 'es' ? 'Hora y Fecha' : 'Date & Time'}: ${toAmPmFormat(indTime!)}',
-                                                          style: TextStyle(
-                                                            color: textP,
-                                                            fontSize: 14,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () =>
-                                                            Navigator.of(
-                                                              context,
-                                                            ).pop(),
-                                                        child: Text(
-                                                          appLanguage.value ==
-                                                                  'es'
-                                                              ? 'Cerrar'
-                                                              : 'Close',
-                                                          style:
-                                                              const TextStyle(
-                                                                color: Color(
-                                                                  0xFF6366f1,
-                                                                ),
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          ),
-                                          const SizedBox(width: 8),
-                                        ],
+
                                         Container(
                                           width: 75,
                                           alignment: Alignment.center,
@@ -1101,7 +985,7 @@ class _SystemModuleState extends State<SystemModule> {
                                                     final bool isChecked =
                                                         v == true;
                                                     final authorName =
-                                                        await _getAuthorName();
+                                                        _cachedAuthorName;
                                                     setState(() {
                                                       final currentFlightList =
                                                           isLeft
@@ -2331,35 +2215,7 @@ class _SystemModuleState extends State<SystemModule> {
                                               onChanged: (v) async {
                                                 final bool isChecked =
                                                     v == true;
-                                                String authorName = 'Usuario';
-                                                try {
-                                                  final uUser = Supabase
-                                                      .instance
-                                                      .client
-                                                      .auth
-                                                      .currentUser;
-                                                  if (uUser != null) {
-                                                    authorName =
-                                                        uUser.email?.split(
-                                                          '@',
-                                                        )[0] ??
-                                                        'Usuario';
-                                                    final userRow =
-                                                        await Supabase
-                                                            .instance
-                                                            .client
-                                                            .from('Users')
-                                                            .select('full-name')
-                                                            .eq('id', uUser.id)
-                                                            .maybeSingle();
-                                                    if (userRow != null &&
-                                                        userRow['full-name'] !=
-                                                            null) {
-                                                      authorName =
-                                                          userRow['full-name'];
-                                                    }
-                                                  }
-                                                } catch (_) {}
+                                                String authorName = _cachedAuthorName;
 
                                                 final truckTime = DateTime.now()
                                                     .toUtc()

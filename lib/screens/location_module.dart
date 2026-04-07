@@ -2766,6 +2766,7 @@ class _LocationModuleState extends State<LocationModule> {
       'Other': [],
     };
     Map<String, TextEditingController> itemLocationCtrls = {};
+    Map<String, int> multiLocCounts = {};
     Set<String> confirmedLocations = {};
     String? requiredGlobalLoc;
     bool isLoading = true;
@@ -2999,8 +3000,20 @@ class _LocationModuleState extends State<LocationModule> {
                             isViewMode = true;
                           }
                           locMap.forEach((k, v) {
-                            itemLocationCtrls[k.toString()] = TextEditingController(text: v.toString());
-                            confirmedLocations.add(k.toString());
+                            String baseKey = k.toString();
+                            String val = v.toString();
+                            if (baseKey.startsWith('AGI Skid_')) {
+                               itemLocationCtrls[baseKey] = TextEditingController(text: val);
+                               confirmedLocations.add(baseKey);
+                            } else {
+                               List<String> splits = val.contains(' / ') ? val.split(' / ') : [val];
+                               multiLocCounts[baseKey] = splits.length;
+                               for (int i = 0; i < splits.length; i++) {
+                                  String locKey = '${baseKey}__$i';
+                                  itemLocationCtrls[locKey] = TextEditingController(text: splits[i]);
+                                  confirmedLocations.add(locKey);
+                               }
+                            }
                           });
                         }
                       }
@@ -3028,10 +3041,25 @@ class _LocationModuleState extends State<LocationModule> {
               } else {
                 int totalPcs = list.isNotEmpty ? list.fold(0, (a, b) => a + b) : 0;
                 if (totalPcs > 0) {
-                  if (!itemLocationCtrls.containsKey(k) || itemLocationCtrls[k]!.text.trim().isEmpty) {
+                  int count = multiLocCounts[k] ?? 1;
+                  List<String> locs = [];
+                  bool filled = true;
+                  for (int i = 0; i < count; i++) {
+                    String locKey = '${k}__$i';
+                    // Support legacy migration where the key was just `k`
+                    if (!itemLocationCtrls.containsKey(locKey) && itemLocationCtrls.containsKey(k)) {
+                       locKey = k;
+                    }
+                    if (!itemLocationCtrls.containsKey(locKey) || itemLocationCtrls[locKey]!.text.trim().isEmpty) {
+                      filled = false;
+                    } else {
+                      locs.add(itemLocationCtrls[locKey]!.text.trim());
+                    }
+                  }
+                  if (!filled) {
                     allSet = false;
                   } else {
-                    locationData[k] = itemLocationCtrls[k]!.text.trim();
+                    locationData[k] = locs.join(' / ');
                   }
                 }
               }
@@ -3062,7 +3090,120 @@ class _LocationModuleState extends State<LocationModule> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 36),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                    icon: const Icon(Icons.info_outline, color: Color(0xFF6366f1), size: 20),
+                    tooltip: 'View AWB Details',
+                    onPressed: () {
+                      showDialog(
+                        context: dialogCtx,
+                        builder: (infoCtx) => AlertDialog(
+                          backgroundColor: const Color(0xFF1e293b),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(color: Colors.white.withAlpha(10)),
+                          ),
+                          title: Row(
+                            children: const [
+                              Icon(Icons.info_outline, color: Color(0xFF6366f1), size: 20),
+                              SizedBox(width: 8),
+                              Text('AWB Details', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          content: SizedBox(
+                            width: 300,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildStatMini('PIECES', '${awb['pieces'] ?? '-'}'),
+                                    _buildStatMini('TOTAL', '${awb['total'] ?? '-'}'),
+                                    _buildStatMini(
+                                      'WEIGHT',
+                                      '${awb['weight'] ?? '-'} kg',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                const Divider(color: Colors.white10),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: _buildStatMini(
+                                        'HOUSES',
+                                        '${(awb['hawbs'] as List?)?.length ?? '0'}',
+                                        onTap: () {
+                                          final hList = (awb['hawbs'] as List?) ?? [];
+                                          if (hList.isEmpty) return;
+                                          showDialog(
+                                            context: infoCtx,
+                                            builder: (ctx) => AlertDialog(
+                                              backgroundColor: const Color(0xFF1e293b),
+                                              elevation: 8,
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                              title: Row(
+                                                children: const [
+                                                  Icon(Icons.inventory_2_outlined, color: Color(0xFF6366f1), size: 18),
+                                                  SizedBox(width: 8),
+                                                  Text('House Numbers', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                              content: Container(
+                                                width: 250,
+                                                constraints: const BoxConstraints(maxHeight: 250),
+                                                child: ListView.separated(
+                                                  shrinkWrap: true,
+                                                  itemCount: hList.length,
+                                                  separatorBuilder: (_, _) => const Divider(color: Color(0xFF334155)),
+                                                  itemBuilder: (c, i) => Padding(
+                                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                                    child: Text(hList[i].toString(), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                                                  ),
+                                                ),
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(ctx),
+                                                  child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildStatMini(
+                                        'REMARKS',
+                                        (awb['remarks']?.toString().trim().isEmpty ?? true)
+                                            ? '-'
+                                            : awb['remarks'].toString().trim(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(infoCtx),
+                              child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
               content: SizedBox(
@@ -3072,130 +3213,6 @@ class _LocationModuleState extends State<LocationModule> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // top summary bar
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white.withAlpha(10)),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildStatMini('PIECES', '${awb['pieces'] ?? '-'}'),
-                                _buildStatMini('TOTAL', '${awb['total'] ?? '-'}'),
-                                _buildStatMini(
-                                  'WEIGHT',
-                                  '${awb['weight'] ?? '-'} kg',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            const Divider(color: Colors.white10),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _buildStatMini(
-                                    'HOUSES',
-                                    '${(awb['hawbs'] as List?)?.length ?? '0'}',
-                                    onTap: () {
-                                      final hList = (awb['hawbs'] as List?) ?? [];
-                                      if (hList.isEmpty) return;
-                                      showDialog(
-                                        context: dialogCtx,
-                                        builder: (ctx) => AlertDialog(
-                                          backgroundColor: const Color(0xFF1e293b),
-                                          elevation: 8,
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
-                                          titlePadding: const EdgeInsets.fromLTRB(
-                                            16,
-                                            16,
-                                            16,
-                                            8,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          title: Row(
-                                            children: const [
-                                              Icon(
-                                                Icons.inventory_2_outlined,
-                                                color: Color(0xFF6366f1),
-                                                size: 18,
-                                              ),
-                                              SizedBox(width: 8),
-                                              Text(
-                                                'House Numbers',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          content: Container(
-                                            width: 250,
-                                            constraints: const BoxConstraints(
-                                              maxHeight: 250,
-                                            ),
-                                            child: ListView.separated(
-                                              shrinkWrap: true,
-                                              itemCount: hList.length,
-                                              separatorBuilder:
-                                                  (_, _) => const Divider(
-                                                    color: Color(0xFF334155),
-                                                  ),
-                                              itemBuilder: (c, i) {
-                                                return Padding(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    vertical: 12,
-                                                  ),
-                                                  child: Text(
-                                                    hList[i].toString(),
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 14,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () => Navigator.pop(ctx),
-                                              child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildStatMini(
-                                    'REMARKS',
-                                    (awb['remarks']?.toString().trim().isEmpty ?? true)
-                                        ? '-'
-                                        : awb['remarks'].toString().trim(),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
 
                       const SizedBox(height: 20),
 
@@ -3353,6 +3370,7 @@ class _LocationModuleState extends State<LocationModule> {
                                       ),
                                     );
                                   } else {
+                                    int count = multiLocCounts[entry.key] ?? 1;
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 12),
                                       padding: const EdgeInsets.all(12),
@@ -3363,32 +3381,126 @@ class _LocationModuleState extends State<LocationModule> {
                                           color: Colors.white.withAlpha(10),
                                         ),
                                       ),
-                                      child: Row(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            '$totalPcs',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '$totalPcs',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                getDisplayName(entry.key, totalPcs),
+                                                style: const TextStyle(
+                                                  color: Color(0xFF94a3b8),
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                              const Spacer(),
+                                              if (!isViewMode)
+                                                IconButton(
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                                  icon: const Icon(Icons.add_circle_outline, color: Color(0xFF3b82f6), size: 20),
+                                                  tooltip: 'Add Location',
+                                                  onPressed: () {
+                                                    setDialogState(() {
+                                                      multiLocCounts[entry.key] = count + 1;
+                                                      if (count == 1) {
+                                                        // Migrate single baseKey to __0
+                                                        if (itemLocationCtrls.containsKey(entry.key)) {
+                                                          itemLocationCtrls['${entry.key}__0'] = TextEditingController(text: itemLocationCtrls[entry.key]!.text);
+                                                          if (confirmedLocations.contains(entry.key)) confirmedLocations.add('${entry.key}__0');
+                                                          itemLocationCtrls.remove(entry.key);
+                                                          confirmedLocations.remove(entry.key);
+                                                        }
+                                                      }
+                                                      // Initialize the new editor if not already present
+                                                      String locKey = '${entry.key}__$count';
+                                                      if (!itemLocationCtrls.containsKey(locKey)) {
+                                                        itemLocationCtrls[locKey] = TextEditingController();
+                                                      }
+                                                    });
+                                                  },
+                                                ),
+                                            ],
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            getDisplayName(entry.key, totalPcs),
-                                            style: const TextStyle(
-                                              color: Color(0xFF94a3b8),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 16),
-                                          Expanded(
-                                            child: (() {
-                                              String locKey = entry.key;
-                                              return buildLocationEditor(locKey);
-                                            })(),
-                                          ),
+                                          const SizedBox(height: 8),
+                                          ...List.generate(count, (idx) {
+                                            String locKey = count == 1 ? entry.key : '${entry.key}__$idx';
+                                            return Padding(
+                                              padding: const EdgeInsets.only(bottom: 8.0),
+                                              child: Row(
+                                                children: [
+                                                  if (count > 1) ...[
+                                                    Text(
+                                                      '#${idx + 1}',
+                                                      style: const TextStyle(color: Color(0xFF64748b), fontSize: 12, fontWeight: FontWeight.bold),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                  ],
+                                                  Expanded(
+                                                    child: buildLocationEditor(locKey),
+                                                  ),
+                                                  if (count > 1 && !isViewMode) ...[
+                                                    const SizedBox(width: 8),
+                                                    IconButton(
+                                                      padding: EdgeInsets.zero,
+                                                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                                      icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
+                                                      tooltip: 'Remove Location',
+                                                      onPressed: () {
+                                                        setDialogState(() {
+                                                          int c = multiLocCounts[entry.key] ?? 1;
+                                                          if (c <= 1) return;
+                                                          
+                                                          // Shift texts down starting from removed idx
+                                                          for (int i = idx; i < c - 1; i++) {
+                                                            String currKey = '${entry.key}__$i';
+                                                            String nextKey = '${entry.key}__${i + 1}';
+                                                            if (!itemLocationCtrls.containsKey(currKey)) {
+                                                              itemLocationCtrls[currKey] = TextEditingController();
+                                                            }
+                                                            itemLocationCtrls[currKey]!.text = itemLocationCtrls[nextKey]?.text ?? '';
+                                                            
+                                                            if (confirmedLocations.contains(nextKey)) {
+                                                              confirmedLocations.add(currKey);
+                                                            } else {
+                                                              confirmedLocations.remove(currKey);
+                                                            }
+                                                          }
+                                                          // Remove the last item
+                                                          String lastKey = '${entry.key}__${c - 1}';
+                                                          itemLocationCtrls.remove(lastKey);
+                                                          confirmedLocations.remove(lastKey);
+                                                          
+                                                          multiLocCounts[entry.key] = c - 1;
+                                                          
+                                                          // If count became 1, migrate __0 back to base key
+                                                          if (c - 1 == 1) {
+                                                            String zeroKey = '${entry.key}__0';
+                                                            if (itemLocationCtrls.containsKey(zeroKey)) {
+                                                              itemLocationCtrls[entry.key] = TextEditingController(text: itemLocationCtrls[zeroKey]!.text);
+                                                              if (confirmedLocations.contains(zeroKey)) confirmedLocations.add(entry.key);
+                                                              itemLocationCtrls.remove(zeroKey);
+                                                              confirmedLocations.remove(zeroKey);
+                                                            }
+                                                          }
+                                                        });
+                                                      },
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            );
+                                          }),
                                         ],
                                       ),
                                     );
