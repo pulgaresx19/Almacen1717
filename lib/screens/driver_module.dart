@@ -22,6 +22,8 @@ class _DriverModuleState extends State<DriverModule> {
   List<Map<String, dynamic>> _driverAwbs = [];
   bool _isLoadingAwbs = false;
   bool _isDelivering = false;
+  bool _autoFoundPieces = true;
+  final _manualFoundCtrl = TextEditingController(text: '0');
   late Stream<List<Map<String, dynamic>>> _deliversStream;
 
   @override
@@ -33,6 +35,7 @@ class _DriverModuleState extends State<DriverModule> {
   @override
   void dispose() {
     _searchController.dispose();
+    _manualFoundCtrl.dispose();
     super.dispose();
   }
 
@@ -439,13 +442,31 @@ class _DriverModuleState extends State<DriverModule> {
                              child: Center(child: Text(appLanguage.value == 'es' ? 'No hay AWBs registrados para este chófer.' : 'No AWBs attached to this driver.', style: TextStyle(color: textS))),
                            )
                         else
-                           ..._driverAwbs.map((awb) {
+                           ..._driverAwbs.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final awb = entry.value;
                               final awbNum = awb['AWB-number']?.toString() ?? '-';
                               final listPickup = (u['list-pickup'] as List?)?.map((e) => e.toString()).toList() ?? [];
                               String piecesStr = '';
+                              String remarkStr = '';
                               final match = listPickup.firstWhere((element) => element.startsWith(awbNum), orElse: () => '');
                               if (match.contains(' - ')) {
-                                 piecesStr = match.split(' - ').last.trim();
+                                 final parts = match.split(' - ');
+                                 if (parts.length > 1) {
+                                   piecesStr = parts[1].trim();
+                                 }
+                                 if (parts.length > 2) {
+                                   remarkStr = parts[2].trim();
+                                 }
+                              }
+
+                              bool isThisDelivered = false;
+                              if (awb['data-deliver'] != null) {
+                                if (awb['data-deliver'] is List) {
+                                  isThisDelivered = (awb['data-deliver'] as List).any((d) => d is Map && d['pickup_id'] == u['id-pickup']);
+                                } else if (awb['data-deliver'] is Map) {
+                                  isThisDelivered = awb['data-deliver']['pickup_id'] == u['id-pickup'];
+                                }
                               }
 
                               return GestureDetector(
@@ -464,18 +485,41 @@ class _DriverModuleState extends State<DriverModule> {
                                   ),
                                 child: Row(
                                   children: [
+                                    Container(
+                                      width: 24, height: 24,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                                      child: Text('${idx + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      flex: 4,
+                                      child: Text(awbNum, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                    ),
                                     Expanded(
                                       flex: 3,
-                                      child: Text(awbNum, style: TextStyle(color: const Color(0xFF6366f1), fontSize: 16, fontWeight: FontWeight.bold)),
-                                    ),
-                                    if (piecesStr.isNotEmpty)
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(piecesStr, style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.inventory_2_outlined, color: textS, size: 14),
+                                          const SizedBox(width: 6),
+                                          Flexible(child: Text(piecesStr, style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                        ],
                                       ),
+                                    ),
+                                    Expanded(
+                                      flex: 5,
+                                      child: remarkStr.isNotEmpty ? Row(
+                                          children: [
+                                            Icon(Icons.notes_rounded, color: textS, size: 14),
+                                            const SizedBox(width: 6),
+                                            Flexible(child: Text(remarkStr, style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                          ],
+                                        ) : const SizedBox(),
+                                    ),
+                                    const SizedBox(width: 8),
                                     Icon(
                                       Icons.check_circle_outline_rounded, 
-                                      color: awb['data-deliver'] != null ? const Color(0xFF10b981) : textS, 
+                                      color: isThisDelivered ? const Color(0xFF10b981) : textS, 
                                       size: 20
                                     ),
                                   ],
@@ -520,9 +564,9 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 
-  List<Widget> _buildSavedDeliveryUI(Map awb, bool dark, Color textP, Color textS, Color borderCard) {
-    if (awb['data-deliver'] == null || awb['data-deliver']['references'] == null) return [];
-    List refs = awb['data-deliver']['references'] is List ? awb['data-deliver']['references'] : [];
+  List<Widget> _buildSavedDeliveryUI(Map? matchingDelivery, String awbNum, bool dark, Color textP, Color textS, Color borderCard) {
+    if (matchingDelivery == null || matchingDelivery['references'] == null) return [];
+    List refs = matchingDelivery['references'] is List ? matchingDelivery['references'] : [];
     if (refs.isEmpty) return [Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text('No delivered items selected.', style: TextStyle(color: textS))))];
     
     // Group by ULD + Flight
@@ -559,7 +603,7 @@ class _DriverModuleState extends State<DriverModule> {
        
        bool isBreak = !items.any((i) => i['item'] == 'NO BREAK AREA');
        
-       String uldKey = 'DELIVERED_${awb['AWB-number']}_$uldNumber';
+       String uldKey = 'DELIVERED_${awbNum}_$uldNumber';
        bool isHidden = _hiddenDriverItems.contains(uldKey);
 
        return Container(
@@ -673,6 +717,9 @@ class _DriverModuleState extends State<DriverModule> {
                    builder: (context, constraints) {
                      List<DataRow> tableRows = items.map((item) {
                         String displayName = item['item']?.toString() ?? '';
+                        if (displayName == 'NO BREAK AREA' || displayName == 'NO_BREAK') {
+                           displayName = item['refULD']?.toString() ?? displayName;
+                        }
                         String pieces = item['pieces']?.toString() ?? '-';
                         if (pieces == '0' || pieces == 'null') pieces = '-';
                         String locText = item['location']?.toString() ?? 'FLOOR';
@@ -729,6 +776,37 @@ class _DriverModuleState extends State<DriverModule> {
 
   Widget _buildAwbDetailPanel(Map<String, dynamic> awb, bool dark, Color textP, Color textS, Color bgCard, Color borderCard) {
     final awbNum = awb['AWB-number']?.toString() ?? '-';
+
+    Map<String, dynamic>? matchingDelivery;
+    Set<String> alreadyPickedUpKeys = {};
+    if (awb['data-deliver'] != null) {
+      if (awb['data-deliver'] is List) {
+        for (var d in (awb['data-deliver'] as List)) {
+          if (d is Map && d['pickup_id'] == _selectedDriver?['id-pickup']) {
+            matchingDelivery = d as Map<String, dynamic>;
+          }
+          if (d is Map && d['references'] is List) {
+            for (var ref in d['references']) {
+               if (ref is Map) {
+                  alreadyPickedUpKeys.add('${ref['refULD']}_${ref['refNumber']}_${ref['item']}');
+               }
+            }
+          }
+        }
+      } else if (awb['data-deliver'] is Map) {
+        final singleMap = awb['data-deliver'] as Map<String, dynamic>;
+        if (singleMap['pickup_id'] == _selectedDriver?['id-pickup']) {
+          matchingDelivery = singleMap;
+        }
+        if (singleMap['references'] is List) {
+           for (var ref in singleMap['references']) {
+              if (ref is Map) {
+                 alreadyPickedUpKeys.add('${ref['refULD']}_${ref['refNumber']}_${ref['item']}');
+              }
+           }
+        }
+      }
+    }
     
     List awbItems = [];
     if (awb['data-AWB'] is List) {
@@ -757,7 +835,10 @@ class _DriverModuleState extends State<DriverModule> {
       final listPickup = (_selectedDriver!['list-pickup'] as List?)?.map((e) => e.toString()).toList() ?? [];
       final match = listPickup.firstWhere((element) => element.startsWith(awbNum), orElse: () => '');
       if (match.contains(' - ')) {
-         deliverPiecesStr = match.split(' - ').last.trim();
+         final parts = match.split(' - ');
+         if (parts.length > 1) {
+           deliverPiecesStr = parts[1].trim();
+         }
       }
     }
 
@@ -799,6 +880,11 @@ class _DriverModuleState extends State<DriverModule> {
        });
     }
     
+    int calculatedFoundPieces = foundPieces;
+    if (!_autoFoundPieces) {
+       foundPieces = int.tryParse(_manualFoundCtrl.text) ?? 0;
+    }
+    
     String digitsOnly = deliverPiecesStr.replaceAll(RegExp(r'[^0-9]'), '');
     int expectedDeliver = int.tryParse(digitsOnly) ?? 0;
 
@@ -807,25 +893,25 @@ class _DriverModuleState extends State<DriverModule> {
     String rejectUser = '';
     String rejectTime = 'Unknown';
     String rejectLocation = 'Unknown';
+    
+    List<Map<String, dynamic>> rejectList = [];
+    
     if (_localRejections.containsKey(awbNum)) {
-      rejectedQty = int.tryParse(_localRejections[awbNum]!['qty']?.toString() ?? '0') ?? 0;
-      rejectReason = _localRejections[awbNum]!['reason']?.toString() ?? 'No reason provided';
-      rejectUser = _localRejections[awbNum]!['user']?.toString() ?? 'Unknown';
-      rejectLocation = _localRejections[awbNum]!['location']?.toString() ?? 'Unknown';
-      if (_localRejections[awbNum]!['time'] != null) {
-        try {
-          final dt = DateTime.parse(_localRejections[awbNum]!['time'].toString()).toLocal();
-          rejectTime = DateFormat('hh:mm a').format(dt);
-        } catch (_) {}
+      rejectList.add(_localRejections[awbNum]!);
+    } else {
+      if (matchingDelivery != null && matchingDelivery['rejection'] != null) {
+        rejectList.add(matchingDelivery['rejection'] as Map<String, dynamic>);
       }
-    } else if (awb['data-reject'] is Map) {
-      rejectedQty = int.tryParse(awb['data-reject']['pieces']?.toString() ?? awb['data-reject']['qty']?.toString() ?? '0') ?? 0;
-      rejectReason = awb['data-reject']['reason']?.toString() ?? 'No reason provided';
-      rejectUser = awb['data-reject']['user']?.toString() ?? 'Unknown';
-      rejectLocation = awb['data-reject']['location']?.toString() ?? 'Unknown';
-      if (awb['data-reject']['time'] != null) {
+    }
+
+    for (var rejectData in rejectList) {
+      rejectedQty += int.tryParse(rejectData['pieces']?.toString() ?? rejectData['qty']?.toString() ?? '0') ?? 0;
+      rejectReason = rejectData['reason']?.toString() ?? 'No reason provided';
+      rejectUser = rejectData['user']?.toString() ?? 'Unknown';
+      rejectLocation = rejectData['location']?.toString() ?? 'Unknown';
+      if (rejectData['time'] != null) {
         try {
-          final dt = DateTime.parse(awb['data-reject']['time'].toString()).toLocal();
+          final dt = DateTime.parse(rejectData['time'].toString()).toLocal();
           rejectTime = DateFormat('hh:mm a').format(dt);
         } catch (_) {}
       }
@@ -879,10 +965,58 @@ class _DriverModuleState extends State<DriverModule> {
                         const SizedBox(width: 24),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Found Pieces', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                Text('Found', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
+                                if (matchingDelivery == null) ...[
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: Checkbox(
+                                      value: _autoFoundPieces,
+                                      activeColor: const Color(0xFF6366f1),
+                                      onChanged: (val) {
+                                         setState(() {
+                                            _autoFoundPieces = val ?? true;
+                                            if (!_autoFoundPieces) {
+                                               _manualFoundCtrl.text = calculatedFoundPieces.toString();
+                                            }
+                                         });
+                                      },
+                                    ),
+                                  ),
+                                ]
+                              ],
+                            ),
                             const SizedBox(height: 4),
-                            Text(foundPieces.toString(), style: TextStyle(color: foundColor, fontSize: 24, fontWeight: FontWeight.bold)),
+                            if (matchingDelivery != null)
+                               Text(matchingDelivery['found']?.toString() ?? '0', style: TextStyle(color: foundColor, fontSize: 24, fontWeight: FontWeight.bold))
+                            else if (_autoFoundPieces)
+                               Text(foundPieces.toString(), style: TextStyle(color: foundColor, fontSize: 24, fontWeight: FontWeight.bold))
+                            else
+                               SizedBox(
+                                 width: 90,
+                                 height: 36,
+                                 child: TextField(
+                                   controller: _manualFoundCtrl,
+                                   keyboardType: TextInputType.number,
+                                   style: TextStyle(color: foundColor, fontSize: 20, fontWeight: FontWeight.bold),
+                                   textAlign: TextAlign.center,
+                                   decoration: InputDecoration(
+                                     isDense: true,
+                                     contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderCard), borderRadius: BorderRadius.circular(8)),
+                                     focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF6366f1)), borderRadius: BorderRadius.circular(8)),
+                                   ),
+                                   onChanged: (val) {
+                                      setState(() {});
+                                   }
+                                 )
+                               ),
                           ],
                         ),
                         const SizedBox(width: 24),
@@ -909,7 +1043,23 @@ class _DriverModuleState extends State<DriverModule> {
                                             builder: (ctx) => AlertDialog(
                                               backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1f2937) : Colors.white,
                                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                              title: Text('Reject Details', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                              title: Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Text('Reject Details', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                                  if (_localRejections.containsKey(awbNum))
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                                      tooltip: 'Delete Local Rejection',
+                                                      onPressed: () {
+                                                        setState(() {
+                                                          _localRejections.remove(awbNum);
+                                                        });
+                                                        Navigator.pop(ctx);
+                                                      },
+                                                    ),
+                                                ],
+                                              ),
                                               content: Column(
                                                 mainAxisSize: MainAxisSize.min,
                                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1032,9 +1182,9 @@ class _DriverModuleState extends State<DriverModule> {
                   const SizedBox(height: 16),
                   Builder(
                     builder: (context) {
-                      bool isSavedDelivery = awb['data-deliver'] != null && awb['data-deliver']['references'] is List;
+                      bool isSavedDelivery = matchingDelivery != null && matchingDelivery['references'] is List;
                       if (isSavedDelivery) {
-                         return Column(children: _buildSavedDeliveryUI(awb, dark, textP, textS, borderCard));
+                         return Column(children: _buildSavedDeliveryUI(matchingDelivery, awbNum, dark, textP, textS, borderCard));
                       }
                       
                       if (awbItems.isEmpty) {
@@ -1157,18 +1307,29 @@ class _DriverModuleState extends State<DriverModule> {
                               'location': locText,
                            };
 
+                           String unifiedKey = '${awbItem['refULD']}_${awbItem['refNumber']}_$displayName';
+                           bool isAlreadyPickedUp = alreadyPickedUpKeys.contains(unifiedKey);
+
                            return DataRow(cells: [
                              DataCell(
-                               Checkbox(
-                                 value: isChecked,
-                                 onChanged: (val) {
-                                   setState(() {
-                                     _driverItemCheckState[checkKey] = val == true;
-                                   });
-                                 },
-                                 activeColor: const Color(0xFF6366f1),
-                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                               ),
+                               isAlreadyPickedUp
+                                 ? const SizedBox(
+                                     width: 40,
+                                     height: 40,
+                                     child: Center(
+                                       child: Icon(Icons.check_circle, color: Color(0xFF10b981), size: 24),
+                                     ),
+                                   )
+                                 : Checkbox(
+                                     value: isChecked,
+                                     onChanged: (val) {
+                                       setState(() {
+                                         _driverItemCheckState[checkKey] = val == true;
+                                       });
+                                     },
+                                     activeColor: const Color(0xFF6366f1),
+                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                   ),
                              ),
                              DataCell(Text(displayName, style: TextStyle(color: const Color(0xFF10b981), fontWeight: FontWeight.bold, fontSize: 14))),
                              DataCell(Text(pieces > 0 ? pieces.toString() : '-', style: TextStyle(color: textP, fontSize: 14))),
@@ -1187,7 +1348,7 @@ class _DriverModuleState extends State<DriverModule> {
                               'refNumber': awbItem['refNumber']?.toString() ?? '',
                               'refCarrier': awbItem['refCarrier']?.toString() ?? '',
                               'refDate': awbItem['refDate']?.toString() ?? '',
-                              'item': 'NO BREAK AREA',
+                              'item': uldNumber,
                               'pieces': totalPieces,
                               'location': 'NO BREAK AREA',
                            };
@@ -1196,18 +1357,31 @@ class _DriverModuleState extends State<DriverModule> {
                            allItemKeys.add('NO_BREAK'); // to satisfy the Checkbox allChecked logic below
                            
                            tableRows.clear();
+                           
+                           String unifiedKey1 = '${awbItem['refULD']}_${awbItem['refNumber']}_NO BREAK AREA';
+                           String unifiedKey2 = '${awbItem['refULD']}_${awbItem['refNumber']}_$uldNumber';
+                           bool isAlreadyPickedUp = alreadyPickedUpKeys.contains(unifiedKey1) || alreadyPickedUpKeys.contains(unifiedKey2);
+
                            tableRows.add(DataRow(cells: [
                              DataCell(
-                               Checkbox(
-                                 value: isChecked,
-                                 onChanged: (val) {
-                                   setState(() {
-                                     _driverItemCheckState[checkKey] = val == true;
-                                   });
-                                 },
-                                 activeColor: const Color(0xFF6366f1),
-                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                               ),
+                               isAlreadyPickedUp
+                                 ? const SizedBox(
+                                     width: 40,
+                                     height: 40,
+                                     child: Center(
+                                       child: Icon(Icons.check_circle, color: Color(0xFF10b981), size: 24),
+                                     ),
+                                   )
+                                 : Checkbox(
+                                     value: isChecked,
+                                     onChanged: (val) {
+                                       setState(() {
+                                         _driverItemCheckState[checkKey] = val == true;
+                                       });
+                                     },
+                                     activeColor: const Color(0xFF6366f1),
+                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                   ),
                              ),
                              DataCell(Text(uldNumber, style: TextStyle(color: const Color(0xFF10b981), fontWeight: FontWeight.bold, fontSize: 14))),
                              DataCell(Text(totalPieces > 0 ? totalPieces.toString() : '-', style: TextStyle(color: textP, fontSize: 14))),
@@ -1351,7 +1525,22 @@ class _DriverModuleState extends State<DriverModule> {
                                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                                        child: LayoutBuilder(
                                          builder: (context, constraints) {
-                                           bool allChecked = allItemKeys.isNotEmpty && allItemKeys.every((itemKey) {
+                                           List<String> selectableKeys = allItemKeys.where((itemKey) {
+                                             String displayName = itemKey.replaceAll('_', ' ');
+                                             if (itemKey.startsWith('AGI Skid_')) {
+                                               int idx = int.tryParse(itemKey.split('_').last) ?? 0;
+                                               displayName = 'AGI Skid ${idx + 1}';
+                                             }
+                                             if (itemKey == 'NO_BREAK') {
+                                               String unifiedKey1 = '${awbItem['refULD']}_${awbItem['refNumber']}_NO BREAK AREA';
+                                               String unifiedKey2 = '${awbItem['refULD']}_${awbItem['refNumber']}_${awbItem['refULD']}';
+                                               return !alreadyPickedUpKeys.contains(unifiedKey1) && !alreadyPickedUpKeys.contains(unifiedKey2);
+                                             }
+                                             String unifiedKey = '${awbItem['refULD']}_${awbItem['refNumber']}_$displayName';
+                                             return !alreadyPickedUpKeys.contains(unifiedKey);
+                                           }).toList();
+
+                                           bool allChecked = selectableKeys.isNotEmpty && selectableKeys.every((itemKey) {
                                              String checkKey = '${awb['AWB-number']}_${awbItem['refULD']}_${awbItem['refNumber']}_$itemKey';
                                              return _driverItemCheckState[checkKey] == true;
                                            });
@@ -1366,10 +1555,10 @@ class _DriverModuleState extends State<DriverModule> {
                                                  columns: [
                                                    DataColumn(
                                                      label: Checkbox(
-                                                       value: allItemKeys.isEmpty ? false : allChecked,
-                                                       onChanged: allItemKeys.isEmpty ? null : (val) {
+                                                       value: selectableKeys.isEmpty ? false : allChecked,
+                                                       onChanged: selectableKeys.isEmpty ? null : (val) {
                                                          setState(() {
-                                                           for (var itemKey in allItemKeys) {
+                                                           for (var itemKey in selectableKeys) {
                                                              String checkKey = '${awb['AWB-number']}_${awbItem['refULD']}_${awbItem['refNumber']}_$itemKey';
                                                              _driverItemCheckState[checkKey] = val == true;
                                                            }
@@ -1411,7 +1600,25 @@ class _DriverModuleState extends State<DriverModule> {
             ),
             child: Builder(
                builder: (context) {
-                  bool isDelivered = awb['data-deliver'] != null;
+                  bool isDelivered = false;
+                  Map<String, dynamic>? matchingDelivery;
+                  if (awb['data-deliver'] != null) {
+                    if (awb['data-deliver'] is List) {
+                      for (var d in (awb['data-deliver'] as List)) {
+                        if (d is Map && d['pickup_id'] == _selectedDriver?['id-pickup']) {
+                          isDelivered = true;
+                          matchingDelivery = d as Map<String, dynamic>;
+                          break;
+                        }
+                      }
+                    } else if (awb['data-deliver'] is Map) {
+                      final singleMap = awb['data-deliver'] as Map<String, dynamic>;
+                      if (singleMap['pickup_id'] == _selectedDriver?['id-pickup']) {
+                        isDelivered = true;
+                        matchingDelivery = singleMap;
+                      }
+                    }
+                  }
 
                   if (isDelivered) {
                      return Row(
@@ -1420,9 +1627,9 @@ class _DriverModuleState extends State<DriverModule> {
                            const Icon(Icons.check_circle_outline, color: Color(0xFF10b981), size: 24),
                            const SizedBox(width: 8),
                            const Text('Delivered', style: TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold, fontSize: 16)),
-                           if (awb['data-deliver']['user'] != null) ...[
+                           if (matchingDelivery != null && matchingDelivery['user'] != null) ...[
                               const SizedBox(width: 8),
-                              Text('by ${awb['data-deliver']['user']}', style: TextStyle(color: textS)),
+                              Text('by ${matchingDelivery['user']}', style: TextStyle(color: textS)),
                            ]
                         ],
                      );
@@ -1433,11 +1640,23 @@ class _DriverModuleState extends State<DriverModule> {
                     children: [
                       TextButton.icon(
                         onPressed: _isDelivering ? null : () async {
-                          String reason = '';
                           final piecesCtrl = TextEditingController();
                           final locCtrl = TextEditingController();
                           bool rejectAll = false;
                           bool hasSubmitError = false;
+                          bool isEditMode = true;
+                          String initReason = '';
+
+                          if (_localRejections.containsKey(awbNum)) {
+                            final rInfo = _localRejections[awbNum]!;
+                            initReason = rInfo['reason']?.toString() ?? '';
+                            piecesCtrl.text = rInfo['qty']?.toString() ?? '';
+                            locCtrl.text = rInfo['location']?.toString() == 'OVERSIZE' ? 'OVERSIZE' : (rInfo['location']?.toString() ?? '');
+                            rejectAll = piecesCtrl.text == expectedDeliver.toString();
+                            isEditMode = false;
+                          }
+                          
+                          final reasonCtrl = TextEditingController(text: initReason);
                           
                           bool? confirm = await showDialog<bool>(
                             context: context,
@@ -1446,7 +1665,24 @@ class _DriverModuleState extends State<DriverModule> {
                                 return AlertDialog(
                                   backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  title: Text('Reject AWB', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                  title: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Reject AWB', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                      if (!isEditMode)
+                                        IconButton(
+                                          icon: const Icon(Icons.edit_outlined, color: Color(0xFF6366f1), size: 20),
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          tooltip: 'Edit',
+                                          onPressed: () {
+                                            setDialogState(() {
+                                              isEditMode = true;
+                                            });
+                                          },
+                                        ),
+                                    ],
+                                  ),
                                   content: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1458,6 +1694,7 @@ class _DriverModuleState extends State<DriverModule> {
                                           Expanded(
                                             child: TextField(
                                               controller: piecesCtrl,
+                                              readOnly: !isEditMode,
                                               keyboardType: TextInputType.number,
                                               style: TextStyle(color: textP),
                                               decoration: InputDecoration(
@@ -1482,18 +1719,18 @@ class _DriverModuleState extends State<DriverModule> {
                                               Checkbox(
                                                 value: rejectAll,
                                                 activeColor: const Color(0xFF6366f1),
-                                                onChanged: (val) {
+                                                onChanged: isEditMode ? (val) {
                                                   setDialogState(() {
                                                     rejectAll = val ?? false;
                                                     if (rejectAll) {
-                                                      piecesCtrl.text = totalPieces;
+                                                      piecesCtrl.text = expectedDeliver.toString();
                                                     } else {
                                                       piecesCtrl.clear();
                                                     }
                                                   });
-                                                },
+                                                } : null,
                                               ),
-                                              Text('All ($totalPieces)', style: TextStyle(color: textP)),
+                                              Text('All ($expectedDeliver)', style: TextStyle(color: textP)),
                                             ],
                                           )
                                         ],
@@ -1502,11 +1739,13 @@ class _DriverModuleState extends State<DriverModule> {
                                       Text('Please provide a reason for rejecting this AWB.', style: TextStyle(color: textS)),
                                       const SizedBox(height: 8),
                                       TextField(
+                                        controller: reasonCtrl,
+                                        readOnly: !isEditMode,
                                         style: TextStyle(color: textP),
                                         decoration: InputDecoration(
                                           hintText: 'Reason...',
                                           hintStyle: TextStyle(color: textS.withValues(alpha: 0.5)),
-                                          errorText: (hasSubmitError && reason.trim().isEmpty) ? 'Required' : null,
+                                          errorText: (hasSubmitError && reasonCtrl.text.trim().isEmpty) ? 'Required' : null,
                                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                           enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderCard), borderRadius: BorderRadius.circular(8)),
                                           focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF6366f1)), borderRadius: BorderRadius.circular(8)),
@@ -1514,7 +1753,6 @@ class _DriverModuleState extends State<DriverModule> {
                                           focusedErrorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
                                         ),
                                         onChanged: (val) {
-                                          reason = val;
                                           if (hasSubmitError) setDialogState(() {});
                                         },
                                         ),
@@ -1523,29 +1761,35 @@ class _DriverModuleState extends State<DriverModule> {
                                         const SizedBox(height: 8),
                                         TextField(
                                           controller: locCtrl,
+                                          readOnly: !isEditMode,
                                           style: TextStyle(color: textP),
                                           decoration: InputDecoration(
-                                            hintText: 'Enter new location...',
+                                            hintText: 'Enter new location (Optional)...',
                                             hintStyle: TextStyle(color: textS.withValues(alpha: 0.5)),
-                                            errorText: (hasSubmitError && locCtrl.text.trim().isEmpty) ? 'Required' : null,
                                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                             enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderCard), borderRadius: BorderRadius.circular(8)),
                                             focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF6366f1)), borderRadius: BorderRadius.circular(8)),
                                             errorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
                                             focusedErrorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
                                             suffixIcon: Padding(
-                                              padding: const EdgeInsets.only(right: 8.0),
+                                              padding: const EdgeInsets.only(right: 8.0, top: 4, bottom: 4),
                                               child: TextButton(
-                                                onPressed: () {
+                                                onPressed: isEditMode ? () {
                                                   setDialogState(() {
-                                                    locCtrl.text = 'OVERSIZE';
+                                                    if (locCtrl.text == 'OVERSIZE') {
+                                                      locCtrl.clear();
+                                                    } else {
+                                                      locCtrl.text = 'OVERSIZE';
+                                                    }
                                                     if (hasSubmitError) hasSubmitError = false;
                                                   });
-                                                },
+                                                } : null,
                                                 style: TextButton.styleFrom(
                                                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
                                                   minimumSize: Size.zero,
                                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  backgroundColor: locCtrl.text == 'OVERSIZE' ? const Color(0xFF6366f1).withAlpha(50) : Colors.transparent,
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                                                 ),
                                                 child: const Text('OVERSIZE', style: TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold)),
                                               ),
@@ -1560,26 +1804,27 @@ class _DriverModuleState extends State<DriverModule> {
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(ctx, false),
-                                      child: Text('Cancel', style: TextStyle(color: textS)),
+                                      child: Text(isEditMode ? 'Cancel' : 'Close', style: TextStyle(color: textS)),
                                     ),
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        if (reason.trim().isEmpty || piecesCtrl.text.trim().isEmpty || locCtrl.text.trim().isEmpty) {
-                                          setDialogState(() { hasSubmitError = true; });
-                                        } else {
-                                          Navigator.pop(ctx, true);
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                      child: const Text('Confirm Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                    ),
+                                    if (isEditMode)
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          if (reasonCtrl.text.trim().isEmpty || piecesCtrl.text.trim().isEmpty) {
+                                            setDialogState(() { hasSubmitError = true; });
+                                          } else {
+                                            Navigator.pop(ctx, true);
+                                          }
+                                        },
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                        child: const Text('Confirm Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      ),
                                   ],
                                 );
                               }
                             ),
                           );
 
-                          if (confirm == true && reason.trim().isNotEmpty && piecesCtrl.text.trim().isNotEmpty && locCtrl.text.trim().isNotEmpty) {
+                          if (confirm == true && reasonCtrl.text.trim().isNotEmpty && piecesCtrl.text.trim().isNotEmpty) {
                              setState(() => _isDelivering = true);
                              String userFullName = 'Driver';
                              final uUser = Supabase.instance.client.auth.currentUser;
@@ -1600,7 +1845,7 @@ class _DriverModuleState extends State<DriverModule> {
                                     _localRejections[awbNum] = {
                                        'time': timeStr,
                                        'user': userFullName,
-                                       'reason': reason.trim(),
+                                       'reason': reasonCtrl.text.trim(),
                                        'qty': int.tryParse(piecesCtrl.text.trim()) ?? 0,
                                        'location': locCtrl.text.trim(),
                                     };
@@ -1646,39 +1891,50 @@ class _DriverModuleState extends State<DriverModule> {
                           _driverItemCheckState.forEach((key, isChecked) {
                             if (isChecked && key.startsWith('${awbNum}_')) {
                               if (_driverItemPayloadData.containsKey(key)) {
-                                 selectedReferences.add(_driverItemPayloadData[key]!);
+                                      selectedReferences.add(_driverItemPayloadData[key]!);
                               }
                             }
                           });
                           
                           try {
-                            await Supabase.instance.client.from('AWB').update({
-                               'data-deliver': {
-                                  'time': timeStr,
-                                  'user': userFullName,
-                                  'delivery': expectedDeliver,
-                                  'found': foundPieces,
-                                  'total': int.tryParse(totalPieces) ?? 0,
-                                  'references': selectedReferences,
-                               },
-                               if (_localRejections.containsKey(awbNum))
-                                  'data-reject': _localRejections[awbNum]
-                            }).eq('AWB-number', awbNum);
-                            
-                            if (mounted && context.mounted) {
-                              setState(() {
-                                 awb['data-deliver'] = {
-                                    'time': timeStr,
-                                    'user': userFullName,
-                                    'delivery': expectedDeliver,
-                                    'found': foundPieces,
-                                    'total': int.tryParse(totalPieces) ?? 0,
-                                    'references': selectedReferences,
-                                 };
-                                 if (_localRejections.containsKey(awbNum)) {
-                                    awb['data-reject'] = _localRejections[awbNum];
-                                 }
-                              });
+                             List<dynamic> currentDeliveries = [];
+                             if (awb['data-deliver'] != null) {
+                                if (awb['data-deliver'] is List) {
+                                   currentDeliveries = List.from(awb['data-deliver']);
+                                } else if (awb['data-deliver'] is Map) {
+                                   currentDeliveries = [awb['data-deliver']];
+                                }
+                             }
+
+                             Map<String, dynamic> newDeliveryObj = {
+                                'time': timeStr,
+                                'user': userFullName,
+                                'delivery': expectedDeliver,
+                                'found': foundPieces,
+                                'total': int.tryParse(totalPieces) ?? 0,
+                                'references': selectedReferences,
+                                'company': _selectedDriver?['truck-company'],
+                                'driver': _selectedDriver?['driver'],
+                                'pickup_id': _selectedDriver?['id-pickup'],
+                                'type': _selectedDriver?['type'],
+                                'status': _selectedDriver?['status'],
+                                'remark': _selectedDriver?['remarks'],
+                                'door': _selectedDriver?['door'],
+                                if (_localRejections.containsKey(awbNum))
+                                   'rejection': _localRejections[awbNum],
+                             };
+
+                             currentDeliveries.add(newDeliveryObj);
+                             
+                             await Supabase.instance.client.from('AWB').update({
+                                'data-deliver': currentDeliveries
+                             }).eq('AWB-number', awbNum);
+                             
+                             if (mounted && context.mounted) {
+                               setState(() {
+                                  awb['data-deliver'] = currentDeliveries;
+                                  awb.remove('data-reject');
+                               });
 
                               bool dialogOpen = true;
                               showGeneralDialog(

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_awb_screen.dart';
+import 'package:intl/intl.dart';
+import '_print_preview.dart';
 
 class AwbModule extends StatefulWidget {
   final bool isActive;
@@ -235,6 +237,7 @@ class _AwbModuleState extends State<AwbModule> {
                           DataColumn(label: Text('Pieces Received')),
                           DataColumn(label: Text('Delivered Pieces')),
                           DataColumn(label: Text('Remaining Pieces')),
+                          DataColumn(label: Text('Reject')),
                           DataColumn(label: Text('Total Pieces')),
                           DataColumn(label: Text('Total Weight')),
                           DataColumn(label: Text('Status')),
@@ -286,23 +289,53 @@ class _AwbModuleState extends State<AwbModule> {
                           if (u['data-deliver'] != null) {
                             if (u['data-deliver'] is List) {
                               for (var item in u['data-deliver']) {
-                                if (item is Map && item.containsKey('delivery')) {
-                                  deliveredPieces += int.tryParse(item['delivery']?.toString() ?? '0') ?? 0;
+                                if (item is Map && item.containsKey('found')) {
+                                  deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
                                 }
                               }
                             } else if (u['data-deliver'] is Map) {
-                              deliveredPieces = int.tryParse(u['data-deliver']['delivery']?.toString() ?? '0') ?? 0;
+                              deliveredPieces = int.tryParse(u['data-deliver']['found']?.toString() ?? '0') ?? 0;
                             }
                           }
                           
                           int remainingPieces = expectedPieces - deliveredPieces;
                           if (remainingPieces < 0) remainingPieces = 0;
 
-                          String status = 'Pending';
-                          if (receivedPieces > 0 && receivedPieces < expectedPieces) {
-                            status = 'In Progress';
-                          } else if (receivedPieces >= expectedPieces && expectedPieces > 0) {
-                            status = 'Ready';
+                          List<Map<String, dynamic>> rejectDataList = [];
+                          
+                          if (u['data-deliver'] != null) {
+                             if (u['data-deliver'] is List) {
+                                for (var del in u['data-deliver']) {
+                                   if (del is Map && del.containsKey('rejection') && del['rejection'] != null) {
+                                      Map<String, dynamic> r = del['rejection'] as Map<String, dynamic>;
+                                      rejectDataList.add(r);
+                                   }
+                                }
+                             } else if (u['data-deliver'] is Map && u['data-deliver']['rejection'] != null) {
+                                Map<String, dynamic> r = u['data-deliver']['rejection'] as Map<String, dynamic>;
+                                rejectDataList.add(r);
+                             }
+                          }
+                          
+                          if (rejectDataList.isEmpty && u['data-reject'] != null) {
+                             if (u['data-reject'] is List) {
+                                for (var r in u['data-reject']) {
+                                   if (r is Map) {
+                                      rejectDataList.add(r as Map<String, dynamic>);
+                                   }
+                                }
+                             } else if (u['data-reject'] is Map) {
+                                Map<String, dynamic> r = u['data-reject'] as Map<String, dynamic>;
+                                rejectDataList.add(r);
+                             }
+                          }
+
+                          final int totalValInt = int.tryParse(u['total']?.toString() ?? '0') ?? 0;
+                          String status = 'Waiting';
+                          if (deliveredPieces == totalValInt && totalValInt > 0) {
+                             status = 'Ready';
+                          } else if (deliveredPieces > 0) {
+                             status = 'In Process';
                           }
 
                           return DataRow(
@@ -314,6 +347,99 @@ class _AwbModuleState extends State<AwbModule> {
                               DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(Text(deliveredPieces > 0 ? deliveredPieces.toString() : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))),
                               DataCell(Text(remainingPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
+                              DataCell(
+                                rejectDataList.isNotEmpty 
+                                ? InkWell(
+                                    onTap: () {
+                                       showDialog(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            title: Text('Reject Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
+                                            content: SizedBox(
+                                              width: 350, // standard constrained width
+                                              child: ListView.separated(
+                                                shrinkWrap: true,
+                                                itemCount: rejectDataList.length,
+                                                separatorBuilder: (ctx, i) => const SizedBox(height: 12),
+                                                itemBuilder: (ctx, i) {
+                                                  final rData = rejectDataList[i];
+                                                  final pcs = int.tryParse(rData['pieces']?.toString() ?? rData['qty']?.toString() ?? '0') ?? 0;
+                                                  return Container(
+                                                    padding: const EdgeInsets.all(12),
+                                                    decoration: BoxDecoration(
+                                                      color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB))
+                                                    ),
+                                                    child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                            Text('Rejection ${i + 1}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                                            const SizedBox(height: 8),
+                                                            Row(
+                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                              children: [
+                                                                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                                    Text('Pieces', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                                    const SizedBox(height: 2),
+                                                                    Text(pcs.toString(), style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13, fontWeight: FontWeight.bold)),
+                                                                 ]),
+                                                                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                                                    Text('Location', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                                    const SizedBox(height: 2),
+                                                                    Text(rData['location']?.toString() ?? 'Unknown', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13)),
+                                                                 ]),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 8),
+                                                            Text('Reason', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 2),
+                                                            Text(rData['reason']?.toString() ?? 'No reason provided', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13)),
+                                                            const SizedBox(height: 8),
+                                                            Row(
+                                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                               children: [
+                                                                  Row(
+                                                                    children: [
+                                                                      Icon(Icons.person_outline, size: 14, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)),
+                                                                      const SizedBox(width: 4),
+                                                                      Text(rData['user']?.toString() ?? 'Unknown', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
+                                                                    ],
+                                                                  ),
+                                                                  Text(rData['time'] != null ? DateFormat('hh:mm a').format(DateTime.parse(rData['time'].toString()).toLocal()) : '', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
+                                                               ]
+                                                            ),
+                                                        ]
+                                                    )
+                                                  );
+                                                }
+                                              )
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(ctx), 
+                                                child: Text('Close', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)))
+                                              )
+                                            ],
+                                          )
+                                       );
+                                    },
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      width: 26,
+                                      height: 26,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent.withAlpha(25),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(rejectDataList.length.toString(), style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    )
+                                ) 
+                                : const Text('-', style: TextStyle(fontWeight: FontWeight.w500))
+                              ),
                               DataCell(Text(u['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
                               DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(_buildStatusBadge(status)),
@@ -371,6 +497,155 @@ class _AwbModuleState extends State<AwbModule> {
                String dd = chicago.day.toString().padLeft(2, '0');
                String yy = chicago.year.toString();
                return '$hh:$mm $amPm $mth/$dd/$yy';
+            }
+
+            List<Widget> buildDeliveryItems() {
+               List delList = [];
+               if (u['data-deliver'] is List) {
+                 delList = u['data-deliver'];
+               } else if (u['data-deliver'] is Map && (u['data-deliver'] as Map).isNotEmpty) {
+                 delList = [u['data-deliver']];
+               }
+               
+               if (delList.isEmpty) return [];
+
+               return delList.map((del) {
+                 final isRejected = del.containsKey('rejection');
+                 final rej = isRejected ? (del['rejection'] as Map) : null;
+                 
+                 return Container(
+                   margin: const EdgeInsets.only(bottom: 16),
+                   decoration: BoxDecoration(
+                     color: bgCard,
+                     borderRadius: BorderRadius.circular(12),
+                     border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                   ),
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                             color: const Color(0xFF10b981).withAlpha(15),
+                             borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                             border: Border(bottom: BorderSide(color: const Color(0xFF10b981).withAlpha(30))),
+                          ),
+                          child: Row(
+                            children: [
+                               const Icon(Icons.outbox_rounded, color: Color(0xFF10b981), size: 20),
+                               const SizedBox(width: 8),
+                               const Text('Delivered to Driver', style: TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold, fontSize: 15)),
+                               const Spacer(),
+                               Icon(Icons.access_time, size: 14, color: textS),
+                               const SizedBox(width: 6),
+                               Text(formatChicagoTime(del['time']), style: TextStyle(color: textS, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                               Row(
+                                 children: [
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Company', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['company'] ?? '-'}', style: TextStyle(color: textP, fontSize: 15, fontWeight: FontWeight.bold)),
+                                    ])),
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Driver', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['driver'] ?? '-'}', style: TextStyle(color: textP, fontSize: 15, fontWeight: FontWeight.bold)),
+                                    ])),
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Door', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['door'] ?? '-'}', style: TextStyle(color: textP, fontSize: 15, fontWeight: FontWeight.bold)),
+                                    ])),
+                                 ],
+                               ),
+                               const SizedBox(height: 16),
+                               Row(
+                                 children: [
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Status', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['status'] ?? '-'}', style: TextStyle(color: textP, fontSize: 14)),
+                                    ])),
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Type', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['type'] ?? '-'}', style: TextStyle(color: textP, fontSize: 14)),
+                                    ])),
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Pickup ID', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['pickup_id'] ?? '-'}', style: TextStyle(color: textP, fontSize: 14)),
+                                    ])),
+                                 ],
+                               ),
+                               const SizedBox(height: 16),
+                               Row(
+                                 children: [
+                                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                      Text('Pieces Handed Over (Expected / Found)', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
+                                      Text('${del['delivery'] ?? 0} / ${del['found'] ?? 0} (Total ${del['total'] ?? 0})', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 14, fontWeight: FontWeight.bold)),
+                                    ])),
+                                 ]
+                               ),
+                               if (del['remark'] != null && del['remark'].toString().isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Text('Remark: ${del['remark']}', style: TextStyle(color: textS, fontSize: 13, fontStyle: FontStyle.italic)),
+                               ],
+                               
+                               if (isRejected && rej != null) ...[
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFef4444).withAlpha(15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFef4444).withAlpha(30)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                         Row(
+                                           children: [
+                                             const Icon(Icons.warning_amber_rounded, color: Color(0xFFef4444), size: 18),
+                                             const SizedBox(width: 6),
+                                             const Text('REJECTION RECORDED', style: TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold)),
+                                             const Spacer(),
+                                             Text(formatChicagoTime(rej['time']), style: const TextStyle(color: Color(0xFFef4444), fontSize: 11)),
+                                           ],
+                                         ),
+                                         const SizedBox(height: 10),
+                                         Row(
+                                           children: [
+                                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                const Text('Rejected Qty', style: TextStyle(color: Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.w600)),
+                                                Text('${rej['qty'] ?? 0}', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                              ])),
+                                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                const Text('New Location', style: TextStyle(color: Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.w600)),
+                                                Text('${rej['location'] ?? '-'}', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                              ])),
+                                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                const Text('Recorded By', style: TextStyle(color: Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.w600)),
+                                                Text('${rej['user'] ?? '-'}', style: TextStyle(color: textP, fontSize: 14)),
+                                              ])),
+                                           ]
+                                         ),
+                                         const SizedBox(height: 8),
+                                         const Text('Reason', style: TextStyle(color: Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.w600)),
+                                         Text('${rej['reason'] ?? '-'}', style: TextStyle(color: textP, fontSize: 13, fontStyle: FontStyle.italic)),
+                                      ],
+                                    ),
+                                  ),
+                               ],
+                            ],
+                          ),
+                        ),
+                     ],
+                   ),
+                 );
+               }).toList();
             }
 
             List<Widget> buildCombinedAuditItems() {
@@ -694,9 +969,21 @@ class _AwbModuleState extends State<AwbModule> {
                                 Text(u['AWB-number']?.toString() ?? 'N/A', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            IconButton(
-                              icon: Icon(Icons.close_rounded, color: textP),
-                              onPressed: () => Navigator.pop(ctx),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.print_rounded, color: textP),
+                                  onPressed: () {
+                                     showPrintPreviewDialog(context, u);
+                                  },
+                                  tooltip: 'Print Preview',
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: Icon(Icons.close_rounded, color: textP),
+                                  onPressed: () => Navigator.pop(ctx),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -725,6 +1012,13 @@ class _AwbModuleState extends State<AwbModule> {
                             ),
                             const SizedBox(height: 32),
                             
+                            if (u['data-deliver'] != null) ...[
+                               Text('Delivery Execution', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                               const SizedBox(height: 12),
+                               ...buildDeliveryItems(),
+                               const SizedBox(height: 32),
+                            ],
+
                             Text('ULD Traceability Flow', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
                             ...buildCombinedAuditItems(),
@@ -756,7 +1050,7 @@ class _AwbModuleState extends State<AwbModule> {
     final s = status.toLowerCase();
     if (s.contains('waiting')) {
       bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
-    } else if (s.contains('received')) {
+    } else if (s.contains('process') || s.contains('progress') || s.contains('received')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
     } else if (s.contains('checked')) {
       bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);

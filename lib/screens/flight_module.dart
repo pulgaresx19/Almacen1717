@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_flight_screen.dart';
+import '_flight_print_preview.dart';
 
 class FlightModule extends StatefulWidget {
   final bool isActive;
@@ -1085,6 +1086,8 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  IconButton(icon: Icon(Icons.print_rounded, color: textP), onPressed: () => showFlightPrintPreviewDialog(context, f, _ulds), tooltip: 'Print Flight Manifest'),
+                  const SizedBox(width: 8),
                   IconButton(icon: Icon(Icons.close_rounded, color: textP), onPressed: () => Navigator.pop(context)),
                 ],
               )

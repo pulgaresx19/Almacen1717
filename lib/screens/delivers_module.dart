@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_deliver_screen.dart';
+import '_deliver_print_preview.dart';
 
 class DeliversModule extends StatefulWidget {
   final bool isActive;
@@ -367,7 +368,11 @@ class _DeliversModuleState extends State<DeliversModule> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            _buildStatusBadge(u['status']?.toString() ?? 'Waiting'),
+                            IconButton(
+                              onPressed: () => showDeliverPrintPreviewDialog(context, u),
+                              icon: Icon(Icons.print_rounded, color: textP, size: 20),
+                              tooltip: 'Print Deliver Manifest',
+                            ),
                             const SizedBox(width: 8),
                             IconButton(
                               onPressed: () => Navigator.pop(ctx),
@@ -449,6 +454,13 @@ class _DeliversModuleState extends State<DeliversModule> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Expanded(child: _buildDeliverEditableCard(context, 'Type', 'type', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.local_shipping_outlined, isTypeDropdown: true)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Status', 'status', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.info_outline, isStatusDropdown: true)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
                                       Expanded(child: _buildDeliverEditableCard(context, 'Door', 'door', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.door_front_door_outlined)),
                                       Expanded(child: _buildDeliverEditableCard(context, 'Priority', 'isPriority', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
                                     ],
@@ -483,18 +495,54 @@ class _DeliversModuleState extends State<DeliversModule> {
                           if (awbs.isEmpty)
                             Text('No AWBs assigned.', style: TextStyle(color: textS))
                           else
-                            ...awbs.map((awb) => Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.inventory_2_outlined, color: textS, size: 20),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: Text(awb.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 14))),
-                                ],
-                              ),
-                            )),
+                            ...awbs.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final str = entry.value.toString();
+                              final parts = str.split(' - ');
+                              final num = parts.isNotEmpty ? parts[0].trim() : '';
+                              final pcs = parts.length > 1 ? parts[1].trim() : '';
+                              final rem = parts.length > 2 ? parts[2].trim() : '';
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 24, height: 24,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                                      child: Text('${idx + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      flex: 4,
+                                      child: Text(num, style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis),
+                                    ),
+                                    Expanded(
+                                      flex: 3,
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.inventory_2_outlined, color: textS, size: 14),
+                                          const SizedBox(width: 6),
+                                          Flexible(child: Text(pcs, style: TextStyle(color: textS, fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 5,
+                                      child: rem.isNotEmpty ? Row(
+                                        children: [
+                                          Icon(Icons.notes_rounded, color: textS, size: 14),
+                                          const SizedBox(width: 6),
+                                          Flexible(child: Text(rem, style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                        ]
+                                      ) : const SizedBox(),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
                         ],
                       ),
                     ),
@@ -528,10 +576,33 @@ class _DeliversModuleState extends State<DeliversModule> {
     bool dark, 
     Color colorL, 
     Color colorP, 
-    {IconData? icon, bool isTime = false, bool isRemarks = false, bool isPriority = false, bool isTypeDropdown = false}
+    {IconData? icon, bool isTime = false, bool isRemarks = false, bool isPriority = false, bool isTypeDropdown = false, bool isStatusDropdown = false}
   ) {
     if (!isEditing) {
       String displayValue = '${u[key] ?? '-'}';
+      
+      if (isStatusDropdown) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, color: colorL, size: 14),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Align(alignment: Alignment.centerLeft, child: _buildStatusBadge(displayValue)),
+              ],
+            ),
+          );
+      }
       
       if (isTime) {
          displayValue = '-';
@@ -649,6 +720,32 @@ class _DeliversModuleState extends State<DeliversModule> {
               DropdownMenuItem(value: true, child: Text('High Priority')),
               DropdownMenuItem(value: false, child: Text('Normal')),
             ],
+            onChanged: (v) {
+              if (v != null) {
+                setDrawerState(() => tempU[key] = v);
+              }
+            },
+          ),
+        ),
+      );
+    } else if (isStatusDropdown) {
+      String currentStatus = tempU[key]?.toString() ?? 'Waiting';
+      final statuses = ['Waiting', 'Received', 'Checked', 'Ready to Load', 'Loaded', 'Delivered'];
+      if (!statuses.contains(currentStatus)) {
+        statuses.add(currentStatus);
+      }
+      editor = Container(
+        height: 32,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: inputBorderC)),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: currentStatus,
+            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            isExpanded: true,
+            style: TextStyle(color: colorP, fontSize: 12),
+            items: statuses.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (v) {
               if (v != null) {
                 setDrawerState(() => tempU[key] = v);

@@ -33,6 +33,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
   List<Map<String, dynamic>> _allAwbs = [];
   final List<Map<String, dynamic>> _selectedAwbs = [];
   final Map<String, TextEditingController> _deliveryPcsControllers = {};
+  final Map<String, TextEditingController> _deliveryRemarkControllers = {};
   final List<Map<String, dynamic>> _importAwbs = [];
 
   final _importAwbNumberCtrl = TextEditingController();
@@ -145,6 +146,9 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     for (var c in _deliveryPcsControllers.values) {
       c.dispose();
     }
+    for (var c in _deliveryRemarkControllers.values) {
+      c.dispose();
+    }
     _truckCompanyCtrl.dispose();
     _driverCtrl.dispose();
     _doorCtrl.dispose();
@@ -196,7 +200,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     });
   }
 
-  void _showMissingFieldAlert(String fieldName) {
+  void _showMissingFieldAlert(String fieldName, {String? customMessage}) {
     showDialog(
       context: context,
       builder: (alertCtx) => AlertDialog(
@@ -225,7 +229,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
+              customMessage ?? 'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFFcbd5e1),
@@ -286,6 +290,20 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         _showMissingFieldAlert('Air Waybills (AWBs)');
         return;
       }
+      for (var awb in _selectedAwbs) {
+        final awbNum = awb['AWB-number']?.toString() ?? '';
+        final pcsStr = _deliveryPcsControllers[awbNum]?.text.trim() ?? '';
+        final pcs = int.tryParse(pcsStr) ?? 0;
+        if (pcs <= 0) {
+          _showMissingFieldAlert(
+            'Pieces for $awbNum', 
+            customMessage: appLanguage.value == 'es'
+                ? 'Las piezas a entregar para la guía $awbNum tienen un valor no válido ($pcsStr).\nPor favor, introduzca un número mayor a 0 para guardar.'
+                : 'The pieces for AWB $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.'
+          );
+          return;
+        }
+      }
     }
 
     String finalTime = _timeCtrl.text.trim();
@@ -344,7 +362,8 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
             : _selectedAwbs.map((e) {
                 final awbNum = e['AWB-number']?.toString() ?? '';
                 final pcs = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
-                return '$awbNum - $pcs Pcs';
+                final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
+                return rem.isNotEmpty ? '$awbNum - $pcs Pcs - $rem' : '$awbNum - $pcs Pcs';
               }).toList(),
       };
 
@@ -738,43 +757,16 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                            expectedPieces += int.tryParse(awb['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
                       }
 
-                      int receivedPieces = 0;
-                      if (awb['data-coordinator'] != null) {
-                        List dcList = [];
-                        if (awb['data-coordinator'] is List) {
-                          dcList = awb['data-coordinator'] as List;
-                        } else if (awb['data-coordinator'] is Map && awb['data-coordinator'].isNotEmpty) {
-                          dcList = [awb['data-coordinator']];
-                        }
-                        
-                        for (var item in dcList) {
-                           if (item is Map) {
-                              if (item.containsKey('breakdown') && item['breakdown'] is Map) {
-                                 Map breakdown = item['breakdown'];
-                                 if (breakdown['AGI Skid'] is List) {
-                                    for (var val in breakdown['AGI Skid']) {
-                                       receivedPieces += int.tryParse(val.toString()) ?? 0;
-                                    }
-                                 }
-                                 for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
-                                    receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
-                                 }
-                              } else {
-                                 receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-                              }
-                           }
-                        }
-                      }
                       int deliveredPieces = 0;
                       if (awb['data-deliver'] != null) {
                         if (awb['data-deliver'] is List) {
                           for (var item in awb['data-deliver']) {
-                            if (item is Map && item.containsKey('delivery')) {
-                              deliveredPieces += int.tryParse(item['delivery']?.toString() ?? '0') ?? 0;
+                            if (item is Map && item.containsKey('found')) {
+                              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
                             }
                           }
                         } else if (awb['data-deliver'] is Map) {
-                          deliveredPieces = int.tryParse(awb['data-deliver']['delivery']?.toString() ?? '0') ?? 0;
+                          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
                         }
                       }
                       int remainingPieces = expectedPieces - deliveredPieces;
@@ -785,7 +777,11 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                       if (!_deliveryPcsControllers.containsKey(awbNumber)) {
                         _deliveryPcsControllers[awbNumber] = TextEditingController(text: remainingPieces.toString());
                       }
+                      if (!_deliveryRemarkControllers.containsKey(awbNumber)) {
+                        _deliveryRemarkControllers[awbNumber] = TextEditingController();
+                      }
                       final pcsCtrl = _deliveryPcsControllers[awbNumber]!;
+                      final remCtrl = _deliveryRemarkControllers[awbNumber]!;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -808,19 +804,6 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                         flex: 5,
                         child: Text(awbNumber, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
-                      Expanded(
-                        flex: 3,
-                        child: Text('Exp: $expectedPieces', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text('Rcv: $receivedPieces', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text('Tot: $totalVal', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
-                      ),
-                      const SizedBox(width: 8),
                       Container(
                         height: 28,
                         width: 80,
@@ -848,7 +831,16 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                               child: TextField(
                                 controller: pcsCtrl,
                                 keyboardType: TextInputType.number,
-                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  TextInputFormatter.withFunction((oldValue, newValue) {
+                                    if (newValue.text.isEmpty) return newValue;
+                                    final val = int.tryParse(newValue.text) ?? 0;
+                                    final maxVal = int.tryParse(totalVal) ?? 0;
+                                    if (val > maxVal) return oldValue;
+                                    return newValue;
+                                  }),
+                                ],
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12, fontWeight: FontWeight.bold),
                                 decoration: const InputDecoration(
@@ -859,6 +851,34 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 9,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8.0, left: 8.0),
+                          child: Container(
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: dark ? Colors.black26 : Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: dark ? Colors.white.withAlpha(30) : const Color(0xFFD1D5DB)),
+                            ),
+                            child: TextField(
+                              controller: remCtrl,
+                              inputFormatters: [
+                                TextInputFormatter.withFunction((oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase())),
+                              ],
+                              style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 11),
+                              decoration: InputDecoration(
+                                hintText: appLanguage.value == 'es' ? 'Comentarios adicionales...' : 'Additional remarks...',
+                                hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(100) : const Color(0xFF9CA3AF), fontSize: 11),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                border: InputBorder.none,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -1387,6 +1407,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                       const DataColumn(label: Text('Received')),
                       const DataColumn(label: Text('Delivered')),
                       const DataColumn(label: Text('Remaining')),
+                      const DataColumn(label: Text('Reject')),
                       const DataColumn(label: Text('Total')),
                       const DataColumn(label: Text('Weight')),
                       const DataColumn(label: Text('Status')),
@@ -1441,25 +1462,52 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                       if (awb['data-deliver'] != null) {
                         if (awb['data-deliver'] is List) {
                           for (var item in awb['data-deliver']) {
-                            if (item is Map && item.containsKey('delivery')) {
-                              deliveredPieces += int.tryParse(item['delivery']?.toString() ?? '0') ?? 0;
+                            if (item is Map && item.containsKey('found')) {
+                              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
                             }
                           }
                         } else if (awb['data-deliver'] is Map) {
-                          deliveredPieces = int.tryParse(awb['data-deliver']['delivery']?.toString() ?? '0') ?? 0;
+                          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
                         }
                       }
                       int remainingPieces = expectedPieces - deliveredPieces;
                       if (remainingPieces < 0) remainingPieces = 0;
                       
+                      List<Map<String, dynamic>> rejectDataList = [];
+                      
+                      if (awb['data-deliver'] != null) {
+                         if (awb['data-deliver'] is List) {
+                            for (var del in awb['data-deliver']) {
+                               if (del is Map && del.containsKey('rejection') && del['rejection'] != null) {
+                                  Map<String, dynamic> r = del['rejection'] as Map<String, dynamic>;
+                                  rejectDataList.add(r);
+                               }
+                            }
+                         } else if (awb['data-deliver'] is Map && awb['data-deliver']['rejection'] != null) {
+                            Map<String, dynamic> r = awb['data-deliver']['rejection'] as Map<String, dynamic>;
+                            rejectDataList.add(r);
+                         }
+                      }
+                      
+                      if (rejectDataList.isEmpty && awb['data-reject'] != null) {
+                         if (awb['data-reject'] is List) {
+                            for (var r in awb['data-reject']) {
+                               if (r is Map) {
+                                  rejectDataList.add(r as Map<String, dynamic>);
+                               }
+                            }
+                         } else if (awb['data-reject'] is Map) {
+                            Map<String, dynamic> r = awb['data-reject'] as Map<String, dynamic>;
+                            rejectDataList.add(r);
+                         }
+                      }
+                      
                       final int totalValInt = int.tryParse(awb['total']?.toString() ?? '0') ?? 0;
-                      String status = 'Pending';
-                      if (receivedPieces > 0) {
-                        if (receivedPieces == expectedPieces && expectedPieces == totalValInt) {
-                          status = 'Ready';
-                        } else {
-                          status = 'In Progress';
-                        }
+                      String status = 'Waiting';
+                      if (deliveredPieces == totalValInt && totalValInt > 0) {
+                         status = 'Ready';
+                      } else if (deliveredPieces > 0) {
+                         status = 'In Process';
                       }
 
                       return DataRow(
@@ -1480,6 +1528,99 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                           DataCell(Text('$receivedPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600))),
                           DataCell(Text(deliveredPieces > 0 ? '$deliveredPieces pcs' : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))),
                           DataCell(Text('$remainingPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
+                          DataCell(
+                                rejectDataList.isNotEmpty 
+                                ? InkWell(
+                                    onTap: () {
+                                       showDialog(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                            title: Text('Reject Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
+                                            content: SizedBox(
+                                              width: 350, // standard constrained width
+                                              child: ListView.separated(
+                                                shrinkWrap: true,
+                                                itemCount: rejectDataList.length,
+                                                separatorBuilder: (ctx, i) => const SizedBox(height: 12),
+                                                itemBuilder: (ctx, i) {
+                                                  final rData = rejectDataList[i];
+                                                  final pcs = int.tryParse(rData['pieces']?.toString() ?? rData['qty']?.toString() ?? '0') ?? 0;
+                                                  return Container(
+                                                    padding: const EdgeInsets.all(12),
+                                                    decoration: BoxDecoration(
+                                                      color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                      border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB))
+                                                    ),
+                                                    child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                            Text('Rejection ${i + 1}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                                            const SizedBox(height: 8),
+                                                            Row(
+                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                              children: [
+                                                                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                                                    Text('Pieces', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                                    const SizedBox(height: 2),
+                                                                    Text(pcs.toString(), style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13, fontWeight: FontWeight.bold)),
+                                                                 ]),
+                                                                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                                                                    Text('Location', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                                    const SizedBox(height: 2),
+                                                                    Text(rData['location']?.toString() ?? 'Unknown', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13)),
+                                                                 ]),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(height: 8),
+                                                            Text('Reason', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 2),
+                                                            Text(rData['reason']?.toString() ?? 'No reason provided', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13)),
+                                                            const SizedBox(height: 8),
+                                                            Row(
+                                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                               children: [
+                                                                  Row(
+                                                                    children: [
+                                                                      Icon(Icons.person_outline, size: 14, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)),
+                                                                      const SizedBox(width: 4),
+                                                                      Text(rData['user']?.toString() ?? 'Unknown', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
+                                                                    ],
+                                                                  ),
+                                                                  Text(rData['time'] != null ? DateFormat('hh:mm a').format(DateTime.parse(rData['time'].toString()).toLocal()) : '', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
+                                                               ]
+                                                            ),
+                                                        ]
+                                                    )
+                                                  );
+                                                }
+                                              )
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(ctx), 
+                                                child: Text('Close', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)))
+                                              )
+                                            ],
+                                          )
+                                       );
+                                    },
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      width: 26,
+                                      height: 26,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent.withAlpha(25),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(rejectDataList.length.toString(), style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    )
+                                ) 
+                                : const Text('-', style: TextStyle(fontWeight: FontWeight.w500))
+                          ),
                           DataCell(Text(awb['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
                           DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg')),
                           DataCell(_buildStatusBadge(status)),

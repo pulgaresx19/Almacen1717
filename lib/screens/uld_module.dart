@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
 import 'add_uld_screen.dart';
+import '_uld_print_preview.dart';
 
 class UldModule extends StatefulWidget {
   final bool isActive;
@@ -39,7 +40,6 @@ class _UldModuleState extends State<UldModule> {
     }
   }
   bool _showAddForm = false;
-  final Set<String> _selectedReadyUlds = {};
   late Stream<List<Map<String, dynamic>>> _uldsStream;
 
   @override
@@ -254,152 +254,9 @@ class _UldModuleState extends State<UldModule> {
                           const DataColumn(label: Text('Break')),
                           const DataColumn(label: SizedBox(width: 250, child: Text('Remarks'))),
                           const DataColumn(numeric: true, label: SizedBox(width: 100, child: Text('Status', textAlign: TextAlign.center))),
-                          DataColumn(
-                            numeric: true,
-                            label: Builder(
-                              builder: (context) {
-                                int countReady = ulds.where((x) {
-                                  final s = x['status']?.toString().toLowerCase().trim() ?? '';
-                                  return s == 'ready' || s == 'saved';
-                                }).length;
-                                bool allSel = countReady > 0 && _selectedReadyUlds.length == countReady;
-                                return Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_selectedReadyUlds.isNotEmpty) ...[
-                                      InkWell(
-                                        onTap: () async {
-                                          bool? confirm = await showDialog<bool>(
-                                            context: context,
-                                            builder: (ctx) => AlertDialog(
-                                              backgroundColor: const Color(0xFF1E293B),
-                                              title: const Text('Delete ULDs', style: TextStyle(color: Colors.white)),
-                                              content: Text('Are you sure you want to delete ${_selectedReadyUlds.length} ULD(s)?', style: const TextStyle(color: Colors.white70)),
-                                              actions: [
-                                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: Colors.white70))),
-                                                ElevatedButton(
-                                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                                                  onPressed: () => Navigator.pop(ctx, true),
-                                                  child: const Text('Delete', style: TextStyle(color: Colors.white)),
-                                                )
-                                              ],
-                                            )
-                                          );
-                                          if (confirm != true) return;
-                                          try {
-                                            await Future.wait(_selectedReadyUlds.map((uldNumber) => 
-                                              Supabase.instance.client.from('ULD').delete().eq('ULD-number', uldNumber)
-                                            ));
-                                            if (context.mounted) {
-                                              showDialog(
-                                                context: context,
-                                                barrierColor: Colors.transparent,
-                                                builder: (BuildContext ctx) {
-                                                  Future.delayed(const Duration(milliseconds: 1500), () {
-                                                    if (ctx.mounted) Navigator.of(ctx).pop();
-                                                  });
-                                                  return Dialog(
-                                                    backgroundColor: Colors.transparent,
-                                                    elevation: 0,
-                                                    child: Center(
-                                                      child: Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                                        decoration: BoxDecoration(color: const Color(0xFF10b981), borderRadius: BorderRadius.circular(12)),
-                                                        child: const Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            Icon(Icons.check_circle_outline, color: Colors.white, size: 28),
-                                                            SizedBox(width: 12),
-                                                            Text('Deleted successfully', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                              );
-                                            }
-                                            setState(() => _selectedReadyUlds.clear());
-                                          } catch (e) {
-                                            if (context.mounted) {
-                                              showDialog(
-                                                context: context,
-                                                barrierColor: Colors.transparent,
-                                                builder: (BuildContext ctx) {
-                                                  Future.delayed(const Duration(milliseconds: 2000), () {
-                                                    if (ctx.mounted) Navigator.of(ctx).pop();
-                                                  });
-                                                  return Dialog(
-                                                    backgroundColor: Colors.transparent,
-                                                    elevation: 0,
-                                                    child: Center(
-                                                      child: Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                                        decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(12)),
-                                                        child: Row(
-                                                          mainAxisSize: MainAxisSize.min,
-                                                          children: [
-                                                            const Icon(Icons.error_outline, color: Colors.white, size: 28),
-                                                            const SizedBox(width: 12),
-                                                            Flexible(child: Text('Error: $e', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                              );
-                                            }
-                                          }
-                                        },
-                                        customBorder: const CircleBorder(),
-                                        child: const Padding(
-                                          padding: EdgeInsets.all(4.0),
-                                          child: Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.all(6),
-                                        margin: const EdgeInsets.only(right: 8),
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF6366f1),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Text(
-                                          '${_selectedReadyUlds.length}',
-                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, height: 1),
-                                        ),
-                                      ),
-                                    ],
-                                    Checkbox(
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      value: countReady == 0 ? false : (allSel ? true : (_selectedReadyUlds.isNotEmpty ? null : false)),
-                                      tristate: true,
-                                      onChanged: countReady == 0 ? null : (val) {
-                                        setState(() {
-                                          if (allSel) {
-                                            _selectedReadyUlds.clear();
-                                          } else {
-                                            for (var x in ulds) {
-                                              final s = x['status']?.toString().toLowerCase().trim() ?? '';
-                                              if (s == 'ready' || s == 'saved') {
-                                                _selectedReadyUlds.add(x['ULD-number']?.toString() ?? '');
-                                              }
-                                            }
-                                          }
-                                        });
-                                      }
-                                    ),
-                                  ],
-                                );
-                              }
-                            )
-                          ),
                         ],
                         rows: List.generate(ulds.length, (index) {
                           final u = ulds[index];
-                          final status = u['status']?.toString().toLowerCase().trim() ?? '';
-                          final isReady = status == 'ready' || status == 'saved';
                           return DataRow(
                             onSelectChanged: (_) => _showUldDrawer(context, u, dark),
                             cells: [
@@ -428,23 +285,6 @@ class _UldModuleState extends State<UldModule> {
                                 child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                               )),
                               DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Received')),
-                              DataCell(
-                                isReady 
-                                ? Checkbox(
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    value: _selectedReadyUlds.contains(u['ULD-number']?.toString()),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        if (val == true) {
-                                          _selectedReadyUlds.add(u['ULD-number']?.toString() ?? '');
-                                        } else {
-                                          _selectedReadyUlds.remove(u['ULD-number']?.toString());
-                                        }
-                                      });
-                                    },
-                                  )
-                                : const SizedBox.shrink(),
-                              ),
                             ],
                           );
                         }),
@@ -700,6 +540,11 @@ class _UldModuleState extends State<UldModule> {
                              Row(
                                crossAxisAlignment: CrossAxisAlignment.center,
                                children: [
+                                 IconButton(
+                                   onPressed: () => showUldPrintPreviewDialog(context, u), 
+                                   icon: Icon(Icons.print_rounded, color: textP),
+                                   tooltip: 'Print ULD Manifest',
+                                 ),
                                  IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: textP)),
                                ],
                              )
