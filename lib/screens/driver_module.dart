@@ -16,7 +16,9 @@ class _DriverModuleState extends State<DriverModule> {
   Map<String, dynamic>? _selectedDriver;
   Map<String, dynamic>? _selectedAwbDetails;
   final Map<String, bool> _driverItemCheckState = {};
+  final Map<String, Map<String, dynamic>> _driverItemPayloadData = {};
   final Set<String> _hiddenDriverItems = {};
+  final Map<String, Map<String, dynamic>> _localRejections = {};
   List<Map<String, dynamic>> _driverAwbs = [];
   bool _isLoadingAwbs = false;
   bool _isDelivering = false;
@@ -208,7 +210,11 @@ class _DriverModuleState extends State<DriverModule> {
                                 bool isPriority = u['isPriority'] == true;
 
                                 return DataRow(
-                                  onSelectChanged: (_) => _showDriverDetailsDialog(context, u, dark, awbsStr, timeStr),
+                                  onSelectChanged: (selected) {
+                                    if (selected == true) {
+                                      _loadDriverDetails(u);
+                                    }
+                                  },
                                   cells: [
                                     DataCell(Text('${index + 1}', style: TextStyle(fontWeight: FontWeight.bold, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)))),
                                     DataCell(Text(u['truck-company']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
@@ -269,256 +275,6 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 
-  void _showDriverDetailsDialog(BuildContext context, Map<String, dynamic> u, bool dark, String awbsStr, String timeStr) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final textP = dark ? Colors.white : const Color(0xFF111827);
-        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-        final bgCard = dark ? const Color(0xFF0f172a) : Colors.white;
-        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-        final accentC = const Color(0xFF6366f1);
-        final bgAccent = dark ? accentC.withAlpha(30) : accentC.withAlpha(20);
-
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          backgroundColor: Colors.transparent,
-          child: Container(
-            width: 520,
-            decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: borderC),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withAlpha(dark ? 150 : 30), blurRadius: 24, offset: const Offset(0, 12)),
-              ]
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.only(left: 24, right: 16, top: 20, bottom: 20),
-                  decoration: BoxDecoration(
-                    color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: bgAccent, 
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: accentC.withAlpha(50))
-                        ),
-                        child: Icon(Icons.local_shipping_rounded, color: accentC, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    u['truck-company']?.toString().isNotEmpty == true ? u['truck-company'].toString() : 'Unknown Company', 
-                                    style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
-                                    maxLines: 1, 
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (u['isPriority'] == true) ...[
-                                  const SizedBox(width: 8),
-                                  const Tooltip(
-                                    message: 'Priority',
-                                    child: Icon(Icons.star_rounded, color: Colors.orange, size: 20),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'ID: ${u['id-pickup']?.toString() ?? 'N/A'}', 
-                              style: TextStyle(color: textS, fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      _buildStatusBadge(u['status']?.toString() ?? 'Waiting'),
-                      const SizedBox(width: 16),
-                      IconButton(
-                        style: IconButton.styleFrom(backgroundColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
-                        onPressed: () => Navigator.pop(context), 
-                        icon: Icon(Icons.close_rounded, color: textP, size: 20),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                Divider(color: borderC, height: 1),
-
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      // Door Highlight & Driver
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(16), border: Border.all(color: borderC)),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(backgroundColor: dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB), child: Icon(Icons.person_rounded, color: textS)),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(u['driver']?.toString().isNotEmpty == true ? u['driver'].toString() : 'Unknown Driver', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                                        Text(u['truck-company']?.toString() ?? '-', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis),
-                                      ],
-                                    ),
-                                  ),
-                                ]
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(color: dark ? Colors.amberAccent.withAlpha(20) : Colors.amber.withAlpha(30), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.amberAccent.withAlpha(50))),
-                            child: Column(
-                              children: [
-                                Text('DOOR', style: TextStyle(color: dark ? Colors.amberAccent : Colors.orange.shade800, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                                const SizedBox(height: 4),
-                                Text(u['door']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 20, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 20),
-
-                      // Specs Grid
-                      Row(
-                        children: [
-                          Expanded(child: _buildModalDataBlock('Time', timeStr, Icons.access_time_rounded, textS, textP, dark, borderC)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildModalDataBlock('Type', u['type']?.toString() ?? '-', Icons.category_rounded, textS, textP, dark, borderC)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildModalDataBlock('AWBs', awbsStr, Icons.inventory_2_rounded, textS, textP, dark, borderC)),
-                        ],
-                      ),
-
-                      if ((u['remarks']?.toString() ?? '').isNotEmpty) ...[
-                        const SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(color: dark ? Colors.redAccent.withAlpha(20) : Colors.red.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: dark ? Colors.redAccent.withAlpha(50) : Colors.red.shade200)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.info_outline_rounded, size: 16, color: dark ? Colors.redAccent : Colors.red.shade600),
-                                  const SizedBox(width: 8),
-                                  Text('Remarks', style: TextStyle(color: dark ? Colors.redAccent : Colors.red.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(u['remarks'].toString(), style: TextStyle(color: textP, fontSize: 13, height: 1.4)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                
-                // Footer
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                  decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB), borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)), border: Border(top: BorderSide(color: borderC))),
-                  child: Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          // En un futuro aqui se mandara a guardar el No Show
-                        },
-                        icon: const Icon(Icons.person_off_rounded, size: 18),
-                        label: const Text('No Show', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.redAccent,
-                          side: const BorderSide(color: Colors.redAccent),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _loadDriverDetails(u);
-                        },
-                        icon: const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 20),
-                        label: Text(
-                          appLanguage.value == 'es' ? 'Confirmar Entrega' : 'Confirm Delivery',
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: accentC,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildModalDataBlock(String label, String value, IconData icon, Color colorL, Color colorV, bool dark, Color borderC) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: dark ? Colors.white.withAlpha(5) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderC),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 12, color: colorL),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: colorL, fontSize: 11, fontWeight: FontWeight.w600)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(color: colorV, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
 
   Future<void> _loadDriverDetails(Map<String, dynamic> u) async {
     setState(() {
@@ -764,6 +520,200 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 
+  List<Widget> _buildSavedDeliveryUI(Map awb, bool dark, Color textP, Color textS, Color borderCard) {
+    if (awb['data-deliver'] == null || awb['data-deliver']['references'] == null) return [];
+    List refs = awb['data-deliver']['references'] is List ? awb['data-deliver']['references'] : [];
+    if (refs.isEmpty) return [Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text('No delivered items selected.', style: TextStyle(color: textS))))];
+    
+    // Group by ULD + Flight
+    Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (var r in refs) {
+       if (r is Map) {
+          String uld = r['refULD']?.toString() ?? 'UNKNOWN ULD';
+          String curFlight = r['refNumber']?.toString() ?? '';
+          String carrier = r['refCarrier']?.toString() ?? '';
+          String groupKey = '${uld}___${curFlight}___$carrier';
+          if (!grouped.containsKey(groupKey)) grouped[groupKey] = [];
+          grouped[groupKey]!.add(Map<String, dynamic>.from(r));
+       }
+    }
+    
+    return grouped.entries.map((entry) {
+       String groupKey = entry.key;
+       var parts = groupKey.split('___');
+       String uldNumber = parts[0];
+       String flightNum = parts.length > 2 ? parts[1] : '';
+       String carrierNum = parts.length > 2 ? parts[2] : '';
+       String flightStr = '$carrierNum $flightNum'.trim();
+       
+       List<Map<String, dynamic>> items = entry.value;
+
+       String rawDate = items.isNotEmpty ? (items.first['refDate']?.toString() ?? '') : '';
+       String dateStr = rawDate;
+       if (dateStr.length >= 10 && dateStr.contains('-')) {
+         var dateParts = dateStr.split('-');
+         if (dateParts.length >= 3) {
+           dateStr = '${dateParts[1]}-${dateParts[2]}';
+         }
+       }
+       
+       bool isBreak = !items.any((i) => i['item'] == 'NO BREAK AREA');
+       
+       String uldKey = 'DELIVERED_${awb['AWB-number']}_$uldNumber';
+       bool isHidden = _hiddenDriverItems.contains(uldKey);
+
+       return Container(
+         width: double.infinity,
+         margin: const EdgeInsets.only(bottom: 16),
+         decoration: BoxDecoration(
+           color: dark ? Colors.white.withAlpha(5) : Colors.white,
+           borderRadius: BorderRadius.circular(12),
+           border: Border.all(color: borderCard),
+         ),
+         child: Column(
+           crossAxisAlignment: CrossAxisAlignment.stretch,
+           children: [
+             Container(
+               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+               decoration: BoxDecoration(
+                 color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+                 borderRadius: isHidden ? BorderRadius.circular(12) : const BorderRadius.vertical(top: Radius.circular(12)),
+                 border: isHidden ? null : Border(bottom: BorderSide(color: borderCard)),
+               ),
+               child: Row(
+                 children: [
+                   Expanded(
+                     child: Wrap(
+                       spacing: 16,
+                       runSpacing: 8,
+                       children: [
+                         _buildCustomChip(
+                           Row(
+                             children: [
+                               Text('ULD:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                               const SizedBox(width: 4),
+                               Expanded(
+                                 child: Text(
+                                   uldNumber,
+                                   style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                                   overflow: TextOverflow.ellipsis,
+                                 ),
+                               ),
+                             ],
+                           ),
+                           dark,
+                           width: 160,
+                         ),
+                         if (flightStr.isNotEmpty)
+                           _buildCustomChip(
+                             Row(
+                               children: [
+                                 Text('Flight:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                                 const SizedBox(width: 4),
+                                 Expanded(
+                                   child: RichText(
+                                     overflow: TextOverflow.ellipsis,
+                                     maxLines: 1,
+                                     text: TextSpan(
+                                       children: [
+                                         TextSpan(text: flightStr, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+                                         if (dateStr.isNotEmpty)
+                                           TextSpan(text: ' / $dateStr', style: TextStyle(color: textS.withAlpha(150), fontSize: 12, fontWeight: FontWeight.normal)),
+                                       ],
+                                     ),
+                                   ),
+                                 ),
+                               ],
+                             ),
+                             dark,
+                             width: 170,
+                           ),
+                           _buildCustomChip(
+                             Center(
+                               child: Text(
+                                 isBreak ? 'BREAK' : 'NO BREAK',
+                                 style: TextStyle(color: isBreak ? const Color(0xFF22c55e) : const Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold),
+                               ),
+                             ),
+                             dark,
+                             width: 100,
+                           ),
+                           _buildCustomChip(
+                             const Center(
+                               child: Text(
+                                 'DELIVERED',
+                                 style: TextStyle(color: Color(0xFF10b981), fontSize: 13, fontWeight: FontWeight.bold),
+                               ),
+                             ),
+                             dark,
+                             width: 110,
+                           ),
+                       ],
+                     ),
+                   ),
+                   IconButton(
+                     icon: Icon(isHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: textS, size: 20),
+                     onPressed: () {
+                       setState(() {
+                         if (isHidden) {
+                           _hiddenDriverItems.remove(uldKey);
+                         } else {
+                           _hiddenDriverItems.add(uldKey);
+                         }
+                       });
+                     },
+                   ),
+                 ],
+               ),
+             ),
+             if (!isHidden)
+               ClipRRect(
+                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                 child: LayoutBuilder(
+                   builder: (context, constraints) {
+                     List<DataRow> tableRows = items.map((item) {
+                        String displayName = item['item']?.toString() ?? '';
+                        String pieces = item['pieces']?.toString() ?? '-';
+                        if (pieces == '0' || pieces == 'null') pieces = '-';
+                        String locText = item['location']?.toString() ?? 'FLOOR';
+                        Color locColor = locText == 'FLOOR' ? textS : textP;
+                        
+                        return DataRow(cells: [
+                           const DataCell(Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 20)),
+                           DataCell(Text(displayName, style: const TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold, fontSize: 14))),
+                           DataCell(Text(pieces, style: TextStyle(color: textP, fontSize: 14))),
+                           DataCell(Text(locText, style: TextStyle(color: locColor, fontSize: 14, fontStyle: locText == 'FLOOR' ? FontStyle.italic : FontStyle.normal))),
+                        ]);
+                     }).toList();
+
+                     return SingleChildScrollView(
+                       scrollDirection: Axis.horizontal,
+                       child: ConstrainedBox(
+                         constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                         child: DataTable(
+                           headingRowHeight: 40,
+                           headingRowColor: WidgetStateProperty.all(Colors.transparent),
+                           columns: [
+                             DataColumn(
+                               label: Icon(Icons.done_all, color: textS.withAlpha(150), size: 22)
+                             ),
+                             DataColumn(label: Text('Item', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold))),
+                             DataColumn(label: Text('Pieces', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold))),
+                             DataColumn(label: Text('Location', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold))),
+                           ],
+                           rows: tableRows,
+                         ),
+                       ),
+                     );
+                   }
+                 ),
+               ),
+           ],
+         ),
+       );
+    }).toList();
+  }
+
   Widget _buildCustomChip(Widget child, bool dark, {double width = 140}) {
     return Container(
       width: width,
@@ -852,6 +802,35 @@ class _DriverModuleState extends State<DriverModule> {
     String digitsOnly = deliverPiecesStr.replaceAll(RegExp(r'[^0-9]'), '');
     int expectedDeliver = int.tryParse(digitsOnly) ?? 0;
 
+    int rejectedQty = 0;
+    String rejectReason = '';
+    String rejectUser = '';
+    String rejectTime = 'Unknown';
+    String rejectLocation = 'Unknown';
+    if (_localRejections.containsKey(awbNum)) {
+      rejectedQty = int.tryParse(_localRejections[awbNum]!['qty']?.toString() ?? '0') ?? 0;
+      rejectReason = _localRejections[awbNum]!['reason']?.toString() ?? 'No reason provided';
+      rejectUser = _localRejections[awbNum]!['user']?.toString() ?? 'Unknown';
+      rejectLocation = _localRejections[awbNum]!['location']?.toString() ?? 'Unknown';
+      if (_localRejections[awbNum]!['time'] != null) {
+        try {
+          final dt = DateTime.parse(_localRejections[awbNum]!['time'].toString()).toLocal();
+          rejectTime = DateFormat('hh:mm a').format(dt);
+        } catch (_) {}
+      }
+    } else if (awb['data-reject'] is Map) {
+      rejectedQty = int.tryParse(awb['data-reject']['pieces']?.toString() ?? awb['data-reject']['qty']?.toString() ?? '0') ?? 0;
+      rejectReason = awb['data-reject']['reason']?.toString() ?? 'No reason provided';
+      rejectUser = awb['data-reject']['user']?.toString() ?? 'Unknown';
+      rejectLocation = awb['data-reject']['location']?.toString() ?? 'Unknown';
+      if (awb['data-reject']['time'] != null) {
+        try {
+          final dt = DateTime.parse(awb['data-reject']['time'].toString()).toLocal();
+          rejectTime = DateFormat('hh:mm a').format(dt);
+        } catch (_) {}
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: bgCard,
@@ -912,6 +891,112 @@ class _DriverModuleState extends State<DriverModule> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text('Reject', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(rejectedQty.toString(), style: TextStyle(color: rejectedQty > 0 ? Colors.redAccent : textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                                if (rejectedQty > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8.0),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (ctx) => AlertDialog(
+                                              backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1f2937) : Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                              title: Text('Reject Details', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                              content: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text('Pieces', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 4),
+                                                            Text(rejectedQty.toString(), style: TextStyle(color: textP, fontSize: 14)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                                          children: [
+                                                            Text('Location', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 4),
+                                                            Text(rejectLocation, style: TextStyle(color: textP, fontSize: 14)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text('Reason', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(height: 4),
+                                                  Text(rejectReason, style: TextStyle(color: textP, fontSize: 14)),
+                                                  const SizedBox(height: 16),
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text('User', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 4),
+                                                            Text(rejectUser, style: TextStyle(color: textP, fontSize: 14)),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                                          children: [
+                                                            Text('Time', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                            const SizedBox(height: 4),
+                                                            Text(rejectTime, style: TextStyle(color: textP, fontSize: 14)),
+                                                          ],
+                                                        ),
+                                                      )
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(ctx),
+                                                  child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
+                                                )
+                                              ]
+                                            ),
+                                          );
+                                        },
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4.0),
+                                          child: Icon(Icons.info_outline_rounded, color: Colors.redAccent, size: 20),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 24),
+                        Container(width: 1, height: 40, color: borderCard),
+                        const SizedBox(width: 24),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text('Total', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
                             Text(totalPieces, style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
@@ -945,11 +1030,19 @@ class _DriverModuleState extends State<DriverModule> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  if (awbItems.isEmpty)
-                    Text('No flight data available.', style: TextStyle(color: textS, fontStyle: FontStyle.italic))
-                  else
-                    Column(
-                      children: awbItems.map<Widget>((awbItem) {
+                  Builder(
+                    builder: (context) {
+                      bool isSavedDelivery = awb['data-deliver'] != null && awb['data-deliver']['references'] is List;
+                      if (isSavedDelivery) {
+                         return Column(children: _buildSavedDeliveryUI(awb, dark, textP, textS, borderCard));
+                      }
+                      
+                      if (awbItems.isEmpty) {
+                        return Text('No flight data available.', style: TextStyle(color: textS, fontStyle: FontStyle.italic));
+                      }
+                      
+                      return Column(
+                        children: awbItems.map<Widget>((awbItem) {
                         Map itemLocs = {};
                         Map locMatch = {};
                         for (var l in locList) {
@@ -1053,6 +1146,16 @@ class _DriverModuleState extends State<DriverModule> {
 
                            String checkKey = '${awb['AWB-number']}_${awbItem['refULD']}_${awbItem['refNumber']}_$itemKey';
                            bool isChecked = _driverItemCheckState[checkKey] ?? false;
+                           
+                           _driverItemPayloadData[checkKey] = {
+                              'refULD': awbItem['refULD']?.toString() ?? '',
+                              'refNumber': awbItem['refNumber']?.toString() ?? '',
+                              'refCarrier': awbItem['refCarrier']?.toString() ?? '',
+                              'refDate': (awbItem['refDate'] ?? locMatch['refDate'])?.toString() ?? '',
+                              'item': displayName,
+                              'pieces': pieces,
+                              'location': locText,
+                           };
 
                            return DataRow(cells: [
                              DataCell(
@@ -1078,6 +1181,16 @@ class _DriverModuleState extends State<DriverModule> {
                            bool isChecked = _driverItemCheckState[checkKey] ?? false;
                            String uldNumber = awbItem['refULD']?.toString() ?? 'UNKNOWN ULD';
                            int totalPieces = int.tryParse(awbItem['pieces']?.toString() ?? '0') ?? 0;
+                           
+                           _driverItemPayloadData[checkKey] = {
+                              'refULD': uldNumber,
+                              'refNumber': awbItem['refNumber']?.toString() ?? '',
+                              'refCarrier': awbItem['refCarrier']?.toString() ?? '',
+                              'refDate': awbItem['refDate']?.toString() ?? '',
+                              'item': 'NO BREAK AREA',
+                              'pieces': totalPieces,
+                              'location': 'NO BREAK AREA',
+                           };
                            
                            allItemKeys.clear();
                            allItemKeys.add('NO_BREAK'); // to satisfy the Checkbox allChecked logic below
@@ -1156,6 +1269,7 @@ class _DriverModuleState extends State<DriverModule> {
                                                      Expanded(
                                                        child: RichText(
                                                          overflow: TextOverflow.ellipsis,
+                                                         maxLines: 1,
                                                          text: TextSpan(
                                                            children: [
                                                              TextSpan(text: flightStr, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
@@ -1279,8 +1393,10 @@ class _DriverModuleState extends State<DriverModule> {
                                ],
                              ),
                            );
-                      }).toList(),
-                    ),
+                       }).toList(),
+                      );
+                    }
+                  ),
 
                 ],
               ),
@@ -1296,7 +1412,6 @@ class _DriverModuleState extends State<DriverModule> {
             child: Builder(
                builder: (context) {
                   bool isDelivered = awb['data-deliver'] != null;
-                  bool isRejected = awb['data-reject'] != null;
 
                   if (isDelivered) {
                      return Row(
@@ -1311,19 +1426,6 @@ class _DriverModuleState extends State<DriverModule> {
                            ]
                         ],
                      );
-                  } else if (isRejected) {
-                     return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                           const Icon(Icons.block_rounded, color: Colors.amber, size: 24),
-                           const SizedBox(width: 8),
-                           const Text('Rejected', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 16)),
-                           if (awb['data-reject']['user'] != null) ...[
-                              const SizedBox(width: 8),
-                              Text('by ${awb['data-reject']['user']}', style: TextStyle(color: textS)),
-                           ]
-                        ],
-                     );
                   }
 
                   return Row(
@@ -1333,7 +1435,9 @@ class _DriverModuleState extends State<DriverModule> {
                         onPressed: _isDelivering ? null : () async {
                           String reason = '';
                           final piecesCtrl = TextEditingController();
+                          final locCtrl = TextEditingController();
                           bool rejectAll = false;
+                          bool hasSubmitError = false;
                           
                           bool? confirm = await showDialog<bool>(
                             context: context,
@@ -1359,10 +1463,16 @@ class _DriverModuleState extends State<DriverModule> {
                                               decoration: InputDecoration(
                                                 hintText: 'Ej. 5',
                                                 hintStyle: TextStyle(color: textS.withValues(alpha: 0.5)),
+                                                errorText: (hasSubmitError && piecesCtrl.text.trim().isEmpty) ? 'Required' : null,
                                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderCard), borderRadius: BorderRadius.circular(8)),
                                                 focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF6366f1)), borderRadius: BorderRadius.circular(8)),
+                                                errorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
+                                                focusedErrorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
                                               ),
+                                              onChanged: (val) {
+                                                if (hasSubmitError) setDialogState(() {});
+                                              },
                                             ),
                                           ),
                                           const SizedBox(width: 8),
@@ -1396,21 +1506,70 @@ class _DriverModuleState extends State<DriverModule> {
                                         decoration: InputDecoration(
                                           hintText: 'Reason...',
                                           hintStyle: TextStyle(color: textS.withValues(alpha: 0.5)),
+                                          errorText: (hasSubmitError && reason.trim().isEmpty) ? 'Required' : null,
                                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                                           enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderCard), borderRadius: BorderRadius.circular(8)),
                                           focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF6366f1)), borderRadius: BorderRadius.circular(8)),
+                                          errorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
+                                          focusedErrorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
                                         ),
-                                        onChanged: (val) => reason = val,
-                                      ),
-                                    ],
-                                  ),
+                                        onChanged: (val) {
+                                          reason = val;
+                                          if (hasSubmitError) setDialogState(() {});
+                                        },
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text('New Location', style: TextStyle(color: textS)),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: locCtrl,
+                                          style: TextStyle(color: textP),
+                                          decoration: InputDecoration(
+                                            hintText: 'Enter new location...',
+                                            hintStyle: TextStyle(color: textS.withValues(alpha: 0.5)),
+                                            errorText: (hasSubmitError && locCtrl.text.trim().isEmpty) ? 'Required' : null,
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: borderCard), borderRadius: BorderRadius.circular(8)),
+                                            focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Color(0xFF6366f1)), borderRadius: BorderRadius.circular(8)),
+                                            errorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
+                                            focusedErrorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
+                                            suffixIcon: Padding(
+                                              padding: const EdgeInsets.only(right: 8.0),
+                                              child: TextButton(
+                                                onPressed: () {
+                                                  setDialogState(() {
+                                                    locCtrl.text = 'OVERSIZE';
+                                                    if (hasSubmitError) hasSubmitError = false;
+                                                  });
+                                                },
+                                                style: TextButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                                  minimumSize: Size.zero,
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                ),
+                                                child: const Text('OVERSIZE', style: TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ),
+                                          ),
+                                          onChanged: (val) {
+                                            if (hasSubmitError) setDialogState(() {});
+                                          },
+                                        ),
+                                      ],
+                                    ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(ctx, false),
                                       child: Text('Cancel', style: TextStyle(color: textS)),
                                     ),
                                     ElevatedButton(
-                                      onPressed: () => Navigator.pop(ctx, true),
+                                      onPressed: () {
+                                        if (reason.trim().isEmpty || piecesCtrl.text.trim().isEmpty || locCtrl.text.trim().isEmpty) {
+                                          setDialogState(() { hasSubmitError = true; });
+                                        } else {
+                                          Navigator.pop(ctx, true);
+                                        }
+                                      },
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
                                       child: const Text('Confirm Reject', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                     ),
@@ -1420,7 +1579,7 @@ class _DriverModuleState extends State<DriverModule> {
                             ),
                           );
 
-                          if (confirm == true && reason.trim().isNotEmpty && piecesCtrl.text.trim().isNotEmpty) {
+                          if (confirm == true && reason.trim().isNotEmpty && piecesCtrl.text.trim().isNotEmpty && locCtrl.text.trim().isNotEmpty) {
                              setState(() => _isDelivering = true);
                              String userFullName = 'Driver';
                              final uUser = Supabase.instance.client.auth.currentUser;
@@ -1436,41 +1595,29 @@ class _DriverModuleState extends State<DriverModule> {
                              final timeStr = DateTime.now().toUtc().toIso8601String();
                              
                              try {
-                               await Supabase.instance.client.from('AWB').update({
-                                  'data-reject': {
-                                     'time': timeStr,
-                                     'user': userFullName,
-                                     'reason': reason.trim(),
-                                     'pieces': int.tryParse(piecesCtrl.text.trim()) ?? 0,
-                                  }
-                               }).eq('AWB-number', awbNum);
-                               
                                if (mounted && context.mounted) {
-                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('AWB Rejected.'), backgroundColor: Colors.amber));
                                  setState(() {
-                                    awb['data-reject'] = {
+                                    _localRejections[awbNum] = {
                                        'time': timeStr,
                                        'user': userFullName,
                                        'reason': reason.trim(),
-                                       'pieces': int.tryParse(piecesCtrl.text.trim()) ?? 0,
+                                       'qty': int.tryParse(piecesCtrl.text.trim()) ?? 0,
+                                       'location': locCtrl.text.trim(),
                                     };
                                  });
                                }
                              } catch (e) {
                                if (mounted && context.mounted) {
-                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error registering rejection.'), backgroundColor: Colors.redAccent));
+                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error saving rejection locally.'), backgroundColor: Colors.redAccent));
                                }
                              } finally {
                                if (mounted) {
                                  setState(() => _isDelivering = false);
                                }
                              }
-                          } else if (confirm == true) {
-                             if (mounted && context.mounted) {
-                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reason and quantity are required to reject.'), backgroundColor: Colors.redAccent));
-                             }
                           }
                           piecesCtrl.dispose();
+                          locCtrl.dispose();
                         },
                         icon: const Icon(Icons.block_rounded, color: Colors.redAccent, size: 20),
                         label: const Text('Reject', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14)),
@@ -1480,7 +1627,7 @@ class _DriverModuleState extends State<DriverModule> {
                         ),
                       ),
                       ElevatedButton.icon(
-                        onPressed: (foundPieces > 0 && foundPieces == expectedDeliver && !_isDelivering) ? () async {
+                        onPressed: ((foundPieces + rejectedQty) == expectedDeliver && expectedDeliver > 0 && !_isDelivering) ? () async {
                           setState(() => _isDelivering = true);
                           String userFullName = 'Driver';
                           final uUser = Supabase.instance.client.auth.currentUser;
@@ -1495,6 +1642,15 @@ class _DriverModuleState extends State<DriverModule> {
                           }
                           final timeStr = DateTime.now().toUtc().toIso8601String();
                           
+                          List<Map<String, dynamic>> selectedReferences = [];
+                          _driverItemCheckState.forEach((key, isChecked) {
+                            if (isChecked && key.startsWith('${awbNum}_')) {
+                              if (_driverItemPayloadData.containsKey(key)) {
+                                 selectedReferences.add(_driverItemPayloadData[key]!);
+                              }
+                            }
+                          });
+                          
                           try {
                             await Supabase.instance.client.from('AWB').update({
                                'data-deliver': {
@@ -1503,7 +1659,10 @@ class _DriverModuleState extends State<DriverModule> {
                                   'delivery': expectedDeliver,
                                   'found': foundPieces,
                                   'total': int.tryParse(totalPieces) ?? 0,
-                               }
+                                  'references': selectedReferences,
+                               },
+                               if (_localRejections.containsKey(awbNum))
+                                  'data-reject': _localRejections[awbNum]
                             }).eq('AWB-number', awbNum);
                             
                             if (mounted && context.mounted) {
@@ -1514,7 +1673,11 @@ class _DriverModuleState extends State<DriverModule> {
                                     'delivery': expectedDeliver,
                                     'found': foundPieces,
                                     'total': int.tryParse(totalPieces) ?? 0,
+                                    'references': selectedReferences,
                                  };
+                                 if (_localRejections.containsKey(awbNum)) {
+                                    awb['data-reject'] = _localRejections[awbNum];
+                                 }
                               });
 
                               bool dialogOpen = true;

@@ -633,49 +633,89 @@ class AddFlightScreenState extends State<AddFlightScreen> {
       }
       
       if (mounted) {
-        await showDialog(
+        bool dialogOpen = true;
+        showGeneralDialog(
           context: context,
-          barrierColor: Colors.black45,
           barrierDismissible: false,
-          builder: (ctx) {
-            Future.delayed(const Duration(seconds: 2), () {
-              if (ctx.mounted) Navigator.pop(ctx);
-            });
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              backgroundColor: const Color(0xFF1e293b),
-              child: const Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF10b981),
-                      size: 64,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Flight structure created successfully',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+          barrierColor: Colors.black54,
+          transitionDuration: const Duration(milliseconds: 350),
+          pageBuilder: (context, anim1, anim2) {
+            final dark = isDarkMode.value;
+            return Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 320,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF1e293b) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10b981).withAlpha(40),
+                        blurRadius: 40,
+                        offset: const Offset(0, 10),
                       ),
-                    ),
-                  ],
+                    ],
+                    border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10b981).withAlpha(20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        appLanguage.value == 'es' ? '¡Vuelo Creado!' : 'Flight Created!',
+                        style: TextStyle(
+                          color: dark ? Colors.white : const Color(0xFF111827),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        appLanguage.value == 'es' ? 'La estructura del vuelo se ha guardado exitosamente.' : 'Flight structure created successfully.',
+                        style: TextStyle(
+                          color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           },
-        );
+          transitionBuilder: (context, anim1, anim2, child) {
+            return Transform.scale(
+              scale: Curves.easeOutBack.transform(anim1.value),
+              child: FadeTransition(
+                opacity: anim1,
+                child: child,
+              ),
+            );
+          },
+        ).then((_) => dialogOpen = false);
 
+        await Future.delayed(const Duration(milliseconds: 2000));
+        
         if (mounted) {
+          if (dialogOpen) {
+            Navigator.of(context).pop();
+          }
           if (widget.onPop != null) {
             widget.onPop!(true);
-          } else {
+          } else if (Navigator.canPop(context)) {
             Navigator.pop(context, true);
           }
         }

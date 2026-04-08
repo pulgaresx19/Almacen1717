@@ -408,45 +408,61 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
       }
 
       if (mounted) {
-        await showDialog(
+        showGeneralDialog(
           context: context,
-          barrierColor: Colors.black45,
+          barrierColor: Colors.black54,
           barrierDismissible: false,
-          builder: (ctx) {
-            Future.delayed(const Duration(seconds: 2), () {
-              if (ctx.mounted) Navigator.pop(ctx);
-            });
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              backgroundColor: const Color(0xFF1e293b),
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF10b981),
-                      size: 64,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      appLanguage.value == 'es' ? 'Entrega creada exitosamente' : 'Delivery created successfully',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+          barrierLabel: 'Success',
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (ctx, animation, secondaryAnimation) => const SizedBox(),
+          transitionBuilder: (ctx, animation, secondaryAnimation, child) {
+            return ScaleTransition(
+              scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              child: FadeTransition(
+                opacity: animation,
+                child: AlertDialog(
+                  backgroundColor: const Color(0xFF1e293b),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(color: const Color(0xFF10b981).withAlpha(50), width: 1),
+                  ),
+                  contentPadding: const EdgeInsets.all(32),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10b981).withAlpha(20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 64),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      Text(
+                        appLanguage.value == 'es' ? '¡Entrega Creada!' : 'Delivery Created!',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        appLanguage.value == 'es' ? 'Los datos han sido guardados.' : 'Records have been saved.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           },
         );
-        if (mounted && widget.onPop != null) widget.onPop!(true);
+
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          Navigator.of(context).pop(); // Dismiss Dialog
+          if (widget.onPop != null) widget.onPop!(true);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -749,11 +765,25 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                            }
                         }
                       }
-                      
+                      int deliveredPieces = 0;
+                      if (awb['data-deliver'] != null) {
+                        if (awb['data-deliver'] is List) {
+                          for (var item in awb['data-deliver']) {
+                            if (item is Map && item.containsKey('delivery')) {
+                              deliveredPieces += int.tryParse(item['delivery']?.toString() ?? '0') ?? 0;
+                            }
+                          }
+                        } else if (awb['data-deliver'] is Map) {
+                          deliveredPieces = int.tryParse(awb['data-deliver']['delivery']?.toString() ?? '0') ?? 0;
+                        }
+                      }
+                      int remainingPieces = expectedPieces - deliveredPieces;
+                      if (remainingPieces < 0) remainingPieces = 0;
+
                       final totalVal = awb['total']?.toString() ?? '0';
 
                       if (!_deliveryPcsControllers.containsKey(awbNumber)) {
-                        _deliveryPcsControllers[awbNumber] = TextEditingController(text: expectedPieces.toString());
+                        _deliveryPcsControllers[awbNumber] = TextEditingController(text: remainingPieces.toString());
                       }
                       final pcsCtrl = _deliveryPcsControllers[awbNumber]!;
 
@@ -1355,6 +1385,8 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                       const DataColumn(label: Text('AWB Number')),
                       const DataColumn(label: Text('Expected')),
                       const DataColumn(label: Text('Received')),
+                      const DataColumn(label: Text('Delivered')),
+                      const DataColumn(label: Text('Remaining')),
                       const DataColumn(label: Text('Total')),
                       const DataColumn(label: Text('Weight')),
                       const DataColumn(label: Text('Status')),
@@ -1404,6 +1436,21 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                            }
                         }
                       }
+
+                      int deliveredPieces = 0;
+                      if (awb['data-deliver'] != null) {
+                        if (awb['data-deliver'] is List) {
+                          for (var item in awb['data-deliver']) {
+                            if (item is Map && item.containsKey('delivery')) {
+                              deliveredPieces += int.tryParse(item['delivery']?.toString() ?? '0') ?? 0;
+                            }
+                          }
+                        } else if (awb['data-deliver'] is Map) {
+                          deliveredPieces = int.tryParse(awb['data-deliver']['delivery']?.toString() ?? '0') ?? 0;
+                        }
+                      }
+                      int remainingPieces = expectedPieces - deliveredPieces;
+                      if (remainingPieces < 0) remainingPieces = 0;
                       
                       final int totalValInt = int.tryParse(awb['total']?.toString() ?? '0') ?? 0;
                       String status = 'Pending';
@@ -1431,14 +1478,19 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                           DataCell(Text(awbNumber, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                           DataCell(Text('$expectedPieces pcs')),
                           DataCell(Text('$receivedPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600))),
+                          DataCell(Text(deliveredPieces > 0 ? '$deliveredPieces pcs' : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))),
+                          DataCell(Text('$remainingPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
                           DataCell(Text(awb['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
                           DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg')),
                           DataCell(_buildStatusBadge(status)),
                           DataCell(
-                            IconButton(
-                              icon: const Icon(Icons.info_outline_rounded, color: Color(0xFF6366f1), size: 20),
-                              onPressed: () => _showAwbDrawer(context, awb, dark, receivedPieces, expectedPieces, status),
-                              tooltip: 'Ver Info',
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: Icon(Icons.info_outline_rounded, color: dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af), size: 16),
+                                onPressed: () => _showAwbDrawer(context, awb, dark, receivedPieces, expectedPieces, status),
+                                tooltip: 'Ver Info',
+                              ),
                             ),
                           ),
                         ],
@@ -1867,7 +1919,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Expanded(
-                                flex: 4,
+                                flex: 6,
                                 child: _buildAwbSelector(dark),
                               ),
                               const SizedBox(width: 16),

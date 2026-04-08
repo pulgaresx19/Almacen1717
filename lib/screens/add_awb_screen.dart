@@ -30,7 +30,6 @@ class AddAwbScreenState extends State<AddAwbScreen> {
   final _coordinatorCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
   final _searchAwbCtrl = TextEditingController();
-  bool _showExtraData = false;
 
   String? _selectedFlight;
   String _refUld = '';
@@ -333,8 +332,8 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         'remarks': _remarksCtrl.text.trim().isEmpty
             ? null
             : _remarksCtrl.text.trim(),
-        'coordinator': _showExtraData && _coordinatorCtrl.text.trim().isNotEmpty ? _coordinatorCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
-        'location': _showExtraData && _locationCtrl.text.trim().isNotEmpty ? _locationCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
+        'coordinator': _coordinatorCtrl.text.trim().isNotEmpty ? _coordinatorCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
+        'location': _locationCtrl.text.trim().isNotEmpty ? _locationCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
         'flight_id': _selectedFlight,
         'flightLabel': flightLabel,
         'refCarrier': refCarrierOut,
@@ -351,7 +350,6 @@ class AddAwbScreenState extends State<AddAwbScreen> {
       _remarksCtrl.clear();
       _coordinatorCtrl.clear();
       _locationCtrl.clear();
-      _showExtraData = false;
       
       if (!_refUldCheck) {
         _refUldCtrl.clear();
@@ -596,51 +594,91 @@ class AddAwbScreenState extends State<AddAwbScreen> {
       }
 
       if (mounted) {
-        await showDialog(
+        bool dialogOpen = true;
+        showGeneralDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) {
-            Future.delayed(const Duration(seconds: 1), () {
-              if (ctx.mounted && Navigator.canPop(ctx)) {
-                Navigator.pop(ctx);
-              }
-            });
-            return Dialog(
-              backgroundColor: const Color(0xFF1e293b),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: Color(0xFF10b981),
-                      size: 64,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Air Waybills saved successfully',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+          barrierColor: Colors.black54,
+          transitionDuration: const Duration(milliseconds: 350),
+          pageBuilder: (context, anim1, anim2) {
+            final dark = isDarkMode.value;
+            return Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 320,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF1e293b) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF10b981).withAlpha(40),
+                        blurRadius: 40,
+                        offset: const Offset(0, 10),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                    ],
+                    border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10b981).withAlpha(20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        appLanguage.value == 'es' ? '¡AWB Guardada!' : 'AWB Saved!',
+                        style: TextStyle(
+                          color: dark ? Colors.white : const Color(0xFF111827),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        appLanguage.value == 'es' ? 'Las Guías Aéreas se guardaron exitosamente.' : 'Air Waybills saved successfully.',
+                        style: TextStyle(
+                          color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
           },
-        );
-        if (!mounted) return;
-        if (widget.onPop != null) {
-          widget.onPop!(true);
-        } else {
-          Navigator.pop(context, true);
+          transitionBuilder: (context, anim1, anim2, child) {
+            return Transform.scale(
+              scale: Curves.easeOutBack.transform(anim1.value),
+              child: FadeTransition(
+                opacity: anim1,
+                child: child,
+              ),
+            );
+          },
+        ).then((_) => dialogOpen = false);
+
+        await Future.delayed(const Duration(milliseconds: 2000));
+        
+        if (mounted) {
+          if (dialogOpen) {
+            Navigator.of(context).pop();
+          }
+          if (widget.onPop != null) {
+            widget.onPop!(true);
+          } else if (Navigator.canPop(context)) {
+            Navigator.pop(context, true);
+          }
         }
       }
     } catch (e) {
@@ -829,29 +867,12 @@ class AddAwbScreenState extends State<AddAwbScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.description_outlined, color: textP, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        appLanguage.value == 'es' ? 'Detalles de AWB y Asignación' : 'AWB Details & Assignment',
-                        style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Extra Data?', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 8),
-                      Switch(
-                        value: _showExtraData, 
-                        activeThumbColor: const Color(0xFF6366f1), 
-                        onChanged: (v) => setState(() => _showExtraData = v)
-                      ),
-                    ],
+                  Icon(Icons.description_outlined, color: textP, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    appLanguage.value == 'es' ? 'Detalles de AWB y Asignación' : 'AWB Details & Assignment',
+                    style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -859,7 +880,7 @@ class AddAwbScreenState extends State<AddAwbScreen> {
 
               LayoutBuilder(
                 builder: (context, constraints) {
-                  double baseWidth = _showExtraData ? 1225 : 1087;
+                  double baseWidth = 1187;
                   double rWidth = constraints.maxWidth - baseWidth - 1;
                   if (rWidth < 70) rWidth = 70;
                   return Wrap(
@@ -960,59 +981,50 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                         width: 140,
                         child: _buildTextField('House Number', _houseCtrl, 'HAWB', dark: dark, textP: textP, maxLines: 3, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters),
                       ),
-                      if (_showExtraData) ...[
-                        SizedBox(
-                          width: 120,
-                          child: _buildTextField('Data Coordinator', _coordinatorCtrl, 'Details...', dark: dark, textP: textP, maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.characters, inputFormatters: [UpperCaseTextFormatter()]),
+                      Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderC),
                         ),
-                        SizedBox(
-                          width: 120,
-                          child: _buildTextField('Data Location', _locationCtrl, 'Details...', dark: dark, textP: textP, maxLines: 3, minLines: 1, textCapitalization: TextCapitalization.characters, inputFormatters: [UpperCaseTextFormatter()]),
-                        ),
-                      ],
-                      if (!_showExtraData)
-                        SizedBox(
-                          width: 110,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _addLocalAwb,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
-                              foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              elevation: 0,
-                              side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.person_outline, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), size: 20),
+                              onPressed: _showCoordinatorDataDialog,
+                              tooltip: 'Data Coordinator',
                             ),
-                            child: const Text('+ Add AWB', style: TextStyle(fontWeight: FontWeight.w600)),
-                          ),
+                            Container(width: 1, height: 24, color: borderC),
+                            IconButton(
+                              icon: Icon(Icons.location_on_outlined, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), size: 20),
+                              onPressed: () {},
+                              tooltip: 'Data Location',
+                            ),
+                          ],
                         ),
+                      ),
+                      SizedBox(
+                        width: 110,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _addLocalAwb,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                            foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            elevation: 0,
+                            side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('+ Add AWB', style: TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
                     ],
                   );
                 }
               ),
-              if (_showExtraData) ...[
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: 120,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _addLocalAwb,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
-                        foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        elevation: 0,
-                        side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('+ Add AWB', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -1411,6 +1423,147 @@ class AddAwbScreenState extends State<AddAwbScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showCoordinatorDataDialog() async {
+    final dark = isDarkMode.value;
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+
+    final ctrls = {
+      'AGI Skid': TextEditingController(),
+      'Pre Skid': TextEditingController(),
+      'Crate': TextEditingController(),
+      'Box': TextEditingController(),
+      'Other': TextEditingController(),
+    };
+
+    int expectedPieces = int.tryParse(_piecesCtrl.text) ?? 0;
+    int enteredPieces = 0;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void updateCount() {
+              int sum = 0;
+              ctrls.forEach((key, ctrl) {
+                if (key == 'AGI Skid') {
+                  final parts = ctrl.text.split(RegExp(r'[,\s-]+'));
+                  for (var p in parts) {
+                    sum += int.tryParse(p) ?? 0;
+                  }
+                } else {
+                  sum += int.tryParse(ctrl.text) ?? 0;
+                }
+              });
+              if (sum != enteredPieces) setDialogState(() => enteredPieces = sum);
+            }
+
+            int agiLastLen = 0;
+
+            Widget buildField(String label) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: ctrls[label],
+                  keyboardType: label == 'AGI Skid' ? TextInputType.text : TextInputType.number,
+                  inputFormatters: [
+                    if (label == 'AGI Skid')
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9\s+]'))
+                    else
+                      FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  style: TextStyle(color: textP),
+                  onChanged: (val) {
+                    if (label == 'AGI Skid') {
+                      if (val.endsWith(' ') && val.length > agiLastLen) {
+                        final newText = '${val.substring(0, val.length - 1)} + ';
+                        ctrls[label]!.value = TextEditingValue(
+                          text: newText,
+                          selection: TextSelection.collapsed(offset: newText.length),
+                        );
+                      }
+                      agiLastLen = ctrls[label]!.text.length;
+                    }
+                    updateCount();
+                  },
+                  decoration: InputDecoration(
+                    labelText: label == 'AGI Skid' ? 'AGI Skid (space separated)' : label,
+                    labelStyle: TextStyle(color: textS, fontSize: label == 'AGI Skid' ? 13 : 15),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+              title: Column(
+                children: [
+                  Text('Insert Coordinator Data', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Column(
+                        children: [
+                          Text('EXPECTED', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('$expectedPieces', style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      Container(width: 1, height: 35, color: dark ? Colors.white24 : Colors.grey.shade300),
+                      Column(
+                        children: [
+                          Text('COUNTED', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text('$enteredPieces', style: TextStyle(color: enteredPieces == expectedPieces ? const Color(0xFF10b981) : const Color(0xFFf59e0b), fontSize: 20, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 300,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      buildField('AGI Skid'),
+                      buildField('Pre Skid'),
+                      buildField('Crate'),
+                      buildField('Box'),
+                      buildField('Other'),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: TextStyle(color: textS)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          }
+        );
+      }
     );
   }
 

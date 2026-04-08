@@ -231,11 +231,11 @@ class _AwbModuleState extends State<AwbModule> {
                         columns: const [
                           DataColumn(label: Text('#')),
                           DataColumn(label: Text('AWB Number')),
-                          DataColumn(label: Text('Pieces Received')),
                           DataColumn(label: Text('Pieces Expected')),
-                          DataColumn(label: Text('Total Pieces')),
+                          DataColumn(label: Text('Pieces Received')),
                           DataColumn(label: Text('Delivered Pieces')),
                           DataColumn(label: Text('Remaining Pieces')),
+                          DataColumn(label: Text('Total Pieces')),
                           DataColumn(label: Text('Total Weight')),
                           DataColumn(label: Text('Status')),
                         ],
@@ -281,7 +281,23 @@ class _AwbModuleState extends State<AwbModule> {
                                }
                             }
                           }
+
+                          int deliveredPieces = 0;
+                          if (u['data-deliver'] != null) {
+                            if (u['data-deliver'] is List) {
+                              for (var item in u['data-deliver']) {
+                                if (item is Map && item.containsKey('delivery')) {
+                                  deliveredPieces += int.tryParse(item['delivery']?.toString() ?? '0') ?? 0;
+                                }
+                              }
+                            } else if (u['data-deliver'] is Map) {
+                              deliveredPieces = int.tryParse(u['data-deliver']['delivery']?.toString() ?? '0') ?? 0;
+                            }
+                          }
                           
+                          int remainingPieces = expectedPieces - deliveredPieces;
+                          if (remainingPieces < 0) remainingPieces = 0;
+
                           String status = 'Pending';
                           if (receivedPieces > 0 && receivedPieces < expectedPieces) {
                             status = 'In Progress';
@@ -294,11 +310,11 @@ class _AwbModuleState extends State<AwbModule> {
                             cells: [
                               DataCell(Text('${index + 1}')),
                               DataCell(Text(u['AWB-number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
-                              DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(Text(expectedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w500))),
+                              DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w500))),
+                              DataCell(Text(deliveredPieces > 0 ? deliveredPieces.toString() : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))),
+                              DataCell(Text(remainingPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
                               DataCell(Text(u['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
-                              const DataCell(Text('-')), // To update with Pieces Delivered
-                              const DataCell(Text('-')), // To update with Remaining Pieces
                               DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(_buildStatusBadge(status)),
                             ],
