@@ -86,14 +86,7 @@ class AddUserScreenState extends State<AddUserScreen> {
       'descEn': 'Access to area management.',
       'icon': Icons.dashboard_customize_rounded,
     },
-    {
-      'key': 'control_flight',
-      'titleEs': 'Control (Flight)',
-      'titleEn': 'Control (Flight)',
-      'descEs': 'Acceso al módulo de control de vuelos.',
-      'descEn': 'Access to the flight control module.',
-      'icon': Icons.airplane_ticket_rounded,
-    },
+
     {
       'key': 'dashboard',
       'titleEs': 'Dashboard',
@@ -148,8 +141,8 @@ class AddUserScreenState extends State<AddUserScreen> {
   final Map<String, bool> _accessMap = {};
 
   void _updateDefaultsForPosition() {
-    final agentDefaults = ['system', 'location', 'driver', 'system_bf', 'area_nobreak'];
-    final coordinatorDefaults = ['system', 'coordinator', 'location', 'driver', 'system_bf', 'area_nobreak', 'control_flight'];
+    final agentDefaults = ['dashboard', 'system', 'location', 'driver', 'system_bf', 'area_nobreak'];
+    final coordinatorDefaults = ['dashboard', 'system', 'coordinator', 'location', 'driver', 'system_bf', 'area_nobreak'];
     final officeDefaults = ['dashboard', 'flights', 'ulds', 'awbs', 'delivers', 'users'];
     
     List<String> activeKeys = [];
@@ -166,6 +159,12 @@ class AddUserScreenState extends State<AddUserScreen> {
     for (var p in _pagesList) {
       final k = p['key'] as String;
       _accessMap[k] = activeKeys.contains(k);
+    }
+
+    if (_position == 'Coordinator' || _position == 'Supervisor' || _position == 'Manager') {
+      _masterDriver = true;
+    } else {
+      _masterDriver = false;
     }
 
     _pagesList.sort((a, b) {

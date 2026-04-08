@@ -11,7 +11,7 @@ import 'screens/driver_module.dart';
 import 'screens/other_modules.dart';
 import 'screens/system_bf_module.dart';
 import 'screens/area_nobreak_module.dart';
-import 'screens/control_flight_module.dart';
+
 
 
 Future<void> main() async {
@@ -585,7 +585,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Users',
                                   5,
                                 ),
-                              if (can('system') || can('coordinator') || can('location') || can('driver') || can('system_bf') || can('area_nobreak') || can('control_flight'))
+                              if ((can('system') || can('coordinator') || can('location') || can('driver') || can('system_bf') || can('area_nobreak')) &&
+                                  (currentUserData.value?['position'] == 'Supervisor' || currentUserData.value?['position'] == 'Manager' || currentUserData.value?['position'] == 'Administrator'))
                                 Padding(
                                   padding: const EdgeInsets.only(
                                     left: 16.0,
@@ -593,7 +594,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     top: 16.0,
                                   ),
                                   child: Text(
-                                    'OPERACIONES',
+                                    appLanguage.value == 'es' ? 'OPERACIONES' : 'OPERATIONS',
                                     style: TextStyle(
                                       color: dark
                                           ? const Color(0xFF64748b)
@@ -640,12 +641,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Area (No break)',
                                   11,
                                 ),
-                              if (can('control_flight'))
-                                _buildNavItem(
-                                  Icons.airplane_ticket_rounded,
-                                  'Control (Flight)',
-                                  12,
-                                ),
+
                             ],
                           ),
                         ),
@@ -867,7 +863,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const DriverModule(),
         const SystemBfModule(),
         const AreaNobreakModule(),
-        const ControlFlightModule(),
+
       ],
     );
   }

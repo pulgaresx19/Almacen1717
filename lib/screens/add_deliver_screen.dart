@@ -47,6 +47,8 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
 
   bool _isLoadingAwbs = true;
   StreamSubscription<List<Map<String, dynamic>>>? _awbSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _deliversSub;
+  List<Map<String, dynamic>> _allDelivers = [];
 
   @override
   void initState() {
@@ -66,6 +68,45 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         });
       }
     });
+
+    _deliversSub = Supabase.instance.client
+        .from('Delivers')
+        .stream(primaryKey: ['id'])
+        .listen((data) {
+      if (mounted) {
+        setState(() {
+          _allDelivers = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    });
+  }
+
+  int getInProcessPieces(String awbNum) {
+    int count = 0;
+    for (var del in _allDelivers) {
+      final status = del['status']?.toString() ?? '';
+      if (status == 'Delivered' || status == 'Canceled') continue;
+      
+      final listPickup = del['list-pickup'];
+      if (listPickup != null) {
+        if (listPickup is List) {
+          for (var item in listPickup) {
+            if (item is Map && item['AWB-number'] == awbNum) {
+              count += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+            }
+          }
+        } else {
+          final str = listPickup.toString();
+          if (str.isNotEmpty) {
+             final parts = str.split(' - ');
+             if (parts.isNotEmpty && parts[0].trim() == awbNum) {
+               count += int.tryParse(parts.length > 1 ? parts[1].trim().replaceAll(RegExp(r'[^0-9]'), '') : '0') ?? 0;
+             }
+          }
+        }
+      }
+    }
+    return count;
   }
 
   bool get hasDataSync {
@@ -143,6 +184,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
   @override
   void dispose() {
     _awbSub?.cancel();
+    _deliversSub?.cancel();
     for (var c in _deliveryPcsControllers.values) {
       c.dispose();
     }
@@ -790,10 +832,11 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                           deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
                         }
                       }
-                      int remainingPieces = expectedPieces - deliveredPieces;
+                      int inProcessPieces = getInProcessPieces(awbNumber);
+                      int remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
                       if (remainingPieces < 0) remainingPieces = 0;
 
-                      final totalVal = awb['total']?.toString() ?? '0';
+
 
                       if (!_deliveryPcsControllers.containsKey(awbNumber)) {
                         _deliveryPcsControllers[awbNumber] = TextEditingController(text: remainingPieces.toString());
@@ -857,8 +900,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                                   TextInputFormatter.withFunction((oldValue, newValue) {
                                     if (newValue.text.isEmpty) return newValue;
                                     final val = int.tryParse(newValue.text) ?? 0;
-                                    final maxVal = int.tryParse(totalVal) ?? 0;
-                                    if (val > maxVal) return oldValue;
+                                    if (val > remainingPieces) return oldValue;
                                     return newValue;
                                   }),
                                 ],
@@ -910,6 +952,10 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                         onPressed: () {
                           setState(() {
                             _selectedAwbs.removeWhere((item) => item['AWB-number'] == awbNumber);
+                            _deliveryPcsControllers[awbNumber]?.dispose();
+                            _deliveryPcsControllers.remove(awbNumber);
+                            _deliveryRemarkControllers[awbNumber]?.dispose();
+                            _deliveryRemarkControllers.remove(awbNumber);
                           });
                         },
                       ),
@@ -1446,6 +1492,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                       const DataColumn(label: Text('Expected')),
                       const DataColumn(label: Text('Received')),
                       const DataColumn(label: Text('Delivered')),
+                      const DataColumn(label: Text('In Process')),
                       const DataColumn(label: Text('Remaining')),
                       const DataColumn(label: Text('Reject')),
                       const DataColumn(label: Text('Total')),
@@ -1510,7 +1557,8 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                           deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
                         }
                       }
-                      int remainingPieces = expectedPieces - deliveredPieces;
+                      int inProcessPieces = getInProcessPieces(awbNumber);
+                      int remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
                       if (remainingPieces < 0) remainingPieces = 0;
                       
                       List<Map<String, dynamic>> rejectDataList = [];
@@ -1558,6 +1606,10 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                               _selectedAwbs.add(awb);
                             } else {
                               _selectedAwbs.removeWhere((item) => item['AWB-number'] == awbNumber);
+                              _deliveryPcsControllers[awbNumber]?.dispose();
+                              _deliveryPcsControllers.remove(awbNumber);
+                              _deliveryRemarkControllers[awbNumber]?.dispose();
+                              _deliveryRemarkControllers.remove(awbNumber);
                             }
                           });
                         },
@@ -1567,6 +1619,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                           DataCell(Text('$expectedPieces pcs')),
                           DataCell(Text('$receivedPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600))),
                           DataCell(Text(deliveredPieces > 0 ? '$deliveredPieces pcs' : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))),
+                          DataCell(Text(inProcessPieces > 0 ? '$inProcessPieces pcs' : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3b82f6)))),
                           DataCell(Text('$remainingPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
                           DataCell(
                                 rejectDataList.isNotEmpty 

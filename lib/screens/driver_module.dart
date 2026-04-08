@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 
 class DriverModule extends StatefulWidget {
   const DriverModule({super.key});
@@ -160,6 +160,18 @@ class _DriverModuleState extends State<DriverModule> {
                   var delivers = List<Map<String, dynamic>>.from(snapshot.data ?? []);
                   
                   delivers.sort((a, b) {
+                    const statusOrder = ['Waiting', 'In process', 'Ready', 'Canceled'];
+                    final statusA = a['status']?.toString() ?? 'Waiting';
+                    final statusB = b['status']?.toString() ?? 'Waiting';
+                    
+                    int indexA = statusOrder.indexOf(statusA);
+                    int indexB = statusOrder.indexOf(statusB);
+                    if (indexA == -1) indexA = 999;
+                    if (indexB == -1) indexB = 999;
+                    
+                    int statusComp = indexA.compareTo(indexB);
+                    if (statusComp != 0) return statusComp;
+
                     final taStr = a['time-deliver']?.toString() ?? '';
                     final tbStr = b['time-deliver']?.toString() ?? '';
                     if (taStr.isEmpty && tbStr.isNotEmpty) return 1;
@@ -205,6 +217,8 @@ class _DriverModuleState extends State<DriverModule> {
                                 const DataColumn(label: Text('Priority')),
                                 const DataColumn(label: Text('Remarks')),
                                 const DataColumn(label: Text('AWBs')),
+                                const DataColumn(label: Text('No Show')),
+                                const DataColumn(label: Text('Agent')),
                                 DataColumn(label: Text(appLanguage.value == 'es' ? 'Estado' : 'Status')),
                               ],
                               rows: List.generate(delivers.length, (index) {
@@ -226,6 +240,15 @@ class _DriverModuleState extends State<DriverModule> {
                                 }
                                 
                                 bool isPriority = u['isPriority'] == true;
+                                
+                                int noShowCount = 0;
+                                if (u['no-show'] != null) {
+                                  if (u['no-show'] is List) {
+                                    noShowCount = (u['no-show'] as List).length;
+                                  } else if (u['no-show'] is Map && (u['no-show'] as Map).isNotEmpty) {
+                                    noShowCount = 1;
+                                  }
+                                }
 
                                 return DataRow(
                                   onSelectChanged: (selected) {
@@ -362,6 +385,41 @@ class _DriverModuleState extends State<DriverModule> {
                                         )
                                       )
                                     ),
+                                    DataCell(
+                                      noShowCount > 0 
+                                          ? InkWell(
+                                              onTap: () {
+                                                _showNoShowDetails(context, u['no-show'], dark, dark ? Colors.white : const Color(0xFF111827));
+                                              },
+                                              child: Container(
+                                                width: 32,
+                                                height: 32,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(color: Colors.redAccent.withAlpha(30), shape: BoxShape.circle),
+                                                child: Text('$noShowCount', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center),
+                                              ),
+                                            )
+                                          : const Text('-', style: TextStyle(color: Colors.grey))
+                                    ),
+                                    DataCell(
+                                      Builder(builder: (ctx) {
+                                        if (u['ref-userDrive'] == null) return const Text('-', style: TextStyle(color: Colors.grey));
+                                        if (u['ref-userDrive'] is Map) {
+                                          final userMap = u['ref-userDrive'] as Map;
+                                          final userName = userMap['user']?.toString() ?? '-';
+                                          String dtStr = '';
+                                          if (userMap['time'] != null) {
+                                            final dt = DateTime.tryParse(userMap['time'].toString())?.toLocal();
+                                            if (dt != null) dtStr = DateFormat('MMM dd, hh:mm a').format(dt);
+                                          }
+                                          return Tooltip(
+                                            message: dtStr,
+                                            child: Text(userName, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563))),
+                                          );
+                                        }
+                                        return const Text('-', style: TextStyle(color: Colors.grey));
+                                      })
+                                    ),
                                     DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
                                   ],
                                 );
@@ -388,12 +446,14 @@ class _DriverModuleState extends State<DriverModule> {
     Color fg = const Color(0xFFcbd5e1);
     
     final s = status.toLowerCase();
-    if (s.contains('waiting') || s.contains('espera')) {
+    if (s.contains('waiting')) {
       bg = const Color(0xFF334155).withAlpha(150); fg = const Color(0xFFcbd5e1);
-    } else if (s.contains('process')) {
+    } else if (s.contains('in process') || s.contains('process')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('completed') || s.contains('delivered')) {
+    } else if (s.contains('ready')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
+    } else if (s.contains('canceled')) {
+      bg = const Color(0xFF7f1d1d).withAlpha(51); fg = const Color(0xFFfca5a5);
     }
 
     return Container(
@@ -411,6 +471,80 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 
+
+  void _showNoShowDetails(BuildContext context, dynamic noShowData, bool dark, Color textP) {
+    List<Map<String, dynamic>> items = [];
+    if (noShowData is List) {
+      items = noShowData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } else if (noShowData is Map) {
+      items = [Map<String, dynamic>.from(noShowData)];
+    }
+
+    showDialog(context: context, builder: (ctx) {
+      return Dialog(
+        backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 400,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('No Show Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ...items.map((i) {
+                String tStr = i['time']?.toString() ?? '-';
+                if (tStr != '-') {
+                  final parsed = DateTime.tryParse(tStr)?.toLocal();
+                  if (parsed != null) {
+                    tStr = DateFormat('MMM dd, hh:mm a').format(parsed);
+                  }
+                }
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: dark ? Colors.white.withAlpha(20) : Colors.grey.shade300)
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.person_rounded, size: 14, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(i['user']?.toString() ?? 'Unknown User', style: TextStyle(color: textP, fontWeight: FontWeight.w600))),
+                        ]
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time_rounded, size: 14, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(tStr, style: const TextStyle(color: Colors.grey, fontSize: 13))),
+                        ]
+                      )
+                    ]
+                  )
+                );
+              }),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        )
+      );
+    });
+  }
 
   void _showDriverConfirmationOverlay(Map<String, dynamic> u) {
     bool dark = isDarkMode.value;
@@ -574,7 +708,40 @@ class _DriverModuleState extends State<DriverModule> {
                     children: [
                       TextButton.icon(
                         icon: const Icon(Icons.block_rounded, size: 18),
-                        onPressed: () => Navigator.pop(ctx),
+                        onPressed: () async {
+                          final currentTime = DateTime.now().toIso8601String();
+                          final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+                          
+                          try {
+                            final currentNoShow = u['no-show'];
+                            List updatedNoShowList = [];
+                            if (currentNoShow is List) {
+                              updatedNoShowList = List.from(currentNoShow);
+                            } else if (currentNoShow is Map && currentNoShow.isNotEmpty) {
+                              updatedNoShowList.add(currentNoShow);
+                            }
+                            updatedNoShowList.add({
+                              'time': currentTime,
+                              'user': currentUserFullName,
+                            });
+                            
+                            Map<String, dynamic> updatePayload = {
+                              'no-show': updatedNoShowList
+                            };
+                            
+                            if (updatedNoShowList.length >= 2) {
+                              updatePayload['status'] = 'Canceled';
+                            }
+                            
+                            await Supabase.instance.client.from('Delivers').update(updatePayload).eq('id', u['id']);
+                          } catch (e) {
+                            debugPrint('NO SHOW Update Error: $e');
+                          }
+                          
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                        },
                         style: TextButton.styleFrom(
                           foregroundColor: const Color(0xFFef4444),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -582,9 +749,29 @@ class _DriverModuleState extends State<DriverModule> {
                         label: const Text('NO SHOW', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                       ),
                       ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _loadDriverDetails(u);
+                        onPressed: () async {
+                          final currentTime = DateTime.now().toUtc().toIso8601String();
+                          final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+
+                          try {
+                            await Supabase.instance.client.from('Delivers').update({
+                              'ref-userDrive': {
+                                'time': currentTime,
+                                'user': currentUserFullName,
+                              }
+                            }).eq('id', u['id']);
+                            u['ref-userDrive'] = {
+                                'time': currentTime,
+                                'user': currentUserFullName,
+                            };
+                          } catch (e) {
+                            debugPrint('Confirm Update Error: $e');
+                          }
+                          
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                            _loadDriverDetails(u);
+                          }
                         },
                         icon: const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
                         style: ElevatedButton.styleFrom(

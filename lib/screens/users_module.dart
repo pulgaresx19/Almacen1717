@@ -266,26 +266,8 @@ class _UsersModuleState extends State<UsersModule> {
                                       ),
                                   ),
                                   DataCell(Text(u['building'] ?? '-')),
-                                  DataCell(
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(color: borderCard),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(u['shift'] ?? '-', style: TextStyle(fontSize: 12, color: textP)),
-                                      ),
-                                  ),
-                                  DataCell(
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(u['position'] ?? '-', style: TextStyle(fontSize: 12, color: textP)),
-                                      ),
-                                  ),
+                                  DataCell(Text(u['shift'] ?? '-', style: TextStyle(color: textP))),
+                                  DataCell(Text(u['position'] ?? '-', style: TextStyle(color: textP))),
                                 ],
                               );
                                   }).toList(),
@@ -370,7 +352,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     {'key': 'driver', 'titleEs': 'Conductor', 'titleEn': 'Driver', 'descEs': 'Administración y asignación de manejo.', 'descEn': 'Driver management and assignment.', 'icon': Icons.local_shipping_rounded},
     {'key': 'system_bf', 'titleEs': 'Sistema (BF)', 'titleEn': 'System (BF)', 'descEs': 'Acceso a la configuración del sistema.', 'descEn': 'Access to the system configuration.', 'icon': Icons.computer_rounded},
     {'key': 'area_nobreak', 'titleEs': 'Área (No break)', 'titleEn': 'Area (No break)', 'descEs': 'Acceso a la gestión de áreas.', 'descEn': 'Access to area management.', 'icon': Icons.dashboard_customize_rounded},
-    {'key': 'control_flight', 'titleEs': 'Control (Flight)', 'titleEn': 'Control (Flight)', 'descEs': 'Acceso al módulo de control de vuelos.', 'descEn': 'Access to the flight control module.', 'icon': Icons.airplane_ticket_rounded},
+
     {'key': 'dashboard', 'titleEs': 'Dashboard', 'titleEn': 'Dashboard', 'descEs': 'Panel general.', 'descEn': 'General dashboard.', 'icon': Icons.dashboard_rounded},
     {'key': 'flights', 'titleEs': 'Vuelos', 'titleEn': 'Flights', 'descEs': 'Acceso para gestionar y visualizar vuelos.', 'descEn': 'Access to manage and view flights.', 'icon': Icons.flight_land_rounded},
     {'key': 'ulds', 'titleEs': 'Contenedores (ULD)', 'titleEn': 'Unit Load Devices (ULD)', 'descEs': 'Acceso para crear y asignar contenedores.', 'descEn': 'Access to create and assign ULDs.', 'icon': Icons.luggage_rounded},
@@ -392,6 +374,21 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
   String? _position;
   bool _masterDriver = false;
   Map<String, bool> _accessMap = {};
+  late final List<String> _originalOrder;
+
+  void _sortPages() {
+    _pagesList.sort((a, b) {
+      bool aAccess = _accessMap[a['key']] == true;
+      bool bAccess = _accessMap[b['key']] == true;
+      
+      if (aAccess && !bAccess) return -1;
+      if (!aAccess && bAccess) return 1;
+      
+      int aIndex = _originalOrder.indexOf(a['key'] as String);
+      int bIndex = _originalOrder.indexOf(b['key'] as String);
+      return aIndex.compareTo(bIndex);
+    });
+  }
 
   @override
   void initState() {
@@ -408,6 +405,8 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     _masterDriver = widget.user['master-driver'] == true;
     
     _accessMap = Map<String, bool>.from((widget.user['access-page'] as Map?)?.cast<String, bool>() ?? {});
+    _originalOrder = _pagesList.map((p) => p['key'] as String).toList();
+    _sortPages();
   }
 
   @override
@@ -457,6 +456,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
       setState(() {
         widget.user['access-page'] = _accessMap;
         _isEditingAccess = false;
+        _sortPages();
       });
       widget.onUpdate?.call();
     } catch (e) {
@@ -745,6 +745,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                           setState(() {
                             _isEditingAccess = false;
                             _accessMap = Map<String, bool>.from((widget.user['access-page'] as Map?)?.cast<String, bool>() ?? {});
+                            _sortPages();
                           });
                         }, textP),
                       const SizedBox(height: 16),
