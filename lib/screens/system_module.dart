@@ -409,11 +409,12 @@ class _SystemModuleState extends State<SystemModule> {
 
     return Stack(
       children: [
-        Container(
-          padding: const EdgeInsets.all(32),
-          color: Colors.transparent,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Positioned.fill(
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -731,8 +732,13 @@ class _SystemModuleState extends State<SystemModule> {
                                     Expanded(
                                       child: Row(
                                         children: [
-                                          GestureDetector(
-                                            onTap: () async {
+                                          Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(10),
+                                              hoverColor: dark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(10),
+                                              splashColor: dark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(10),
+                                              onTap: () async {
                                               if (uld['awbList'] == null &&
                                                   uld['ULD-number'] != null &&
                                                   match.isNotEmpty) {
@@ -767,6 +773,7 @@ class _SystemModuleState extends State<SystemModule> {
                                                         'remarks':
                                                             awb['remarks'] ??
                                                             '',
+                                                        'data-received': awb['data-received'],
                                                       });
                                                     }
                                                   }
@@ -816,6 +823,7 @@ class _SystemModuleState extends State<SystemModule> {
                                               ),
                                             ),
                                           ),
+                                        ),
                                           const SizedBox(width: 12),
                                           SizedBox(
                                             width: 105,
@@ -1235,6 +1243,89 @@ class _SystemModuleState extends State<SystemModule> {
                     ),
                   if ((isLeft ? _uldsLeft : _uldsRight).isNotEmpty) ...[
                     const SizedBox(height: 16),
+                    Builder(
+                      builder: (context) {
+                        final flightList = isLeft ? _flightsLeft : _flightsRight;
+                        final currentFlightIdx = flightList.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedId);
+                        final currentFlight = currentFlightIdx != -1 ? flightList[currentFlightIdx] : null;
+
+                        String? fTruck = currentFlight?['first-truck']?.toString();
+                        String? lTruck = currentFlight?['last-truck']?.toString();
+
+                        if (currentFlight != null) {
+                          final Map<String, dynamic> truckMap = currentFlight['local-truck-arrived'] is Map
+                              ? Map<String, dynamic>.from(currentFlight['local-truck-arrived'])
+                              : {};
+                          if (truckMap.isNotEmpty) {
+                            List<String> times = truckMap.values.map((v) => v.toString()).toList();
+                            times.sort((a, b) => a.compareTo(b));
+                            fTruck ??= times.first;
+                            lTruck ??= times.last;
+                          } else if (currentFlight['local-first-truck'] != null) {
+                            fTruck ??= currentFlight['local-first-truck'].toString();
+                          }
+                        }
+
+                        if (fTruck == null) return const SizedBox.shrink();
+
+                        String toAmPm(String? t) {
+                          if (t == null) return '-';
+                          try {
+                            if (t.contains('T')) {
+                              final dt = DateTime.parse(t).toLocal();
+                              int h = dt.hour;
+                              int m = dt.minute;
+                              bool pm = h >= 12;
+                              int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+                              return '${dt.day}/${dt.month} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
+                            }
+                            final pts = t.split(':');
+                            if (pts.length >= 2) {
+                              int h = int.parse(pts[0]);
+                              int m = int.parse(pts[1]);
+                              bool pm = h >= 12;
+                              int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+                              return '$h12:${m.toString().padLeft(2, '0')} ${pm ? 'PM' : 'AM'}';
+                            }
+                          } catch (_) {}
+                          return t;
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0, left: 4, right: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'First Truck: ${toAmPm(fTruck)}',
+                                    style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              if (isFlightReceived)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.done_all, size: 14, color: Color(0xFF10b981)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Last Truck: ${toAmPm(lTruck ?? fTruck)}',
+                                      style: const TextStyle(fontSize: 13, color: Color(0xFF10b981), fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                              if (!isFlightReceived)
+                                const SizedBox.shrink(),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1337,9 +1428,7 @@ class _SystemModuleState extends State<SystemModule> {
                                     '${f['carrier']}-${f['number']}' ==
                                     selectedId,
                               );
-                              final currentFlight = currentFlightIdx != -1
-                                  ? flightList[currentFlightIdx]
-                                  : null;
+
 
                               Widget actionButton = ElevatedButton.icon(
                                 onPressed: isFlightReceived
@@ -1542,122 +1631,8 @@ class _SystemModuleState extends State<SystemModule> {
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
-                                ),
-                              );
-
-                              String? fTruck = currentFlight?['first-truck']
-                                  ?.toString();
-                              String? lTruck = currentFlight?['last-truck']
-                                  ?.toString();
-
-                              if (currentFlight != null) {
-                                final Map<String, dynamic> truckMap =
-                                    currentFlight['local-truck-arrived'] is Map
-                                    ? Map<String, dynamic>.from(
-                                        currentFlight['local-truck-arrived'],
-                                      )
-                                    : {};
-                                if (truckMap.isNotEmpty) {
-                                  List<String> times = truckMap.values
-                                      .map((v) => v.toString())
-                                      .toList();
-                                  times.sort((a, b) => a.compareTo(b));
-                                  fTruck ??= times.first;
-                                  lTruck ??= times.last;
-                                } else if (currentFlight['local-first-truck'] !=
-                                    null) {
-                                  fTruck ??= currentFlight['local-first-truck']
-                                      .toString();
-                                }
-                              }
-
-                              if (fTruck != null) {
-                                String toAmPm(String? t) {
-                                  if (t == null) return '-';
-                                  try {
-                                    if (t.contains('T')) {
-                                      final dt = DateTime.parse(t).toLocal();
-                                      int h = dt.hour;
-                                      int m = dt.minute;
-                                      bool pm = h >= 12;
-                                      int h12 = h > 12
-                                          ? h - 12
-                                          : (h == 0 ? 12 : h);
-                                      return '${dt.day}/${dt.month} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-                                    }
-                                    final pts = t.split(':');
-                                    if (pts.length >= 2) {
-                                      int h = int.parse(pts[0]);
-                                      int m = int.parse(pts[1]);
-                                      bool pm = h >= 12;
-                                      int h12 = h > 12
-                                          ? h - 12
-                                          : (h == 0 ? 12 : h);
-                                      return '$h12:${m.toString().padLeft(2, '0')} ${pm ? 'PM' : 'AM'}';
-                                    }
-                                  } catch (_) {}
-                                  return t;
-                                }
-
-                                return Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.end,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.access_time,
-                                              size: 13,
-                                              color: Color(0xFF94a3b8),
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'First Truck: ${toAmPm(fTruck)}',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Color(0xFF94a3b8),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (isFlightReceived) ...[
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                Icons.done_all,
-                                                size: 13,
-                                                color: Color(0xFF10b981),
-                                              ),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Last Truck: ${toAmPm(lTruck ?? fTruck)}',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: Color(0xFF10b981),
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                    const SizedBox(width: 12),
-                                    actionButton,
-                                  ],
-                                );
-                              }
-
-                              return actionButton;
+                                ),                               );
+                               return actionButton;
                             },
                           ),
                         ],
@@ -1668,6 +1643,7 @@ class _SystemModuleState extends State<SystemModule> {
               ],
             ],
           ),
+        ),
         ),
         if ((isLeft ? _activeAwbOverlayLeft : _activeAwbOverlayRight) !=
             null) ...[
@@ -1712,6 +1688,26 @@ class _SystemModuleState extends State<SystemModule> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          if (activeUld['data-received'] != null && (activeUld['data-received'] as Map).isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle, size: 14, color: Color(0xFF10b981)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Received by ${activeUld['data-received']['user'] ?? 'Unknown'} at ${activeUld['data-received']['time'] != null ? DateFormat('MMM dd, hh:mm a').format(DateTime.parse(activeUld['data-received']['time']).toLocal()) : ''}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF10b981),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           const SizedBox(height: 16),
                           if (isLoading)
                             const Center(

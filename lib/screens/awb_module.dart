@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_awb_screen.dart';
 import 'package:intl/intl.dart';
 import '_print_preview.dart';
@@ -154,7 +154,8 @@ class _AwbModuleState extends State<AwbModule> {
                   const SizedBox(width: 16),
                   
                   // Add AWB Button
-                  SizedBox(
+                  if (currentUserData.value?['position'] != 'Supervisor')
+                    SizedBox(
                     height: 40,
                     child: ElevatedButton.icon(
                       onPressed: () => setState(() => _showAddForm = true),
@@ -677,7 +678,8 @@ class _AwbModuleState extends State<AwbModule> {
                 final e = entry.value;
                 final isBreak = e['isBreak'] == true;
                 final uldNum = e['refULD']?.toString() ?? '';
-                final uldDcData = dcList.where((dc) => dc['refULD']?.toString() == uldNum || dcList.length == 1).toList();
+                final uldDcData = dcList.where((dc) => dc['refULD']?.toString() == uldNum).toList();
+                final uldLocData = locList.where((loc) => loc['refULD']?.toString() == uldNum).toList();
                 final isExpanded = expandedCards.contains(idx);
 
                 return Container(
@@ -839,7 +841,12 @@ class _AwbModuleState extends State<AwbModule> {
                                                  return Container(
                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
-                                                   child: Text('${entry.key}: ${entry.value is List ? entry.value.join(', ') : entry.value}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
+                                                   child: Text(
+                                                     entry.value is List 
+                                                        ? '${(entry.value as List).length} ${entry.key}: ${(entry.value as List).join(', ')}' 
+                                                        : '${entry.key}: ${entry.value}', 
+                                                     style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)
+                                                   ),
                                                  );
                                                }).toList(),
                                              ),
@@ -869,7 +876,7 @@ class _AwbModuleState extends State<AwbModule> {
                               ],
 
                               // --- LOCATION AUDIT ---
-                              if (locList.isNotEmpty && awbList.last == e) ...[
+                              if (uldLocData.isNotEmpty) ...[
                                  const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
                                  Row(children: [
                                     Icon(Icons.location_on_outlined, size: 16, color: textP),
@@ -877,7 +884,7 @@ class _AwbModuleState extends State<AwbModule> {
                                     Text('Location Audit', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
                                  ]),
                                  const SizedBox(height: 12),
-                                 ...locList.map((loc) {
+                                 ...uldLocData.map((loc) {
                                     Map itemLocs = (loc['itemLocations'] is Map) ? loc['itemLocations'] as Map : {};
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
@@ -904,10 +911,21 @@ class _AwbModuleState extends State<AwbModule> {
                                                runSpacing: 6,
                                                children: itemLocs.entries.map((entry) {
                                                  if (entry.value == null || entry.value.toString().isEmpty) return const SizedBox.shrink();
+                                                 
+                                                 String formattedKey = entry.key;
+                                                 final RegExp exp = RegExp(r'^(.*?)[\-_](\d+)$');
+                                                 final match = exp.firstMatch(formattedKey);
+                                                 if (match != null) {
+                                                     final prefix = match.group(1)?.trim() ?? '';
+                                                     final numStr = match.group(2) ?? '0';
+                                                     final numValue = int.tryParse(numStr) ?? 0;
+                                                     formattedKey = '${numValue + 1} $prefix';
+                                                 }
+
                                                  return Container(
                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                    decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF10b981).withAlpha(50))),
-                                                   child: Text('${entry.key} ➔ ${entry.value}', style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
+                                                   child: Text('$formattedKey ➔ ${entry.value}', style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
                                                  );
                                                }).toList(),
                                              ),
@@ -992,37 +1010,17 @@ class _AwbModuleState extends State<AwbModule> {
                         child: ListView(
                           padding: const EdgeInsets.all(24),
                           children: [
-                            // Totals Summary
-                            Text('Pieces Summary', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                            Text('ULD Traceability Flow', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
-                              child: Column(
-                                children: [
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Root Total:', style: TextStyle(color: textS)), Text(u['total']?.toString() ?? '-', style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
-                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Expected (Manifest):', style: TextStyle(color: textS)), Text(expectedPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
-                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Received (Coordinator):', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
-                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Calculated Status:', style: TextStyle(color: textS)), _buildStatusBadge(status)]),
-                                ]
-                              )
-                            ),
+                            ...buildCombinedAuditItems(),
                             const SizedBox(height: 32),
-                            
+
                             if (u['data-deliver'] != null) ...[
                                Text('Delivery Execution', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                                const SizedBox(height: 12),
                                ...buildDeliveryItems(),
-                               const SizedBox(height: 32),
+                               const SizedBox(height: 24),
                             ],
-
-                            Text('ULD Traceability Flow', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 12),
-                            ...buildCombinedAuditItems(),
-                            const SizedBox(height: 24),
                           ],
                         ),
                       ),

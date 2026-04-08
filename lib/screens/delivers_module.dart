@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_deliver_screen.dart';
 import '_deliver_print_preview.dart';
 
@@ -142,7 +142,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                   const SizedBox(width: 16),
                 ],
                 
-                if (!_showAddForm)
+                if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor')
                   SizedBox(
                     height: 40,
                     child: ElevatedButton.icon(
@@ -449,7 +449,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                                       Expanded(child: _buildDeliverEditableCard(context, 'ID Pickup', 'id-pickup', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.badge_outlined)),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -457,19 +457,19 @@ class _DeliversModuleState extends State<DeliversModule> {
                                       Expanded(child: _buildDeliverEditableCard(context, 'Status', 'status', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.info_outline, isStatusDropdown: true)),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(child: _buildDeliverEditableCard(context, 'Door', 'door', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.door_front_door_outlined)),
                                       Expanded(child: _buildDeliverEditableCard(context, 'Priority', 'isPriority', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
+                                      Expanded(child: _buildDeliverEditableCard(context, 'Time', 'time-deliver', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.access_time_rounded, isTime: true)),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(flex: 1, child: _buildDeliverEditableCard(context, 'Time', 'time-deliver', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.access_time_rounded, isTime: true)),
+                                      Expanded(flex: 1, child: _buildDeliverEditableCard(context, 'Door', 'door', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.door_front_door_outlined)),
                                       const SizedBox(width: 16),
                                       Expanded(flex: 2, child: _buildDeliverEditableCard(context, 'Remarks', 'remarks', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.notes, isRemarks: true)),
                                     ],
@@ -581,28 +581,7 @@ class _DeliversModuleState extends State<DeliversModule> {
     if (!isEditing) {
       String displayValue = '${u[key] ?? '-'}';
       
-      if (isStatusDropdown) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (icon != null) ...[
-                      Icon(icon, color: colorL, size: 14),
-                      const SizedBox(width: 4),
-                    ],
-                    Expanded(child: Text(label, style: TextStyle(color: colorL, fontSize: 11), overflow: TextOverflow.ellipsis)),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Align(alignment: Alignment.centerLeft, child: _buildStatusBadge(displayValue)),
-              ],
-            ),
-          );
-      }
+
       
       if (isTime) {
          displayValue = '-';
@@ -821,10 +800,12 @@ class _DeliversModuleState extends State<DeliversModule> {
         color: bg,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        status.toUpperCase(), 
-        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
-      ),
+      child: (s.contains('received') || s.contains('recibido') || s.contains('process'))
+          ? Icon(Icons.check_circle_rounded, color: fg, size: 18)
+          : Text(
+              status.toUpperCase(), 
+              style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
+            ),
     );
   }
 }

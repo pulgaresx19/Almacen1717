@@ -3008,6 +3008,72 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                     ),
                   if ((isLeft ? _uldsLeft : _uldsRight).isNotEmpty) ...[
                     const SizedBox(height: 16),
+                    Builder(
+                      builder: (context) {
+                        final flightList = isLeft ? _flightsLeft : _flightsRight;
+                        final currentFlightIdx = flightList.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedId);
+                        
+                        String? startB;
+                        String? endB;
+                        if (currentFlightIdx != -1) {
+                          startB = flightList[currentFlightIdx]['start-break']?.toString();
+                          endB = flightList[currentFlightIdx]['end-break']?.toString();
+                        }
+
+                        if (startB == null && endB == null) return const SizedBox.shrink();
+
+                        String fmtBreak(String? t) {
+                          if (t == null) return '-';
+                          try {
+                            final dt = DateTime.parse(t.replaceAll(' ', 'T')).toLocal();
+                            int h = dt.hour;
+                            int m = dt.minute;
+                            bool pm = h >= 12;
+                            int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
+                            String mm = m < 10 ? '0$m' : '$m';
+                            String suff = pm ? 'pm' : 'am';
+                            return '${dt.day}/${dt.month} $h12:$mm $suff';
+                          } catch (_) {
+                            return t;
+                          }
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0, left: 4, right: 4),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              startB != null
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Start Break: ${fmtBreak(startB)}',
+                                          style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
+                              endB != null
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.done_all, size: 14, color: Color(0xFF10b981)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'End Break: ${fmtBreak(endB)}',
+                                          style: const TextStyle(fontSize: 13, color: Color(0xFF10b981), fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    )
+                                  : const SizedBox.shrink(),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -5164,95 +5230,6 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                   baseActionButton,
                                 ],
                               );
-
-                              String fmtBreak(String? t) {
-                                if (t == null) return '-';
-                                try {
-                                  final dt = DateTime.parse(
-                                    t.replaceAll(' ', 'T'),
-                                  ).toLocal();
-                                  int h = dt.hour;
-                                  int m = dt.minute;
-                                  bool pm = h >= 12;
-                                  int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-                                  String mm = m < 10 ? '0$m' : '$m';
-                                  String suff = pm ? 'pm' : 'am';
-                                  return '${dt.day}/${dt.month} $h12:$mm $suff';
-                                } catch (_) {
-                                  return t;
-                                }
-                              }
-
-                              if (currentFlightIdx != -1) {
-                                final startB =
-                                    flightList[currentFlightIdx]['start-break']
-                                        ?.toString();
-                                final endB =
-                                    flightList[currentFlightIdx]['end-break']
-                                        ?.toString();
-
-                                if (startB != null || endB != null) {
-                                  return Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (startB != null)
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.access_time,
-                                                  size: 13,
-                                                  color: Color(0xFF94a3b8),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Start Break: ${fmtBreak(startB)}',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF94a3b8),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          if (endB != null) ...[
-                                            if (startB != null)
-                                              const SizedBox(height: 4),
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.done_all,
-                                                  size: 13,
-                                                  color: Color(0xFF10b981),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'End Break: ${fmtBreak(endB)}',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Color(0xFF10b981),
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                      const SizedBox(width: 12),
-                                      actionButton,
-                                    ],
-                                  );
-                                }
-                              }
 
                               return actionButton;
                             },

@@ -111,7 +111,22 @@ class _DriverModuleState extends State<DriverModule> {
         const SizedBox(height: 30),
         
         if (_selectedDriver != null)
-          Expanded(child: _buildDriverDetailView(dark, textP, textS, bgCard, borderCard, iconColor))
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _deliversStream,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return _buildDriverDetailView(_selectedDriver!, dark, textP, textS, bgCard, borderCard, iconColor);
+                }
+                final uList = snapshot.data ?? [];
+                final updatedDriver = uList.firstWhere(
+                  (element) => element['id'] == _selectedDriver!['id'],
+                  orElse: () => _selectedDriver!
+                );
+                return _buildDriverDetailView(updatedDriver, dark, textP, textS, bgCard, borderCard, iconColor);
+              }
+            )
+          )
         else
           Expanded(
             child: Container(
@@ -215,7 +230,7 @@ class _DriverModuleState extends State<DriverModule> {
                                 return DataRow(
                                   onSelectChanged: (selected) {
                                     if (selected == true) {
-                                      _loadDriverDetails(u);
+                                      _showDriverConfirmationOverlay(u);
                                     }
                                   },
                                   cells: [
@@ -228,7 +243,125 @@ class _DriverModuleState extends State<DriverModule> {
                                     DataCell(Text(timeStr)),
                                     DataCell(isPriority ? const Icon(Icons.star_rounded, color: Colors.orange, size: 20) : const Icon(Icons.star_border_rounded, color: Colors.grey, size: 20)),
                                     DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
-                                    DataCell(Text(awbsStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366f1)))),
+                                    DataCell(
+                                      GestureDetector(
+                                        onTap: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (ctx) {
+                                              List<Map<String, dynamic>> awbItems = [];
+                                              if (u['list-pickup'] is List) {
+                                                awbItems = (u['list-pickup'] as List).map((e) {
+                                                   if (e is Map) return Map<String, dynamic>.from(e);
+                                                   final str = e.toString();
+                                                   final parts = str.split(' - ');
+                                                   return {
+                                                      'AWB-number': parts.isNotEmpty ? parts[0].trim() : '-',
+                                                      'pieces': parts.length > 1 ? parts[1].trim().replaceAll(RegExp(r'[^0-9]'), '') : '-',
+                                                      'weight': '',
+                                                      'remarks': parts.length > 2 ? parts[2].trim() : '',
+                                                   };
+                                                }).toList();
+                                              } else if (u['list-pickup'] != null) {
+                                                final str = u['list-pickup'].toString();
+                                                final parts = str.split(' - ');
+                                                awbItems = [{
+                                                   'AWB-number': parts.isNotEmpty ? parts[0].trim() : '-',
+                                                   'pieces': parts.length > 1 ? parts[1].trim().replaceAll(RegExp(r'[^0-9]'), '') : '-',
+                                                   'weight': '',
+                                                   'remarks': parts.length > 2 ? parts[2].trim() : '',
+                                                }];
+                                              }
+                                              return AlertDialog(
+                                                backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                                title: Row(
+                                                  children: [
+                                                    const Icon(Icons.inventory_2_rounded, color: Color(0xFF6366f1)),
+                                                    const SizedBox(width: 8),
+                                                    Text('AWBs Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
+                                                  ]
+                                                ),
+                                                content: SizedBox(
+                                                  width: 400,
+                                                  child: ListView.builder(
+                                                    shrinkWrap: true,
+                                                    itemCount: awbItems.length,
+                                                    itemBuilder: (ctx, i) {
+                                                      final item = awbItems[i];
+                                                      final awbN = item['AWB-number']?.toString() ?? '-';
+                                                      final pcs = item['pieces']?.toString() ?? '-';
+                                                      final weight = item['weight']?.toString() ?? '';
+                                                      final rmks = item['remarks']?.toString() ?? '';
+                                                      return Container(
+                                                        margin: const EdgeInsets.only(bottom: 8),
+                                                        padding: const EdgeInsets.all(12),
+                                                        decoration: BoxDecoration(
+                                                          color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+                                                          borderRadius: BorderRadius.circular(8),
+                                                          border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
+                                                        ),
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Row(
+                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                              children: [
+                                                                Expanded(child: Text(awbN, style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold))),
+                                                                SizedBox(
+                                                                  width: 70,
+                                                                  child: Row(
+                                                                    mainAxisAlignment: MainAxisAlignment.end,
+                                                                    children: [
+                                                                      Flexible(child: Text('$pcs pcs', style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                                if (weight.isNotEmpty && weight != '0.00' && weight != '0')
+                                                                  SizedBox(
+                                                                    width: 80,
+                                                                    child: Row(
+                                                                      mainAxisAlignment: MainAxisAlignment.end,
+                                                                      children: [
+                                                                        Flexible(child: Text('${weight}kg', style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                if (weight.isEmpty || weight == '0.00' || weight == '0')
+                                                                  const SizedBox(width: 80),
+                                                              ]
+                                                            ),
+                                                            if (rmks.isNotEmpty) ...[
+                                                              const SizedBox(height: 4),
+                                                              Text('Remarks: $rmks', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 12)),
+                                                            ]
+                                                          ]
+                                                        )
+                                                      );
+                                                    }
+                                                  )
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(ctx),
+                                                    child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold))
+                                                  )
+                                                ]
+                                              );
+                                            }
+                                          );
+                                        },
+                                        child: Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF6366f1).withAlpha(25),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Text(awbsStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366f1), fontSize: 13)),
+                                        )
+                                      )
+                                    ),
                                     DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
                                   ],
                                 );
@@ -279,6 +412,220 @@ class _DriverModuleState extends State<DriverModule> {
   }
 
 
+  void _showDriverConfirmationOverlay(Map<String, dynamic> u) {
+    bool dark = isDarkMode.value;
+
+    String timeStr = '-';
+    if (u['time-deliver'] != null) {
+      final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
+      if (tdt != null) timeStr = DateFormat('hh:mm a').format(tdt);
+    }
+
+    String awbsStr = '0';
+    if (u['list-pickup'] != null) {
+      if (u['list-pickup'] is List) {
+        awbsStr = (u['list-pickup'] as List).length.toString();
+      } else {
+        awbsStr = '1';
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(24),
+          child: Container(
+            width: 440,
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF1e293b) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(dark ? 100 : 25),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                  offset: const Offset(0, 8),
+                )
+              ]
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF0f172a) : const Color(0xFFf8fafc),
+                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+                    border: Border(bottom: BorderSide(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)))
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366f1).withAlpha(40),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.verified_user_rounded, color: Color(0xFF6366f1), size: 24),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          appLanguage.value == 'es' ? 'Verificar Conductor' : 'Verify Driver', 
+                          style: TextStyle(color: dark ? Colors.white : const Color(0xFF0f172a), fontWeight: FontWeight.bold, fontSize: 18)
+                        ),
+                      ),
+                      if (u['isPriority'] == true)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 12.0),
+                          child: Icon(Icons.star_rounded, color: Colors.orange, size: 28),
+                        ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(Icons.close_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b)),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      )
+                    ],
+                  ),
+                ),
+                // Body
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: dark ? const Color(0xFF0f172a).withAlpha(128) : const Color(0xFFf8fafc),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      _confirmDetailRow(Icons.business_rounded, appLanguage.value == 'es' ? 'Compañía' : 'Company', u['truck-company']?.toString().isNotEmpty == true ? u['truck-company'].toString() : '-', dark),
+                                      Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                                      _confirmDetailRow(Icons.person_rounded, appLanguage.value == 'es' ? 'Conductor' : 'Driver', u['driver']?.toString().isNotEmpty == true ? u['driver'].toString() : '-', dark),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: dark ? Colors.amberAccent.withAlpha(20) : Colors.amber.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: dark ? Colors.amberAccent.withAlpha(50) : Colors.amber.shade300)
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(appLanguage.value == 'es' ? 'PUERTA' : 'DOOR', style: TextStyle(color: dark ? Colors.amberAccent : Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
+                                      Text(u['door']?.toString().isNotEmpty == true ? u['door'].toString() : '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 24, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                            Row(
+                              children: [
+                                Expanded(child: _confirmDetailRow(Icons.local_shipping_rounded, appLanguage.value == 'es' ? 'Tipo' : 'Type', u['type']?.toString().isNotEmpty == true ? u['type'].toString() : '-', dark)),
+                                Container(width: 1, height: 40, color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                                Expanded(child: _confirmDetailRow(Icons.qr_code_rounded, 'ID Pickup', u['id-pickup']?.toString().isNotEmpty == true ? u['id-pickup'].toString() : '-', dark)),
+                              ],
+                            ),
+                            Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                            Row(
+                              children: [
+                                Expanded(child: _confirmDetailRow(Icons.access_time_rounded, appLanguage.value == 'es' ? 'Hora' : 'Time', timeStr, dark)),
+                                Container(width: 1, height: 40, color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                                Expanded(child: _confirmDetailRow(Icons.inventory_2_outlined, 'AWBs', awbsStr, dark)),
+                              ],
+                            ),
+                            if (u['remarks']?.toString().isNotEmpty == true) ...[
+                              Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                              _confirmDetailRow(Icons.notes_rounded, appLanguage.value == 'es' ? 'Comentarios' : 'Remarks', u['remarks'].toString(), dark),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Footer
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF0f172a) : const Color(0xFFf8fafc),
+                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
+                    border: Border(top: BorderSide(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)))
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.block_rounded, size: 18),
+                        onPressed: () => Navigator.pop(ctx),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFef4444),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                        label: const Text('NO SHOW', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _loadDriverDetails(u);
+                        },
+                        icon: const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        label: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        );
+      }
+    );
+  }
+
+  Widget _confirmDetailRow(IconData icon, String label, String value, bool dark) {
+    return Row(
+      children: [
+        Icon(icon, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), size: 18),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: dark ? const Color(0xFF64748b) : const Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              const SizedBox(height: 2),
+              Text(value, style: TextStyle(color: dark ? const Color(0xFFf8fafc) : const Color(0xFF0f172a), fontSize: 14, fontWeight: FontWeight.bold)),
+            ]
+          ),
+        )
+      ]
+    );
+  }
+
   Future<void> _loadDriverDetails(Map<String, dynamic> u) async {
     setState(() {
       _selectedDriver = u;
@@ -290,6 +637,7 @@ class _DriverModuleState extends State<DriverModule> {
     List<String> awbsToFetch = [];
     if (u['list-pickup'] != null && u['list-pickup'] is List) {
        awbsToFetch = (u['list-pickup'] as List).map((e) {
+           if (e is Map) return e['AWB-number']?.toString() ?? '';
            String displayStr = e.toString();
            if (displayStr.contains(' - ')) {
                return displayStr.split(' - ').first.trim();
@@ -319,8 +667,17 @@ class _DriverModuleState extends State<DriverModule> {
     }
   }
 
-  Widget _buildDriverDetailView(bool dark, Color textP, Color textS, Color bgCard, Color borderCard, Color iconColor) {
-    final u = _selectedDriver!;
+  Widget _buildDriverDetailView(Map<String, dynamic> u, bool dark, Color textP, Color textS, Color bgCard, Color borderCard, Color iconColor) {
+    bool allDelivered = _driverAwbs.isNotEmpty && _driverAwbs.every((awb) {
+      if (awb['data-deliver'] == null) return false;
+      if (awb['data-deliver'] is List) {
+        return (awb['data-deliver'] as List).any((d) => d is Map && d['pickup_id'] == u['id-pickup']);
+      }
+      if (awb['data-deliver'] is Map) {
+        return awb['data-deliver']['pickup_id'] == u['id-pickup'];
+      }
+      return false;
+    });
     
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,18 +803,24 @@ class _DriverModuleState extends State<DriverModule> {
                               final idx = entry.key;
                               final awb = entry.value;
                               final awbNum = awb['AWB-number']?.toString() ?? '-';
-                              final listPickup = (u['list-pickup'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                              final listPickup = u['list-pickup'] as List? ?? [];
                               String piecesStr = '';
                               String remarkStr = '';
-                              final match = listPickup.firstWhere((element) => element.startsWith(awbNum), orElse: () => '');
-                              if (match.contains(' - ')) {
-                                 final parts = match.split(' - ');
-                                 if (parts.length > 1) {
-                                   piecesStr = parts[1].trim();
-                                 }
-                                 if (parts.length > 2) {
-                                   remarkStr = parts[2].trim();
-                                 }
+                              String weightStr = '';
+                              for (var item in listPickup) {
+                                if (item is Map && item['AWB-number'] == awbNum) {
+                                   piecesStr = item['pieces']?.toString() ?? '';
+                                   weightStr = item['weight']?.toString() ?? '';
+                                   remarkStr = item['remarks']?.toString() ?? '';
+                                   if (!piecesStr.toLowerCase().contains('pcs') && piecesStr.isNotEmpty) piecesStr += ' Pcs';
+                                   if (weightStr.isNotEmpty && weightStr != '0.00' && weightStr != '0') weightStr += ' kg';
+                                   break;
+                                } else if (item is String && item.startsWith(awbNum)) {
+                                   final parts = item.split(' - ');
+                                   if (parts.length > 1) piecesStr = parts[1].trim();
+                                   if (parts.length > 2) remarkStr = parts[2].trim();
+                                   break;
+                                }
                               }
 
                               bool isThisDelivered = false;
@@ -500,14 +863,20 @@ class _DriverModuleState extends State<DriverModule> {
                                       flex: 3,
                                       child: Row(
                                         children: [
-                                          Icon(Icons.inventory_2_outlined, color: textS, size: 14),
-                                          const SizedBox(width: 6),
-                                          Flexible(child: Text(piecesStr, style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                          Flexible(child: Text(piecesStr, style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
                                         ],
                                       ),
                                     ),
                                     Expanded(
-                                      flex: 5,
+                                      flex: 3,
+                                      child: weightStr.isNotEmpty ? Row(
+                                        children: [
+                                          Flexible(child: Text(weightStr, style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                        ],
+                                      ) : const SizedBox(),
+                                    ),
+                                    Expanded(
+                                      flex: 6,
                                       child: remarkStr.isNotEmpty ? Row(
                                           children: [
                                             Icon(Icons.notes_rounded, color: textS, size: 14),
@@ -527,11 +896,114 @@ class _DriverModuleState extends State<DriverModule> {
                               ),
                               );
                            }),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                       ],
+                     ),
+                   ),
+                 ),
+                 const SizedBox(height: 16),
+                 SizedBox(
+                   width: double.infinity,
+                   child: ElevatedButton.icon(
+                     onPressed: allDelivered ? () async {
+                        bool dialogOpen = true;
+                        showGeneralDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          barrierColor: Colors.black54,
+                          transitionDuration: const Duration(milliseconds: 350),
+                          pageBuilder: (context, anim1, anim2) {
+                            return Center(
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Container(
+                                  width: 320,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                  decoration: BoxDecoration(
+                                    color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10)),
+                                    ],
+                                    border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle),
+                                        child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48),
+                                      ),
+                                      const SizedBox(height: 24),
+                                      Text(
+                                        appLanguage.value == 'es' ? '¡Entrega Completada!' : 'Delivery Completed!',
+                                        style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        appLanguage.value == 'es' ? 'La entrega ha sido registrada exitosamente.' : 'The delivery has been successfully recorded.',
+                                        style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          transitionBuilder: (context, anim1, anim2, child) {
+                            return Transform.scale(
+                              scale: Curves.easeOutBack.transform(anim1.value),
+                              child: FadeTransition(opacity: anim1, child: child),
+                            );
+                          },
+                        ).then((_) => dialogOpen = false);
+
+                        try {
+                          await Supabase.instance.client.from('Delivers').update({
+                             'status': 'Delivered'
+                          }).eq('id', u['id']);
+                          
+                          await Future.delayed(const Duration(milliseconds: 2000));
+                          
+                          if (mounted) {
+                            if (dialogOpen) Navigator.of(context).pop();
+                            
+                            setState(() {
+                              _selectedDriver = null;
+                              _selectedAwbDetails = null;
+                            });
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            if (dialogOpen) Navigator.of(context).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error updating status: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.redAccent),
+                            );
+                          }
+                        }
+                     } : null,
+                     icon: Icon(Icons.check_circle_outline, 
+                       color: allDelivered ? Colors.white : (dark ? Colors.white54 : Colors.black38), 
+                       size: 20
+                     ),
+                     label: Text('DELIVERY COMPLETED', 
+                       style: TextStyle(
+                         fontWeight: FontWeight.bold, 
+                         fontSize: 14,
+                         color: allDelivered ? Colors.white : (dark ? Colors.white54 : Colors.black38)
+                       )
+                     ),
+                     style: ElevatedButton.styleFrom(
+                       padding: const EdgeInsets.symmetric(vertical: 16),
+                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                       backgroundColor: allDelivered ? const Color(0xFF10b981) : (dark ? Colors.white12 : Colors.black12),
+                       elevation: allDelivered ? 2 : 0,
+                     ),
+                   ),
+                 ),
+               ],
             ),
           ),
         ),
@@ -832,13 +1304,17 @@ class _DriverModuleState extends State<DriverModule> {
     final totalPieces = awb['total']?.toString() ?? '-';
     String deliverPiecesStr = '';
     if (_selectedDriver != null && _selectedDriver!['list-pickup'] != null) {
-      final listPickup = (_selectedDriver!['list-pickup'] as List?)?.map((e) => e.toString()).toList() ?? [];
-      final match = listPickup.firstWhere((element) => element.startsWith(awbNum), orElse: () => '');
-      if (match.contains(' - ')) {
-         final parts = match.split(' - ');
-         if (parts.length > 1) {
-           deliverPiecesStr = parts[1].trim();
-         }
+      final listPickup = _selectedDriver!['list-pickup'] as List? ?? [];
+      for (var item in listPickup) {
+        if (item is Map && item['AWB-number'] == awbNum) {
+          deliverPiecesStr = item['pieces']?.toString() ?? '';
+          if (!deliverPiecesStr.toLowerCase().contains('pcs') && deliverPiecesStr.isNotEmpty) deliverPiecesStr += ' Pcs';
+          break;
+        } else if (item is String && item.startsWith(awbNum)) {
+          final parts = item.split(' - ');
+          if (parts.length > 1) deliverPiecesStr = parts[1].trim();
+          break;
+        }
       }
     }
 
@@ -1419,10 +1895,11 @@ class _DriverModuleState extends State<DriverModule> {
                                            children: [
                                              _buildCustomChip(
                                                Row(
+                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                  children: [
                                                    Text('ULD:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
                                                    const SizedBox(width: 4),
-                                                   Expanded(
+                                                   Flexible(
                                                      child: Text(
                                                        awbItem['refULD']?.toString().isNotEmpty == true ? awbItem['refULD'].toString() : '-',
                                                        style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
@@ -1437,10 +1914,11 @@ class _DriverModuleState extends State<DriverModule> {
                                              if (flightStr.isNotEmpty)
                                                _buildCustomChip(
                                                  Row(
+                                                   mainAxisAlignment: MainAxisAlignment.center,
                                                    children: [
                                                      Text('Flight:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
                                                      const SizedBox(width: 4),
-                                                     Expanded(
+                                                     Flexible(
                                                        child: RichText(
                                                          overflow: TextOverflow.ellipsis,
                                                          maxLines: 1,
@@ -1490,6 +1968,20 @@ class _DriverModuleState extends State<DriverModule> {
                                                  ),
                                                ),
                                            ],
+                                         ),
+                                       ),
+                                       Container(
+                                         width: 26,
+                                         height: 26,
+                                         margin: const EdgeInsets.only(right: 8),
+                                         decoration: BoxDecoration(
+                                           color: const Color(0xFF10b981).withAlpha(30),
+                                           shape: BoxShape.circle,
+                                         ),
+                                         alignment: Alignment.center,
+                                         child: Text(
+                                           '${awbItem['pieces'] ?? 0}',
+                                           style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold),
                                          ),
                                        ),
                                        IconButton(

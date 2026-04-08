@@ -32,6 +32,7 @@ final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
 final ValueNotifier<String> appLanguage = ValueNotifier<String>('en');
 final ValueNotifier<bool> isDarkMode = ValueNotifier<bool>(true);
 final ValueNotifier<bool> isSidebarExpandedNotifier = ValueNotifier<bool>(true);
+final ValueNotifier<Map<String, dynamic>?> currentUserData = ValueNotifier<Map<String, dynamic>?>(null);
 
 class AlmacenApp extends StatelessWidget {
   const AlmacenApp({super.key});
@@ -117,6 +118,27 @@ class _LoginScreenState extends State<LoginScreen>
       );
 
       if (response.user != null) {
+
+        // Fetch detailed user info from public "Users" table
+        try {
+          final userData = await Supabase.instance.client
+              .from('Users')
+              .select()
+              .eq('email', email)
+              .maybeSingle();
+              
+          if (userData != null) {
+            currentUserData.value = userData;
+          } else {
+            currentUserData.value = {
+              'full-name': email.split('@')[0],
+              'email': email,
+              'master-driver': false,
+            };
+          }
+        } catch (e) {
+          debugPrint('Error fetching user info: $e');
+        }
 
         // Clear text fields to trick Google Chrome into not prompting for password save
         _emailController.clear();
@@ -418,6 +440,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _logout() async {
+    currentUserData.value = null;
     await Supabase.instance.client.auth.signOut();
     if (mounted) {
       Navigator.of(context).pushReplacement(
@@ -436,6 +459,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     final userEmail = user?.email ?? 'Usuario';
+
+    final apMap = currentUserData.value?['access-page'] as Map?;
+    // Safely parse permissions. If null, we'll allow (backward compatibility for old admin users).
+    bool can(String key) => apMap == null || apMap[key] == true;
 
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
@@ -522,88 +549,103 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: ListView(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             children: [
-                              _buildNavItem(
-                                Icons.dashboard_rounded,
-                                'Dashboard',
-                                0,
-                              ),
-                              _buildNavItem(
-                                Icons.flight_land_rounded,
-                                'Flight',
-                                1,
-                              ),
-                              _buildNavItem(
-                                Icons.inventory_2_rounded,
-                                'ULD',
-                                2,
-                              ),
-                              _buildNavItem(
-                                Icons.description_rounded,
-                                'AWB',
-                                3,
-                              ),
-                              _buildNavItem(
-                                Icons.local_shipping_outlined,
-                                'Delivers',
-                                4,
-                              ),
-                              _buildNavItem(
-                                Icons.people_alt_rounded,
-                                'Users',
-                                5,
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 16.0,
-                                  bottom: 8,
+                              if (can('dashboard'))
+                                _buildNavItem(
+                                  Icons.dashboard_rounded,
+                                  'Dashboard',
+                                  0,
                                 ),
-                                child: Text(
-                                  'OPERACIONES',
-                                  style: TextStyle(
-                                    color: dark
-                                        ? const Color(0xFF64748b)
-                                        : const Color(0xFF6B7280),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.2,
+                              if (can('flights'))
+                                _buildNavItem(
+                                  Icons.flight_land_rounded,
+                                  'Flight',
+                                  1,
+                                ),
+                              if (can('ulds'))
+                                _buildNavItem(
+                                  Icons.inventory_2_rounded,
+                                  'ULD',
+                                  2,
+                                ),
+                              if (can('awbs'))
+                                _buildNavItem(
+                                  Icons.description_rounded,
+                                  'AWB',
+                                  3,
+                                ),
+                              if (can('delivers'))
+                                _buildNavItem(
+                                  Icons.local_shipping_outlined,
+                                  'Delivers',
+                                  4,
+                                ),
+                              if (can('users'))
+                                _buildNavItem(
+                                  Icons.people_alt_rounded,
+                                  'Users',
+                                  5,
+                                ),
+                              if (can('system') || can('coordinator') || can('location') || can('driver') || can('system_bf') || can('area_nobreak') || can('control_flight'))
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 16.0,
+                                    bottom: 8,
+                                    top: 16.0,
+                                  ),
+                                  child: Text(
+                                    'OPERACIONES',
+                                    style: TextStyle(
+                                      color: dark
+                                          ? const Color(0xFF64748b)
+                                          : const Color(0xFF6B7280),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.2,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              _buildNavItem(
-                                Icons.settings_system_daydream_rounded,
-                                'System',
-                                6,
-                              ),
-                              _buildNavItem(
-                                Icons.support_agent_rounded,
-                                'Coordinator',
-                                7,
-                              ),
-                              _buildNavItem(
-                                Icons.location_on_rounded,
-                                'Location',
-                                8,
-                              ),
-                              _buildNavItem(
-                                Icons.local_shipping_rounded,
-                                'Driver',
-                                9,
-                              ),
-                              _buildNavItem(
-                                Icons.computer_rounded,
-                                'System (BF)',
-                                10,
-                              ),
-                              _buildNavItem(
-                                Icons.dashboard_customize_rounded,
-                                'Area (No break)',
-                                11,
-                              ),
-                              _buildNavItem(
-                                Icons.airplane_ticket_rounded,
-                                'Control (Flight)',
-                                12,
-                              ),
+                              if (can('system'))
+                                _buildNavItem(
+                                  Icons.settings_system_daydream_rounded,
+                                  'System',
+                                  6,
+                                ),
+                              if (can('coordinator'))
+                                _buildNavItem(
+                                  Icons.support_agent_rounded,
+                                  'Coordinator',
+                                  7,
+                                ),
+                              if (can('location'))
+                                _buildNavItem(
+                                  Icons.location_on_rounded,
+                                  'Location',
+                                  8,
+                                ),
+                              if (can('driver'))
+                                _buildNavItem(
+                                  Icons.local_shipping_rounded,
+                                  'Driver',
+                                  9,
+                                ),
+                              if (can('system_bf'))
+                                _buildNavItem(
+                                  Icons.computer_rounded,
+                                  'System (BF)',
+                                  10,
+                                ),
+                              if (can('area_nobreak'))
+                                _buildNavItem(
+                                  Icons.dashboard_customize_rounded,
+                                  'Area (No break)',
+                                  11,
+                                ),
+                              if (can('control_flight'))
+                                _buildNavItem(
+                                  Icons.airplane_ticket_rounded,
+                                  'Control (Flight)',
+                                  12,
+                                ),
                             ],
                           ),
                         ),
@@ -692,9 +734,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               CircleAvatar(
                                 backgroundColor: const Color(0xFF4f46e5),
                                 child: Text(
-                                  userEmail.isNotEmpty
-                                      ? userEmail[0].toUpperCase()
-                                      : 'U',
+                                  (currentUserData.value?['full-name'] as String?)?.isNotEmpty == true
+                                      ? currentUserData.value!['full-name'][0].toUpperCase()
+                                      : (userEmail.isNotEmpty ? userEmail[0].toUpperCase() : 'U'),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
@@ -707,7 +749,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      userEmail.split('@')[0],
+                                      currentUserData.value?['full-name'] ?? userEmail.split('@')[0],
                                       style: TextStyle(
                                         color: textP,
                                         fontWeight: FontWeight.w600,
@@ -716,7 +758,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
-                                      'Admin',
+                                      currentUserData.value?['position'] ?? 'Admin',
                                       style: TextStyle(
                                         color: dark
                                             ? const Color(0xFF94a3b8)

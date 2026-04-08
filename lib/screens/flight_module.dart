@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_flight_screen.dart';
 import '_flight_print_preview.dart';
 
@@ -135,7 +135,7 @@ class _FlightModuleState extends State<FlightModule> {
             const SizedBox(width: 16),
             
             // Add Flight Button
-            if (!_showAddForm)
+            if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor')
               SizedBox(
                 height: 40,
                 child: ElevatedButton.icon(
@@ -1111,7 +1111,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                              children: [
                                Icon(Icons.flight_outlined, size: 16, color: textP),
                                const SizedBox(width: 8),
-                               Text(appLanguage.value == 'es' ? 'Información General' : 'General Info', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                               Text(appLanguage.value == 'es' ? 'Información General' : 'General Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
                              ],
                            ),
                            if (!_isEditingGeneralInfo)

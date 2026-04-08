@@ -358,12 +358,33 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         'remarks': _remarksCtrl.text.trim(),
         'isPriority': _isPriority,
         'list-pickup': _typeCtrl.text == 'Import' 
-            ? _importAwbs.map((e) => '${e['awbNumber']?.toString() ?? ''} - ${e['pieces'] ?? 0} Pcs').toList() 
+            ? _importAwbs.map((e) => {
+                'AWB-number': e['awbNumber']?.toString() ?? '',
+                'pieces': e['pieces']?.toString() ?? '0',
+                'weight': e['weight']?.toString() ?? '0',
+                'remarks': e['remarks']?.toString() ?? ''
+              }).toList() 
             : _selectedAwbs.map((e) {
                 final awbNum = e['AWB-number']?.toString() ?? '';
-                final pcs = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+                final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+                final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
                 final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
-                return rem.isNotEmpty ? '$awbNum - $pcs Pcs - $rem' : '$awbNum - $pcs Pcs';
+                
+                double expectedWeight = 0.0;
+                if (e['data-AWB'] is List) {
+                  for (var item in e['data-AWB']) {
+                     expectedWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+                  }
+                } else if (e['data-AWB'] is Map) {
+                     expectedWeight += double.tryParse(e['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
+                }
+
+                return {
+                  'AWB-number': awbNum,
+                  'pieces': pcs,
+                  'weight': expectedWeight.toStringAsFixed(2),
+                  'remarks': rem
+                };
               }).toList(),
       };
 
@@ -1358,14 +1379,33 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
       );
     }
     
-    var filteredAwbs = _allAwbs;
-    if (_searchAwbCtrl.text.isNotEmpty) {
-      final term = _searchAwbCtrl.text.toLowerCase();
-      filteredAwbs = _allAwbs.where((awb) {
+    var filteredAwbs = _allAwbs.where((awb) {
+      int deliveredPieces = 0;
+      if (awb['data-deliver'] != null) {
+        if (awb['data-deliver'] is List) {
+          for (var item in awb['data-deliver']) {
+            if (item is Map && item.containsKey('found')) {
+              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
+            }
+          }
+        } else if (awb['data-deliver'] is Map) {
+          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
+        }
+      }
+      final int totalValInt = int.tryParse(awb['total']?.toString() ?? '0') ?? 0;
+      
+      if (deliveredPieces == totalValInt && totalValInt > 0) {
+        return false;
+      }
+      
+      if (_searchAwbCtrl.text.isNotEmpty) {
+        final term = _searchAwbCtrl.text.toLowerCase();
         final awbNumber = (awb['AWB-number']?.toString() ?? '').toLowerCase();
-        return awbNumber.contains(term);
-      }).toList();
-    }
+        if (!awbNumber.contains(term)) return false;
+      }
+      
+      return true;
+    }).toList();
     
     final isImport = _typeCtrl.text == 'Import';
 

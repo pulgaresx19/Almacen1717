@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_uld_screen.dart';
 import '_uld_print_preview.dart';
 
@@ -35,6 +35,16 @@ class _UldModuleState extends State<UldModule> {
     try {
       final dt = DateTime.parse(raw);
       return DateFormat('MM/dd/yyyy').format(dt);
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  String _formatDateShort(String? raw) {
+    if (raw == null || raw.isEmpty) return '-';
+    try {
+      final dt = DateTime.parse(raw);
+      return DateFormat('MMM dd').format(dt);
     } catch (_) {
       return raw;
     }
@@ -153,7 +163,7 @@ class _UldModuleState extends State<UldModule> {
             const SizedBox(width: 16),
             
             // Add ULD Button
-            if (!_showAddForm)
+            if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor')
               SizedBox(
                 height: 40,
                 child: ElevatedButton.icon(
@@ -371,7 +381,7 @@ class _UldModuleState extends State<UldModule> {
         return StatefulBuilder(
           builder: (ctxModal, setModalState) {
 
-            Widget buildEditable(String label, String key, {bool isBool = false, String trueText = '', String falseText = '', bool isNum = false, List<String>? options}) {
+            Widget buildEditable(String label, String key, {bool isBool = false, String trueText = '', String falseText = '', bool isNum = false, List<String>? options, IconData? icon}) {
                dynamic val = u[key];
                final bool isEditing = isEditingGlobal;
 
@@ -398,7 +408,11 @@ class _UldModuleState extends State<UldModule> {
                         children: [
                            Row(
                               children: [
-                                 Text(label, style: TextStyle(color: textS, fontSize: 11)),
+                                 if (icon != null) ...[
+                                   Icon(icon, color: textS, size: 14),
+                                   const SizedBox(width: 4),
+                                 ],
+                                 Expanded(child: Text(label, style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
                               ],
                            ),
                            const SizedBox(height: 6),
@@ -498,7 +512,15 @@ class _UldModuleState extends State<UldModule> {
                   child: Column(
                      crossAxisAlignment: CrossAxisAlignment.start,
                      children: [
-                        Text(label, style: TextStyle(color: textS, fontSize: 11)),
+                        Row(
+                           children: [
+                              if (icon != null) ...[
+                                Icon(icon, color: textS, size: 14),
+                                const SizedBox(width: 4),
+                              ],
+                              Expanded(child: Text(label, style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                           ],
+                        ),
                         const SizedBox(height: 8),
                         editor,
                      ]
@@ -533,6 +555,32 @@ class _UldModuleState extends State<UldModule> {
                                      Icon(Icons.inventory_2_rounded, color: textP, size: 24),
                                      const SizedBox(width: 8),
                                      Text('${u['ULD-number'] ?? '-'}', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                                     const SizedBox(width: 12),
+                                     Container(
+                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                       decoration: BoxDecoration(
+                                         color: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFFeef2ff),
+                                         borderRadius: BorderRadius.circular(8),
+                                         border: Border.all(color: dark ? const Color(0xFF6366f1).withAlpha(50) : const Color(0xFFc7d2fe)),
+                                       ),
+                                       child: Row(
+                                         mainAxisSize: MainAxisSize.min,
+                                         children: [
+                                           Icon(u['refCarrier'] == null ? Icons.inventory_2_outlined : Icons.flight_takeoff_rounded, size: 14, color: const Color(0xFF6366f1)),
+                                           const SizedBox(width: 6),
+                                           Text(
+                                             u['refCarrier'] == null 
+                                               ? 'Standalone ULD • ${u['created_at'] != null ? _formatDateShort(u['created_at'].toString()) : '-'}' 
+                                               : '${u['refCarrier']} ${u['refNumber'] ?? ''} • ${_formatDateShort(u['refDate']?.toString())}',
+                                             style: const TextStyle(
+                                               color: Color(0xFF6366f1), 
+                                               fontSize: 12, 
+                                               fontWeight: FontWeight.w600
+                                             ),
+                                           ),
+                                         ],
+                                       ),
+                                     ),
                                    ]
                                  )
                                ],
@@ -568,9 +616,9 @@ class _UldModuleState extends State<UldModule> {
                                          children: [
                                            Row(
                                              children: [
-                                                Icon(Icons.flight_takeoff, size: 16, color: textP),
+                                                Icon(Icons.edit_note_rounded, size: 16, color: textP),
                                                 const SizedBox(width: 8),
-                                                Text('Flight Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                                Text('General Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
                                              ]
                                            ),
                                            if (!isEditingGlobal)
@@ -636,32 +684,23 @@ class _UldModuleState extends State<UldModule> {
                                              ),
                                          ]
                                        ),
+
                                        const SizedBox(height: 12),
                                        Row(children: [
-                                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                           Text('Ref. Flight', style: TextStyle(color: textS, fontSize: 12)),
-                                           Text(u['refCarrier'] == null ? 'Standalone ULD' : '${u['refCarrier']} ${u['refNumber'] ?? ''}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                         ])),
-                                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                           Text('Date', style: TextStyle(color: textS, fontSize: 12)),
-                                           Text(u['refCarrier'] == null ? (u['created_at'] != null ? _formatDate(u['created_at'].toString()) : '-') : _formatDate(u['refDate']?.toString()), style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                         ])),
+                                         Expanded(child: buildEditable('Pieces', 'pieces', isNum: true, icon: Icons.extension_outlined)),
+                                         Expanded(child: buildEditable('Weight', 'weight', isNum: true, icon: Icons.scale_outlined)),
                                        ]),
-                                       const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
+                                       const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                                        Row(children: [
-                                         Expanded(child: buildEditable('Pieces', 'pieces', isNum: true)),
-                                         Expanded(child: buildEditable('Weight', 'weight', isNum: true)),
+                                         Expanded(child: buildEditable('Type', 'isBreak', isBool: true, trueText: 'BREAK', falseText: 'NO BREAK', icon: Icons.broken_image_rounded)),
+                                         Expanded(child: buildEditable('Priority', 'isPriority', isBool: true, trueText: 'Priority', falseText: 'Normal', icon: Icons.star_outline_rounded)),
                                        ]),
-                                       const SizedBox(height: 12),
-                                       Row(children: [
-                                         Expanded(child: buildEditable('Type', 'isBreak', isBool: true, trueText: 'BREAK', falseText: 'NO BREAK')),
-                                         Expanded(child: buildEditable('Priority', 'isPriority', isBool: true, trueText: 'Priority', falseText: 'Normal')),
-                                       ]),
-                                       const SizedBox(height: 12),
-                                       Row(children: [
-                                         Expanded(flex: 2, child: buildEditable('Status', 'status', options: (u['isBreak'] == true || u['isBreak']?.toString().toLowerCase() == 'true') ? ['Waiting', 'Received', 'Checked', 'Ready'] : ['Waiting', 'Received', 'Delivered'])),
-                                         const SizedBox(width: 12),
-                                         Expanded(flex: 3, child: buildEditable('Remarks', 'remarks')),
+                                       const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
+                                       Row(
+                                         crossAxisAlignment: CrossAxisAlignment.start,
+                                         children: [
+                                           Expanded(flex: 2, child: buildEditable('Status', 'status', options: (u['isBreak'] == true || u['isBreak']?.toString().toLowerCase() == 'true') ? ['Waiting', 'Received', 'Checked', 'Ready'] : ['Waiting', 'Received', 'Delivered'], icon: Icons.info_outline)),
+                                           Expanded(flex: 3, child: buildEditable('Remarks', 'remarks', icon: Icons.notes_rounded)),
                                        ])
                                     ]
                                   )

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_user_screen.dart';
 
 class UsersModule extends StatefulWidget {
@@ -132,7 +132,7 @@ class _UsersModuleState extends State<UsersModule> {
             const SizedBox(width: 16),
             
             // Add User Button
-            if (!_showAddForm)
+            if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor' && currentUserData.value?['position'] != 'Office')
               SizedBox(
                 height: 40,
                 child: ElevatedButton.icon(
@@ -364,12 +364,6 @@ class UserDrawerDetails extends StatefulWidget {
 
 class _UserDrawerDetailsState extends State<UserDrawerDetails> {
   final List<Map<String, dynamic>> _pagesList = [
-    {'key': 'dashboard', 'titleEs': 'Dashboard', 'titleEn': 'Dashboard', 'descEs': 'Panel general.', 'descEn': 'General dashboard.', 'icon': Icons.dashboard_rounded},
-    {'key': 'flights', 'titleEs': 'Vuelos', 'titleEn': 'Flights', 'descEs': 'Acceso para gestionar y visualizar vuelos.', 'descEn': 'Access to manage and view flights.', 'icon': Icons.flight_land_rounded},
-    {'key': 'ulds', 'titleEs': 'Contenedores (ULD)', 'titleEn': 'Unit Load Devices (ULD)', 'descEs': 'Acceso para crear y asignar contenedores.', 'descEn': 'Access to create and assign ULDs.', 'icon': Icons.luggage_rounded},
-    {'key': 'awbs', 'titleEs': 'Guías Aéreas (AWB)', 'titleEn': 'Air Waybills (AWB)', 'descEs': 'Acceso a la administración de guías aéreas.', 'descEn': 'Access to the management of Air Waybills.', 'icon': Icons.receipt_long_rounded},
-    {'key': 'delivers', 'titleEs': 'Entregas', 'titleEn': 'Delivers', 'descEs': 'Acceso para registrar y administrar entregas.', 'descEn': 'Access to register and manage deliveries.', 'icon': Icons.local_shipping_rounded},
-    {'key': 'users', 'titleEs': 'Usuarios', 'titleEn': 'Users', 'descEs': 'Administración de roles y accesos.', 'descEn': 'Management of roles and accesses.', 'icon': Icons.people_alt_rounded},
     {'key': 'system', 'titleEs': 'Sistema', 'titleEn': 'System', 'descEs': 'Configuración general.', 'descEn': 'General system settings.', 'icon': Icons.settings_system_daydream_rounded},
     {'key': 'coordinator', 'titleEs': 'Coordinador', 'titleEn': 'Coordinator', 'descEs': 'Coordinación de recursos operativos.', 'descEn': 'Coordination of operational resources.', 'icon': Icons.support_agent_rounded},
     {'key': 'location', 'titleEs': 'Ubicación', 'titleEn': 'Location', 'descEs': 'Gestión del almacén.', 'descEn': 'Warehouse management.', 'icon': Icons.location_on_rounded},
@@ -377,9 +371,15 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     {'key': 'system_bf', 'titleEs': 'Sistema (BF)', 'titleEn': 'System (BF)', 'descEs': 'Acceso a la configuración del sistema.', 'descEn': 'Access to the system configuration.', 'icon': Icons.computer_rounded},
     {'key': 'area_nobreak', 'titleEs': 'Área (No break)', 'titleEn': 'Area (No break)', 'descEs': 'Acceso a la gestión de áreas.', 'descEn': 'Access to area management.', 'icon': Icons.dashboard_customize_rounded},
     {'key': 'control_flight', 'titleEs': 'Control (Flight)', 'titleEn': 'Control (Flight)', 'descEs': 'Acceso al módulo de control de vuelos.', 'descEn': 'Access to the flight control module.', 'icon': Icons.airplane_ticket_rounded},
+    {'key': 'dashboard', 'titleEs': 'Dashboard', 'titleEn': 'Dashboard', 'descEs': 'Panel general.', 'descEn': 'General dashboard.', 'icon': Icons.dashboard_rounded},
+    {'key': 'flights', 'titleEs': 'Vuelos', 'titleEn': 'Flights', 'descEs': 'Acceso para gestionar y visualizar vuelos.', 'descEn': 'Access to manage and view flights.', 'icon': Icons.flight_land_rounded},
+    {'key': 'ulds', 'titleEs': 'Contenedores (ULD)', 'titleEn': 'Unit Load Devices (ULD)', 'descEs': 'Acceso para crear y asignar contenedores.', 'descEn': 'Access to create and assign ULDs.', 'icon': Icons.luggage_rounded},
+    {'key': 'awbs', 'titleEs': 'Guías Aéreas (AWB)', 'titleEn': 'Air Waybills (AWB)', 'descEs': 'Acceso a la administración de guías aéreas.', 'descEn': 'Access to the management of Air Waybills.', 'icon': Icons.receipt_long_rounded},
+    {'key': 'delivers', 'titleEs': 'Entregas', 'titleEn': 'Delivers', 'descEs': 'Acceso para registrar y administrar entregas.', 'descEn': 'Access to register and manage deliveries.', 'icon': Icons.local_shipping_rounded},
+    {'key': 'users', 'titleEs': 'Usuarios', 'titleEn': 'Users', 'descEs': 'Administración de roles y accesos.', 'descEn': 'Management of roles and accesses.', 'icon': Icons.people_alt_rounded},
   ];
 
-  final List<String> _positions = ['Agent', 'Coordinator', 'Supervisor', 'Manager', 'Office'];
+  final List<String> _positions = ['Agent', 'Office', 'Coordinator', 'Supervisor', 'Manager'];
   final List<String> _shifts = ['Morning', 'Afternoon'];
 
   bool _isEditingContact = false;
@@ -465,6 +465,8 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
   }
 
   Widget _buildSectionHeader(String title, IconData icon, bool isEditing, VoidCallback onEdit, VoidCallback onSave, VoidCallback onCancel, Color textP) {
+    final bool isOffice = currentUserData.value?['position'] == 'Office';
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -475,23 +477,24 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
             Text(title, style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
           ],
         ),
-        if (!isEditing)
-          InkWell(
-            onTap: onEdit,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: textP.withAlpha(10), borderRadius: BorderRadius.circular(6)),
-              child: Icon(Icons.edit_rounded, color: textP.withAlpha(200), size: 14),
+        if (!isOffice)
+          if (!isEditing)
+            InkWell(
+              onTap: onEdit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: textP.withAlpha(10), borderRadius: BorderRadius.circular(6)),
+                child: Icon(Icons.edit_rounded, color: textP.withAlpha(200), size: 14),
+              ),
+            )
+          else
+            Row(
+              children: [
+                InkWell(onTap: onCancel, child: const Icon(Icons.close_rounded, color: Colors.red, size: 20)),
+                const SizedBox(width: 16),
+                InkWell(onTap: onSave, child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)),
+              ],
             ),
-          )
-        else
-          Row(
-            children: [
-              InkWell(onTap: onCancel, child: const Icon(Icons.close_rounded, color: Colors.red, size: 20)),
-              const SizedBox(width: 16),
-              InkWell(onTap: onSave, child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 20)),
-            ],
-          ),
       ],
     );
   }

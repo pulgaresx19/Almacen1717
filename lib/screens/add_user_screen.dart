@@ -3,6 +3,23 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode;
 
+class TitleCaseTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    final words = newValue.text.split(' ');
+    final capitalizedWords = words.map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + (word.length > 1 ? word.substring(1).toLowerCase() : '');
+    }).toList();
+    final capitalizedText = capitalizedWords.join(' ');
+    return TextEditingValue(
+      text: capitalizedText,
+      selection: newValue.selection,
+    );
+  }
+}
+
 class AddUserScreen extends StatefulWidget {
   final bool isInline;
   final Function(Map<String, dynamic>?)? onPop;
@@ -21,54 +38,6 @@ class AddUserScreenState extends State<AddUserScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final List<Map<String, dynamic>> _pagesList = [
-    {
-      'key': 'dashboard',
-      'titleEs': 'Dashboard',
-      'titleEn': 'Dashboard',
-      'descEs': 'Panel general.',
-      'descEn': 'General dashboard.',
-      'icon': Icons.dashboard_rounded,
-    },
-    {
-      'key': 'flights',
-      'titleEs': 'Vuelos',
-      'titleEn': 'Flights',
-      'descEs': 'Acceso para gestionar y visualizar vuelos.',
-      'descEn': 'Access to manage and view flights.',
-      'icon': Icons.flight_land_rounded,
-    },
-    {
-      'key': 'ulds',
-      'titleEs': 'Contenedores (ULD)',
-      'titleEn': 'Unit Load Devices (ULD)',
-      'descEs': 'Acceso para crear y asignar contenedores.',
-      'descEn': 'Access to create and assign ULDs.',
-      'icon': Icons.luggage_rounded,
-    },
-    {
-      'key': 'awbs',
-      'titleEs': 'Guías Aéreas (AWB)',
-      'titleEn': 'Air Waybills (AWB)',
-      'descEs': 'Acceso a la administración de guías aéreas.',
-      'descEn': 'Access to the management of Air Waybills.',
-      'icon': Icons.receipt_long_rounded,
-    },
-    {
-      'key': 'delivers',
-      'titleEs': 'Entregas',
-      'titleEn': 'Delivers',
-      'descEs': 'Acceso para registrar y administrar entregas.',
-      'descEn': 'Access to register and manage deliveries.',
-      'icon': Icons.local_shipping_rounded,
-    },
-    {
-      'key': 'users',
-      'titleEs': 'Usuarios',
-      'titleEn': 'Users',
-      'descEs': 'Administración de roles y accesos.',
-      'descEn': 'Management of roles and accesses.',
-      'icon': Icons.people_alt_rounded,
-    },
     {
       'key': 'system',
       'titleEs': 'Sistema',
@@ -125,17 +94,93 @@ class AddUserScreenState extends State<AddUserScreen> {
       'descEn': 'Access to the flight control module.',
       'icon': Icons.airplane_ticket_rounded,
     },
+    {
+      'key': 'dashboard',
+      'titleEs': 'Dashboard',
+      'titleEn': 'Dashboard',
+      'descEs': 'Panel general.',
+      'descEn': 'General dashboard.',
+      'icon': Icons.dashboard_rounded,
+    },
+    {
+      'key': 'flights',
+      'titleEs': 'Vuelos',
+      'titleEn': 'Flights',
+      'descEs': 'Acceso para gestionar y visualizar vuelos.',
+      'descEn': 'Access to manage and view flights.',
+      'icon': Icons.flight_land_rounded,
+    },
+    {
+      'key': 'ulds',
+      'titleEs': 'Contenedores (ULD)',
+      'titleEn': 'Unit Load Devices (ULD)',
+      'descEs': 'Acceso para crear y asignar contenedores.',
+      'descEn': 'Access to create and assign ULDs.',
+      'icon': Icons.luggage_rounded,
+    },
+    {
+      'key': 'awbs',
+      'titleEs': 'Guías Aéreas (AWB)',
+      'titleEn': 'Air Waybills (AWB)',
+      'descEs': 'Acceso a la administración de guías aéreas.',
+      'descEn': 'Access to the management of Air Waybills.',
+      'icon': Icons.receipt_long_rounded,
+    },
+    {
+      'key': 'delivers',
+      'titleEs': 'Entregas',
+      'titleEn': 'Delivers',
+      'descEs': 'Acceso para registrar y administrar entregas.',
+      'descEn': 'Access to register and manage deliveries.',
+      'icon': Icons.local_shipping_rounded,
+    },
+    {
+      'key': 'users',
+      'titleEs': 'Usuarios',
+      'titleEn': 'Users',
+      'descEs': 'Administración de roles y accesos.',
+      'descEn': 'Management of roles and accesses.',
+      'icon': Icons.people_alt_rounded,
+    },
   ];
 
   bool _masterDriver = false;
   final Map<String, bool> _accessMap = {};
 
+  void _updateDefaultsForPosition() {
+    final agentDefaults = ['system', 'location', 'driver', 'system_bf', 'area_nobreak'];
+    final coordinatorDefaults = ['system', 'coordinator', 'location', 'driver', 'system_bf', 'area_nobreak', 'control_flight'];
+    final officeDefaults = ['dashboard', 'flights', 'ulds', 'awbs', 'delivers', 'users'];
+    
+    List<String> activeKeys = [];
+    if (_position == 'Agent') {
+      activeKeys = agentDefaults;
+    } else if (_position == 'Coordinator') {
+      activeKeys = coordinatorDefaults;
+    } else if (_position == 'Office') {
+      activeKeys = officeDefaults;
+    } else if (_position == 'Manager' || _position == 'Supervisor') {
+      activeKeys = _pagesList.map((p) => p['key'] as String).toList();
+    }
+
+    for (var p in _pagesList) {
+      final k = p['key'] as String;
+      _accessMap[k] = activeKeys.contains(k);
+    }
+
+    _pagesList.sort((a, b) {
+      bool aActive = activeKeys.contains(a['key']);
+      bool bActive = activeKeys.contains(b['key']);
+      if (aActive && !bActive) return -1;
+      if (!aActive && bActive) return 1;
+      return 0;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    for (var p in _pagesList) {
-      _accessMap[p['key'] as String] = false;
-    }
+    _updateDefaultsForPosition();
   }
 
   final _nameCtrl = TextEditingController();
@@ -149,7 +194,7 @@ class AddUserScreenState extends State<AddUserScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  final List<String> _positions = ['Agent', 'Coordinator', 'Supervisor', 'Manager', 'Office'];
+  final List<String> _positions = ['Agent', 'Office', 'Coordinator', 'Supervisor', 'Manager'];
   final List<String> _shifts = ['Morning', 'Evening', 'Night'];
 
   @override
@@ -424,14 +469,16 @@ class AddUserScreenState extends State<AddUserScreen> {
                             children: [
                               SizedBox(
                                 width: 260,
-                                child: _buildTextField('Full Name', _nameCtrl, dark, Icons.person_rounded),
+                                child: _buildTextField('Full Name', _nameCtrl, dark, Icons.person_rounded, 
+                                  textCapitalization: TextCapitalization.words, 
+                                  inputFormatters: [TitleCaseTextInputFormatter()]),
                               ),
                               SizedBox(
                                 width: 260,
                                 child: _buildTextField('Email', _emailCtrl, dark, Icons.email_rounded, keyboardType: TextInputType.emailAddress),
                               ),
                               SizedBox(
-                                width: 200,
+                                width: 160,
                                 child: _buildTextField(
                                   'Password', 
                                   _passwordCtrl, 
@@ -467,10 +514,15 @@ class AddUserScreenState extends State<AddUserScreen> {
                               ),
                               SizedBox(
                                 width: 180,
-                                child: _buildDropdownField('Position', _position, _positions, (v) => setState(() => _position = v!), dark, Icons.work_rounded),
+                                child: _buildDropdownField('Position', _position, _positions, (v) {
+                                  setState(() {
+                                    _position = v!;
+                                    _updateDefaultsForPosition();
+                                  });
+                                }, dark, Icons.work_rounded),
                               ),
                               SizedBox(
-                                width: 180,
+                                width: 110,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -648,7 +700,7 @@ class AddUserScreenState extends State<AddUserScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData icon, {bool obscureText = false, TextInputType? keyboardType, List<TextInputFormatter>? inputFormatters, Widget? suffixIcon}) {
+  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData icon, {bool obscureText = false, TextInputType? keyboardType, List<TextInputFormatter>? inputFormatters, Widget? suffixIcon, TextCapitalization textCapitalization = TextCapitalization.none}) {
     final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
     final fillC = dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB);
     final textP = dark ? Colors.white : const Color(0xFF111827);
@@ -660,6 +712,7 @@ class AddUserScreenState extends State<AddUserScreen> {
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
+          textCapitalization: textCapitalization,
           obscureText: obscureText,
           enableSuggestions: false,
           autocorrect: false,
