@@ -15,6 +15,7 @@ class FlightModule extends StatefulWidget {
 }
 
 class _FlightModuleState extends State<FlightModule> {
+  final ScrollController _horizontalScrollController = ScrollController();
 
   @override
   void didUpdateWidget(covariant FlightModule oldWidget) {
@@ -40,6 +41,7 @@ class _FlightModuleState extends State<FlightModule> {
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -243,10 +245,17 @@ class _FlightModuleState extends State<FlightModule> {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            return SingleChildScrollView(
+            return Scrollbar(
+                            controller: _horizontalScrollController,
+                            thumbVisibility: true,
+                            thickness: 8,
+                            radius: const Radius.circular(8),
+                            interactive: true,
+                            child: SingleChildScrollView(
+                              controller: _horizontalScrollController,
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                constraints: BoxConstraints(minWidth: constraints.maxWidth, minHeight: constraints.maxHeight),
                 child: SingleChildScrollView(
                   child: DataTable(
                     columnSpacing: 28,
@@ -360,7 +369,7 @@ class _FlightModuleState extends State<FlightModule> {
             ),
           ),
         ),
-      );
+      ));
     },
   );
 },
@@ -1095,9 +1104,11 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
           ),
         ),
         Expanded(
-          child: ListView(
+          child: Padding(
             padding: const EdgeInsets.all(24),
-            children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: widget.dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB))),
@@ -1199,10 +1210,16 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                 Text(appLanguage.value == 'es' ? 'ULDs del Vuelo' : 'ULDs in Flight', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
                 
-                if (_isLoading) const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                else if (_ulds.isEmpty) Text(appLanguage.value == 'es' ? 'No se encontraron ULDs.' : 'No ULDs found.', style: TextStyle(color: textS))
-                else ..._ulds.asMap().entries.map((entry) {
-                  final int index = entry.key;
+                Expanded(
+                  child: _isLoading 
+                    ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+                    : _ulds.isEmpty 
+                      ? Text(appLanguage.value == 'es' ? 'No se encontraron ULDs.' : 'No ULDs found.', style: TextStyle(color: textS))
+                      : SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _ulds.asMap().entries.map((entry) {
+                              final int index = entry.key;
                   final Map<String, dynamic> u = entry.value;
                   final isSelected = _selectedUldId == u['ULD-number'];
                   return Column(
@@ -1567,8 +1584,12 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
                         )
                     ],
                   );
-                }),
-            ],
+                }).toList(),
+              ),
+            ),
+          ),
+              ],
+            ),
           ),
         ),
       ],

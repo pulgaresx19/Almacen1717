@@ -15,6 +15,7 @@ class AwbModule extends StatefulWidget {
 }
 
 class _AwbModuleState extends State<AwbModule> {
+  final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
   final GlobalKey<AddAwbScreenState> _addAwbKey = GlobalKey<AddAwbScreenState>();
   bool _showAddForm = false;
@@ -42,6 +43,7 @@ class _AwbModuleState extends State<AwbModule> {
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -220,10 +222,17 @@ class _AwbModuleState extends State<AwbModule> {
 
                   return LayoutBuilder(
                     builder: (context, constraints) {
-                      return SingleChildScrollView(
+                      return Scrollbar(
+                            controller: _horizontalScrollController,
+                            thumbVisibility: true,
+                            thickness: 8,
+                            radius: const Radius.circular(8),
+                            interactive: true,
+                            child: SingleChildScrollView(
+                              controller: _horizontalScrollController,
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                          constraints: BoxConstraints(minWidth: constraints.maxWidth, minHeight: constraints.maxHeight),
                           child: SingleChildScrollView(
                             child: DataTable(
                               showCheckboxColumn: false,
@@ -450,7 +459,7 @@ class _AwbModuleState extends State<AwbModule> {
                       ),
                     ),
                   ),
-                );
+                ));
               },
             );
           },

@@ -412,9 +412,22 @@ class _DriverModuleState extends State<DriverModule> {
                                             final dt = DateTime.tryParse(userMap['time'].toString())?.toLocal();
                                             if (dt != null) dtStr = DateFormat('MMM dd, hh:mm a').format(dt);
                                           }
+                                          final avatarStr = userMap['avatar']?.toString();
                                           return Tooltip(
-                                            message: dtStr,
-                                            child: Text(userName, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563))),
+                                            message: 'Agent: $userName',
+                                            child: InkWell(
+                                              onTap: () => _showAgentProfile(context, userName, avatarStr, dtStr, dark),
+                                              borderRadius: BorderRadius.circular(20),
+                                              child: CircleAvatar(
+                                                radius: 16,
+                                                backgroundColor: const Color(0xFF6366f1).withAlpha(50),
+                                                backgroundImage: avatarStr != null && avatarStr.isNotEmpty ? NetworkImage(avatarStr) : null,
+                                                child: avatarStr == null || avatarStr.isEmpty ? Text(
+                                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366f1), fontSize: 13),
+                                                ) : null,
+                                              ),
+                                            ),
                                           );
                                         }
                                         return const Text('-', style: TextStyle(color: Colors.grey));
@@ -438,6 +451,71 @@ class _DriverModuleState extends State<DriverModule> {
       ],
     );
      }
+    );
+  }
+
+  void _showAgentProfile(BuildContext context, String userName, String? avatarStr, String timeStr, bool dark) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withAlpha(50),
+      builder: (BuildContext modalContext) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 280,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: dark ? const Color(0xFF1e293b) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 20, offset: const Offset(0, 10))
+                ],
+                border: Border.all(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: const Color(0xFF4f46e5),
+                    backgroundImage: avatarStr != null && avatarStr.isNotEmpty ? NetworkImage(avatarStr) : null,
+                    child: avatarStr == null || avatarStr.isEmpty ? Text(
+                      userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 24),
+                    ) : null,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    userName,
+                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.w600, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    timeStr,
+                    style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: const Color(0xFF6366f1).withAlpha(10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(modalContext),
+                      child: Text('Close', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF6366f1), fontWeight: FontWeight.bold)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     );
   }
 
@@ -752,17 +830,20 @@ class _DriverModuleState extends State<DriverModule> {
                         onPressed: () async {
                           final currentTime = DateTime.now().toUtc().toIso8601String();
                           final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+                          final currentUserAvatar = currentUserData.value?['avatar-url'];
 
                           try {
                             await Supabase.instance.client.from('Delivers').update({
                               'ref-userDrive': {
                                 'time': currentTime,
                                 'user': currentUserFullName,
+                                'avatar': currentUserAvatar,
                               }
                             }).eq('id', u['id']);
                             u['ref-userDrive'] = {
                                 'time': currentTime,
                                 'user': currentUserFullName,
+                                'avatar': currentUserAvatar,
                             };
                           } catch (e) {
                             debugPrint('Confirm Update Error: $e');

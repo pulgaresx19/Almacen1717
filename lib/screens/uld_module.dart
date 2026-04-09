@@ -15,6 +15,7 @@ class UldModule extends StatefulWidget {
 }
 
 class _UldModuleState extends State<UldModule> {
+  final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
   final GlobalKey<AddUldScreenState> _addUldKey = GlobalKey<AddUldScreenState>();
 
@@ -69,6 +70,7 @@ class _UldModuleState extends State<UldModule> {
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -243,10 +245,17 @@ class _UldModuleState extends State<UldModule> {
 
                   return LayoutBuilder(
                     builder: (context, constraints) {
-                      return SingleChildScrollView(
+                      return Scrollbar(
+                            controller: _horizontalScrollController,
+                            thumbVisibility: true,
+                            thickness: 8,
+                            radius: const Radius.circular(8),
+                            interactive: true,
+                            child: SingleChildScrollView(
+                              controller: _horizontalScrollController,
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                          constraints: BoxConstraints(minWidth: constraints.maxWidth, minHeight: constraints.maxHeight),
                           child: SingleChildScrollView(
                             child: DataTable(
                               showCheckboxColumn: false,
@@ -301,7 +310,7 @@ class _UldModuleState extends State<UldModule> {
                       ),
                     ),
                   ),
-                );
+                ));
               },
             );
           },

@@ -13,6 +13,7 @@ class UsersModule extends StatefulWidget {
 }
 
 class _UsersModuleState extends State<UsersModule> {
+  final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddUserScreenState> _addUserKey = GlobalKey<AddUserScreenState>();
@@ -38,6 +39,7 @@ class _UsersModuleState extends State<UsersModule> {
 
   @override
   void dispose() {
+    _horizontalScrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -209,10 +211,17 @@ class _UsersModuleState extends State<UsersModule> {
 
                       return LayoutBuilder(
                         builder: (context, constraints) {
-                          return SingleChildScrollView(
+                          return Scrollbar(
+                            controller: _horizontalScrollController,
+                            thumbVisibility: true,
+                            thickness: 8,
+                            radius: const Radius.circular(8),
+                            interactive: true,
+                            child: SingleChildScrollView(
+                              controller: _horizontalScrollController,
                             scrollDirection: Axis.horizontal,
                             child: ConstrainedBox(
-                              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                              constraints: BoxConstraints(minWidth: constraints.maxWidth, minHeight: constraints.maxHeight),
                               child: SingleChildScrollView(
                                 child: DataTable(
                                   headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
@@ -241,6 +250,7 @@ class _UsersModuleState extends State<UsersModule> {
                             rows: users.map((u) {
                               final name = u['full-name'] ?? 'Unknown';
                               final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+                              final String? avatarStr = u['avatar-url']?.toString();
                               
                               return DataRow(
                                 onSelectChanged: (_) => _showUserDrawer(context, u, dark),
@@ -251,7 +261,8 @@ class _UsersModuleState extends State<UsersModule> {
                                           CircleAvatar(
                                             radius: 14,
                                             backgroundColor: const Color(0xFF6366f1).withAlpha(40),
-                                            child: Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
+                                            backgroundImage: avatarStr != null && avatarStr.isNotEmpty ? NetworkImage(avatarStr) : null,
+                                            child: avatarStr == null || avatarStr.isEmpty ? Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)) : null,
                                           ),
                                           const SizedBox(width: 12),
                                           Text(name, style: TextStyle(color: textP, fontWeight: FontWeight.w500)),
@@ -274,7 +285,7 @@ class _UsersModuleState extends State<UsersModule> {
                                 ),
                               ),
                             ),
-                          );
+                          ));
                         },
                       );
                     },
@@ -587,6 +598,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     
     final name = widget.user['full-name'] ?? 'Unknown';
     final initial = name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?';
+    final String? avatarStr = widget.user['avatar-url']?.toString();
 
     return Column(
       children: [
@@ -605,9 +617,10 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                   Row(
                     children: [
                       CircleAvatar(
-                        radius: 12,
+                        radius: 16,
                         backgroundColor: const Color(0xFF6366f1).withAlpha(40),
-                        child: Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 11, fontWeight: FontWeight.bold)),
+                        backgroundImage: avatarStr != null && avatarStr.isNotEmpty ? NetworkImage(avatarStr) : null,
+                        child: avatarStr == null || avatarStr.isEmpty ? Text(initial, style: const TextStyle(color: Color(0xFF6366f1), fontSize: 13, fontWeight: FontWeight.bold)) : null,
                       ),
                       const SizedBox(width: 8),
                       Text(name, style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
