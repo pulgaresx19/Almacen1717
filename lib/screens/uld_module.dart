@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_uld_screen.dart';
 import '_uld_print_preview.dart';
+import '_uld_pdf_exporter.dart';
 
 class UldModule extends StatefulWidget {
   final bool isActive;
@@ -404,11 +405,60 @@ class _UldModuleState extends State<UldModule> {
                             const SizedBox(width: 16),
                             Container(height: 24, width: 1, color: borderCard),
                             const SizedBox(width: 16),
-                            IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            IconButton(
+                              onPressed: () async {
+                                final res = await Supabase.instance.client.from('ULD').select().inFilter('id', _selectedUldIds.toList());
+                                final selected = List<Map<String, dynamic>>.from(res);
+                                if (selected.isNotEmpty) {
+                                  UldPdfExporter.printUlds(selected);
+                                }
+                              },
+                              icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)),
+                              tooltip: 'Print Selected',
+                              style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15)),
+                            ),
                             const SizedBox(width: 8),
-                            IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            IconButton(
+                              onPressed: () async {
+                                final res = await Supabase.instance.client.from('ULD').select().inFilter('id', _selectedUldIds.toList());
+                                final selected = List<Map<String, dynamic>>.from(res);
+                                if (selected.isNotEmpty) {
+                                  UldPdfExporter.downloadPdf(selected);
+                                }
+                              },
+                              icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)),
+                              tooltip: 'Download PDF',
+                              style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15)),
+                            ),
                             const SizedBox(width: 8),
-                            IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                            IconButton(
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Delete ULDs'),
+                                    content: Text('Are you sure you want to delete ${_selectedUldIds.length} ULD(s)?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('Delete'),
+                                      )
+                                    ],
+                                  )
+                                );
+                                if (confirm == true) {
+                                  for (var uid in _selectedUldIds) {
+                                    await Supabase.instance.client.from('ULD').delete().eq('id', uid);
+                                  }
+                                  setState(() => _selectedUldIds.clear());
+                                }
+                              },
+                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                              tooltip: 'Delete Selected',
+                              style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15)),
+                            ),
                           ],
                         ),
                       ),

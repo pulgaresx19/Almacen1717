@@ -4159,8 +4159,8 @@ class _LocationModuleState extends State<LocationModule> {
                     const SizedBox(height: 4),
                     Text(
                       appLanguage.value == 'es'
-                          ? 'Módulo para añadir ubicación a las paletas y mercancías correspondientes.'
-                          : 'Module for assigning locations to the corresponding pallets and goods.',
+                          ? 'Módulo para asignar locaciones al AWB.'
+                          : 'Module to assign locations to the AWB.',
                       style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13),
                     ),
                   ],

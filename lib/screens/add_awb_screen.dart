@@ -29,6 +29,8 @@ class AddAwbScreenState extends State<AddAwbScreen> {
   final _remarksCtrl = TextEditingController();
   final _coordinatorCtrl = TextEditingController();
   final _locationCtrl = TextEditingController();
+  final Map<String, String> _coordinatorCounts = {};
+  final Map<String, String> _itemLocations = {};
   final _searchAwbCtrl = TextEditingController();
 
   String? _selectedFlight;
@@ -333,12 +335,14 @@ class AddAwbScreenState extends State<AddAwbScreen> {
             ? null
             : _remarksCtrl.text.trim(),
         'coordinator': _coordinatorCtrl.text.trim().isNotEmpty ? _coordinatorCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
+        'coordinatorCounts': Map<String, String>.from(_coordinatorCounts),
+        'itemLocations': Map<String, String>.from(_itemLocations),
         'location': _locationCtrl.text.trim().isNotEmpty ? _locationCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).map((e) => '${e[0].toUpperCase()}${e.substring(1).toLowerCase()}').toList() : null,
         'flight_id': _selectedFlight,
         'flightLabel': flightLabel,
         'refCarrier': refCarrierOut,
         'refNumber': refNumberOut,
-        'refUld': _refUld.trim().toUpperCase(),
+        'refUld': _refUld.trim().isEmpty ? 'MANUAL' : _refUld.trim().toUpperCase(),
         'isBreak': _isBreak,
       });
 
@@ -349,6 +353,8 @@ class AddAwbScreenState extends State<AddAwbScreen> {
       _houseCtrl.clear();
       _remarksCtrl.clear();
       _coordinatorCtrl.clear();
+      _coordinatorCounts.clear();
+      _itemLocations.clear();
       _locationCtrl.clear();
       
       if (!_refUldCheck) {
@@ -420,26 +426,58 @@ class AddAwbScreenState extends State<AddAwbScreen> {
            };
         }
         
-        if (a['coordinator'] != null && a['coordinator'].toString().isNotEmpty) {
-           (mergedAwbs[num]!['data-coordinator'] as List).add({
-             'manual_entry': a['coordinator'],
+        bool hasCoordManual = a['coordinator'] != null && a['coordinator'].toString().isNotEmpty;
+        Map<String, String>? coordCounts = a['coordinatorCounts'] as Map<String, String>?;
+        bool hasCoordCounts = coordCounts != null && coordCounts.isNotEmpty;
+
+        if (hasCoordManual || hasCoordCounts) {
+           Map<String, dynamic> record = {
              'refULD': a['refUld'],
              'refCarrier': a['refCarrier'],
              'refNumber': a['refNumber'],
              'user': userName,
              'time': nowUtc
-           });
+           };
+           if (hasCoordManual) {
+             record['manual_entry'] = a['coordinator'];
+           }
+           if (hasCoordCounts) {
+             record['breakdown'] = {
+                'AGI Skid': coordCounts['AGI Skid'] != null ? coordCounts['AGI Skid']!.split(RegExp(r'[,\s+]+')).where((e) => int.tryParse(e) != null && int.parse(e) > 0).toList() : [],
+                'Pre Skid': coordCounts['Pre Skid'] ?? '0',
+                'Crate': coordCounts['Crate'] ?? '0',
+                'Box': coordCounts['Box'] ?? '0',
+                'Other': coordCounts['Other'] ?? '0',
+             };
+           }
+           (mergedAwbs[num]!['data-coordinator'] as List).add(record);
         }
         
-        if (a['location'] != null && a['location'].toString().isNotEmpty) {
-           (mergedAwbs[num]!['data-location'] as List).add({
-             'manual_entry': a['location'],
+        Map<String, dynamic>? itemLocs = a['itemLocations'] as Map<String, dynamic>?;
+        bool hasItemLocs = itemLocs != null && itemLocs.isNotEmpty;
+
+        if ((a['location'] != null && a['location'].toString().isNotEmpty) || hasItemLocs) {
+           Map<String, dynamic> locRecord = {
              'refULD': a['refUld'],
              'refCarrier': a['refCarrier'],
              'refNumber': a['refNumber'],
              'user': userName,
              'time': nowUtc
-           });
+           };
+           if (a['location'] != null && a['location'].toString().isNotEmpty) {
+             locRecord['manual_entry'] = a['location'];
+           }
+           if (hasItemLocs) {
+             Map<String, String> sanitizedLocs = {};
+             itemLocs.forEach((k, v) {
+               if (v.toString().trim().isNotEmpty) {
+                 sanitizedLocs[k] = v.toString().trim();
+               }
+             });
+             locRecord['locations'] = sanitizedLocs;
+           }
+           
+           (mergedAwbs[num]!['data-location'] as List).add(locRecord);
         }
         
         final dataAwbItem = {
@@ -963,7 +1001,7 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                       ),
                       SizedBox(
                         width: 75,
-                        child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly]),
+                        child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly], onChanged: (_) => setState(() {})),
                       ),
                       SizedBox(
                         width: 75,
@@ -992,14 +1030,26 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: Icon(Icons.person_outline, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), size: 20),
-                              onPressed: _showCoordinatorDataDialog,
+                              icon: Icon(
+                                Icons.assignment_add, 
+                                color: _piecesCtrl.text.isEmpty 
+                                    ? (dark ? const Color(0xFF475569) : const Color(0xFF9CA3AF))
+                                    : (_coordinatorCounts.isNotEmpty ? const Color(0xFF6366f1) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563))), 
+                                size: 20
+                              ),
+                              onPressed: _piecesCtrl.text.isNotEmpty ? _showCoordinatorDataDialog : null,
                               tooltip: 'Data Coordinator',
                             ),
                             Container(width: 1, height: 24, color: borderC),
                             IconButton(
-                              icon: Icon(Icons.location_on_outlined, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), size: 20),
-                              onPressed: () {},
+                              icon: Icon(
+                                Icons.location_on_outlined, 
+                                color: _coordinatorCounts.isEmpty 
+                                    ? (dark ? const Color(0xFF475569) : const Color(0xFF9CA3AF)) 
+                                    : (_itemLocations.isNotEmpty ? const Color(0xFF10b981) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563))), 
+                                size: 20
+                              ),
+                              onPressed: _coordinatorCounts.isEmpty ? null : _showItemLocationEntryDialog,
                               tooltip: 'Data Location',
                             ),
                           ],
@@ -1310,28 +1360,42 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                                                         ),
                                                         Padding(
                                                           padding: const EdgeInsets.only(right: 8, top: 12, bottom: 12),
-                                                          child: ((a['coordinator'] != null && (a['coordinator'] is List ? (a['coordinator'] as List).isNotEmpty : a['coordinator'].toString().isNotEmpty)) || (a['location'] != null && (a['location'] is List ? (a['location'] as List).isNotEmpty : a['location'].toString().isNotEmpty))) ? Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              if (a['coordinator'] != null && (a['coordinator'] is List ? (a['coordinator'] as List).isNotEmpty : a['coordinator'].toString().isNotEmpty))
+                                                          child: Builder(
+                                                            builder: (context) {
+                                                              bool hasCoordinatorData = (a['coordinator'] != null && (a['coordinator'] is List ? (a['coordinator'] as List).isNotEmpty : a['coordinator'].toString().isNotEmpty)) || (a['coordinatorCounts'] != null && (a['coordinatorCounts'] as Map).isNotEmpty);
+                                                              bool hasLocationData = (a['location'] != null && (a['location'] is List ? (a['location'] as List).isNotEmpty : a['location'].toString().isNotEmpty)) || (a['itemLocations'] != null && (a['itemLocations'] as Map).isNotEmpty);
+                                                              if (!hasCoordinatorData && !hasLocationData) return const SizedBox.shrink();
+                                                              
+                                                              return Row(
+                                                                mainAxisSize: MainAxisSize.min,
+                                                                children: [
+                                                                  if (hasCoordinatorData)
                                                                 InkWell(
                                                                   onTap: () {
-                                                                    List<String> dcList = a['coordinator'] is List ? (a['coordinator'] as List).map((e) => e.toString()).toList() : a['coordinator'].toString().split('\n').where((e) => e.trim().isNotEmpty).toList();
-                                                                    _showCustomListDialog('Data Coordinator', dcList);
+                                                                    if (a['coordinatorCounts'] != null && (a['coordinatorCounts'] as Map).isNotEmpty) {
+                                                                      _showCoordinatorDataPreviewDialog(a);
+                                                                    } else {
+                                                                      List<String> dcList = a['coordinator'] is List ? (a['coordinator'] as List).map((e) => e.toString()).toList() : a['coordinator'].toString().split('\n').where((e) => e.trim().isNotEmpty).toList();
+                                                                      _showCustomListDialog('Data Coordinator', dcList);
+                                                                    }
                                                                   },
                                                                   customBorder: const CircleBorder(),
                                                                   child: Container(
                                                                     margin: const EdgeInsets.only(right: 6),
                                                                     padding: const EdgeInsets.all(6),
-                                                                    decoration: BoxDecoration(color: Colors.amber.withAlpha(30), shape: BoxShape.circle),
-                                                                    child: const Icon(Icons.person_outline, size: 14, color: Colors.amber),
+                                                                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), shape: BoxShape.circle),
+                                                                    child: const Icon(Icons.assignment_add, size: 14, color: Color(0xFF6366f1)),
                                                                   ),
                                                                 ),
-                                                              if (a['location'] != null && (a['location'] is List ? (a['location'] as List).isNotEmpty : a['location'].toString().isNotEmpty))
+                                                              if (hasLocationData)
                                                                 InkWell(
                                                                   onTap: () {
-                                                                    List<String> locList = a['location'] is List ? (a['location'] as List).map((e) => e.toString()).toList() : a['location'].toString().split('\n').where((e) => e.trim().isNotEmpty).toList();
-                                                                    _showCustomListDialog('Data Location', locList);
+                                                                    if (a['itemLocations'] != null && (a['itemLocations'] as Map).isNotEmpty) {
+                                                                      _showItemLocationPreviewDialog(a);
+                                                                    } else {
+                                                                      List<String> locList = a['location'] is List ? (a['location'] as List).map((e) => e.toString()).toList() : a['location'].toString().split('\n').where((e) => e.trim().isNotEmpty).toList();
+                                                                      _showCustomListDialog('Data Location', locList);
+                                                                    }
                                                                   },
                                                                   customBorder: const CircleBorder(),
                                                                   child: Container(
@@ -1340,8 +1404,10 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                                                                     child: const Icon(Icons.location_on_outlined, size: 14, color: Colors.green),
                                                                   ),
                                                                 ),
-                                                            ],
-                                                          ) : const SizedBox.shrink(),
+                                                              ],
+                                                              );
+                                                            }
+                                                          ),
                                                         ),
                                                         Padding(
                                                           padding: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
@@ -1432,15 +1498,23 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
 
     final ctrls = {
-      'AGI Skid': TextEditingController(),
-      'Pre Skid': TextEditingController(),
-      'Crate': TextEditingController(),
-      'Box': TextEditingController(),
-      'Other': TextEditingController(),
+      'AGI Skid': TextEditingController(text: _coordinatorCounts['AGI Skid'] ?? ''),
+      'Pre Skid': TextEditingController(text: _coordinatorCounts['Pre Skid'] ?? ''),
+      'Crate': TextEditingController(text: _coordinatorCounts['Crate'] ?? ''),
+      'Box': TextEditingController(text: _coordinatorCounts['Box'] ?? ''),
+      'Other': TextEditingController(text: _coordinatorCounts['Other'] ?? ''),
     };
 
     int expectedPieces = int.tryParse(_piecesCtrl.text) ?? 0;
     int enteredPieces = 0;
+    ctrls.forEach((key, ctrl) {
+      if (key == 'AGI Skid') {
+        final parts = ctrl.text.split(RegExp(r'[,\s-]+'));
+        for (var p in parts) { enteredPieces += int.tryParse(p) ?? 0; }
+      } else {
+        enteredPieces += int.tryParse(ctrl.text) ?? 0;
+      }
+    });
 
     await showDialog(
       context: context,
@@ -1554,6 +1628,16 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
+                    setState(() {
+                      _coordinatorCounts.clear();
+                      ctrls.forEach((k, v) {
+                        if (v.text.trim().isNotEmpty) {
+                          _coordinatorCounts[k] = v.text.trim();
+                        } else {
+                          _coordinatorCounts[k] = '0';
+                        }
+                      });
+                    });
                     Navigator.pop(ctx);
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white),
@@ -1562,6 +1646,417 @@ class AddAwbScreenState extends State<AddAwbScreen> {
               ],
             );
           }
+        );
+      }
+    );
+  }
+
+  Future<void> _showCoordinatorDataPreviewDialog(Map<String, dynamic> awb) async {
+    Map<String, String> counts = {};
+    if (awb['coordinatorCounts'] != null && awb['coordinatorCounts'] is Map) {
+      counts = Map<String, String>.from(awb['coordinatorCounts']);
+    }
+
+    Map<String, List<String>> breakdownParts = {};
+
+    int totalChecked = 0;
+    counts.forEach((k, v) {
+      final parts = v.split(RegExp(r'[,\s\+]+')).where((e) => int.tryParse(e) != null && int.parse(e) > 0).toList();
+      if (parts.isNotEmpty) {
+        breakdownParts[k] = parts;
+        totalChecked += parts.map((e) => int.tryParse(e) ?? 0).fold(0, (x, y) => x + y);
+      }
+    });
+
+    String getDisplayName(String key, int count) {
+      if (count <= 1) return key.toUpperCase();
+      if (key == 'Box') return 'BOXES';
+      return '${key.toUpperCase()}S';
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(10))),
+          title: Column(
+            children: [
+              const Text('Coordinator Data Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Column(
+                    children: [
+                      const Text('EXPECTED', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('${awb['pieces'] ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Container(width: 1, height: 35, color: Colors.white24),
+                  Column(
+                    children: [
+                      const Text('COUNTED', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('$totalChecked', style: TextStyle(color: totalChecked == (int.tryParse(awb['pieces']?.toString() ?? '0') ?? 0) ? const Color(0xFF10b981) : const Color(0xFFf59e0b), fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+          content: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 250,
+                    width: double.infinity,
+                    decoration: BoxDecoration(border: Border.all(color: Colors.white.withAlpha(10)), borderRadius: BorderRadius.circular(8)),
+                    child: ListView(
+                      padding: const EdgeInsets.all(12),
+                      children: breakdownParts.entries.map((entry) {
+                         int groupTotal = entry.value.map((e) => int.tryParse(e) ?? 0).fold(0, (x, y) => x + y);
+                         return Container(
+                           margin: const EdgeInsets.only(bottom: 12),
+                           padding: const EdgeInsets.all(12),
+                           decoration: BoxDecoration(color: Colors.white.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(10))),
+                           child: Row(
+                             children: [
+                               Container(
+                                 width: 24, height: 24, alignment: Alignment.center,
+                                 decoration: BoxDecoration(color: Colors.white.withAlpha(25), shape: BoxShape.circle),
+                                 child: Text('${entry.value.length}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.bold)),
+                               ),
+                               const SizedBox(width: 8),
+                               Text(getDisplayName(entry.key, entry.value.length), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                               const Spacer(),
+                               Text('$groupTotal pcs', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 12)),
+                             ]
+                           )
+                         );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ]
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  Future<void> _showItemLocationPreviewDialog(Map<String, dynamic> a) async {
+    Map<String, dynamic> coordCounts = a['coordinatorCounts'] ?? {};
+    Map<String, dynamic> itemLocs = a['itemLocations'] ?? {};
+    int totalChecked = 0;
+    Map<String, List<String>> breakdownParts = {};
+
+    coordCounts.forEach((k, v) {
+      final parts = v.toString().split(RegExp(r'[,\s\+]+')).where((e) => int.tryParse(e) != null && int.parse(e) > 0).toList();
+      if (parts.isNotEmpty) {
+        breakdownParts[k] = parts;
+        totalChecked += parts.map((e) => int.tryParse(e) ?? 0).fold(0, (x, y) => x + y);
+      }
+    });
+
+    String getDisplayName(String key, int count) {
+      if (count <= 1) return key.toUpperCase();
+      if (key == 'Box') return 'BOXES';
+      return '${key.toUpperCase()}S';
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(10))),
+          title: Column(
+            children: [
+              const Text('Location Data Preview', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Column(
+                    children: [
+                      const Text('EXPECTED', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('${a['pieces'] ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Container(width: 1, height: 35, color: Colors.white24),
+                  Column(
+                    children: [
+                      const Text('COUNTED', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('$totalChecked', style: TextStyle(color: totalChecked == (int.tryParse(a['pieces']?.toString() ?? '0') ?? 0) ? const Color(0xFF10b981) : const Color(0xFFf59e0b), fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+          content: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 350,
+                    width: double.infinity,
+                    decoration: BoxDecoration(border: Border.all(color: Colors.white.withAlpha(10)), borderRadius: BorderRadius.circular(8)),
+                    child: ListView(
+                      padding: const EdgeInsets.all(12),
+                      children: breakdownParts.entries.map((entry) {
+                         int groupTotal = entry.value.map((e) => int.tryParse(e) ?? 0).fold(0, (x, y) => x + y);
+                         return Container(
+                           margin: const EdgeInsets.only(bottom: 12),
+                           padding: const EdgeInsets.all(12),
+                           decoration: BoxDecoration(color: Colors.white.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(10))),
+                           child: Column(
+                             children: [
+                               Row(
+                                 children: [
+                                   Container(
+                                     width: 24, height: 24, alignment: Alignment.center,
+                                     decoration: BoxDecoration(color: Colors.white.withAlpha(25), shape: BoxShape.circle),
+                                     child: Text('${entry.value.length}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.bold)),
+                                   ),
+                                   const SizedBox(width: 8),
+                                   Text(getDisplayName(entry.key, entry.value.length), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                   const Spacer(),
+                                   Text('$groupTotal pcs', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 12)),
+                                 ]
+                               ),
+                               const SizedBox(height: 12),
+                               ...entry.value.asMap().entries.map((item) {
+                                  int idx = item.key;
+                                  String pc = item.value;
+                                  String locKey = '${entry.key}__$idx';
+                                  String locVal = itemLocs[locKey]?.toString() ?? '-';
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(width: 24, child: Text('#${idx+1}', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 13, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 8),
+                                        SizedBox(width: 45, child: Text(pc, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              locVal,
+                                              style: TextStyle(color: locVal == '-' ? Colors.white30 : const Color(0xFF60a5fa), fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                               })
+                             ],
+                           )
+                         );
+                       }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ]
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: Color(0xFF94a3b8))),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  Future<void> _showItemLocationEntryDialog() async {
+    Map<String, TextEditingController> ctrls = {};
+    int totalChecked = 0;
+    Map<String, List<String>> breakdownParts = {};
+
+    _coordinatorCounts.forEach((k, v) {
+      final parts = v.split(RegExp(r'[,\s\+]+')).where((e) => int.tryParse(e) != null && int.parse(e) > 0).toList();
+      if (parts.isNotEmpty) {
+        breakdownParts[k] = parts;
+        totalChecked += parts.map((e) => int.tryParse(e) ?? 0).fold(0, (a, b) => a + b);
+
+        for (int i = 0; i < parts.length; i++) {
+          String key = '${k}__$i';
+          ctrls[key] = TextEditingController(text: _itemLocations[key] ?? '');
+        }
+      }
+    });
+
+    String getDisplayName(String key, int count) {
+      if (count <= 1) return key.toUpperCase();
+      if (key == 'Box') return 'BOXES';
+      return '${key.toUpperCase()}S';
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(10))),
+          title: Column(
+            children: [
+              Text('Insert Location Data', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Column(
+                    children: [
+                      const Text('EXPECTED', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('${int.tryParse(_piecesCtrl.text) ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Container(width: 1, height: 35, color: Colors.white24),
+                  Column(
+                    children: [
+                      const Text('COUNTED', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('$totalChecked', style: TextStyle(color: totalChecked == (int.tryParse(_piecesCtrl.text) ?? 0) ? const Color(0xFF10b981) : const Color(0xFFf59e0b), fontSize: 20, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+          content: SizedBox(
+            width: 320,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+// Removed redundant break down header
+                  Container(
+                    height: 350,
+                    width: double.infinity,
+                    decoration: BoxDecoration(border: Border.all(color: Colors.white.withAlpha(10)), borderRadius: BorderRadius.circular(8)),
+                    child: ListView(
+                      padding: const EdgeInsets.all(12),
+                      children: breakdownParts.entries.map((entry) {
+                         int groupTotal = entry.value.map((e) => int.tryParse(e) ?? 0).fold(0, (a, b) => a + b);
+                         return Container(
+                           margin: const EdgeInsets.only(bottom: 12),
+                           padding: const EdgeInsets.all(12),
+                           decoration: BoxDecoration(color: Colors.white.withAlpha(5), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withAlpha(10))),
+                           child: Column(
+                             children: [
+                               Row(
+                                 children: [
+                                   Container(
+                                     width: 24, height: 24, alignment: Alignment.center,
+                                     decoration: BoxDecoration(color: Colors.white.withAlpha(25), shape: BoxShape.circle),
+                                     child: Text('${entry.value.length}', style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.bold)),
+                                   ),
+                                   const SizedBox(width: 8),
+                                   Text(getDisplayName(entry.key, entry.value.length), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                   const Spacer(),
+                                   Text('$groupTotal pcs', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 12)),
+                                 ]
+                               ),
+                               const SizedBox(height: 12),
+                               ...entry.value.asMap().entries.map((item) {
+                                  int idx = item.key;
+                                  String pc = item.value;
+                                  String locKey = '${entry.key}__$idx';
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(width: 24, child: Text('#${idx+1}', style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 13, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 8),
+                                        SizedBox(width: 45, child: Text(pc, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: TextField(
+                                            controller: ctrls[locKey],
+                                            style: const TextStyle(color: Colors.white, fontSize: 13),
+                                            textCapitalization: TextCapitalization.characters,
+                                            inputFormatters: [
+                                              TextInputFormatter.withFunction((oldValue, newValue) {
+                                                return newValue.copyWith(text: newValue.text.toUpperCase());
+                                              }),
+                                            ],
+                                            decoration: InputDecoration(
+                                              hintText: 'Location...',
+                                              hintStyle: TextStyle(color: Colors.white.withAlpha(50), fontSize: 12),
+                                              filled: true,
+                                              fillColor: Colors.white.withAlpha(5),
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                              isDense: true,
+                                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide.none),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                               })
+                             ],
+                           )
+                         );
+                       }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ]
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF94a3b8))),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _itemLocations.clear();
+                  ctrls.forEach((k, v) {
+                    if (v.text.trim().isNotEmpty) {
+                      _itemLocations[k] = v.text.trim();
+                    }
+                  });
+                });
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white),
+              child: const Text('Save'),
+            ),
+          ],
         );
       }
     );
@@ -1662,6 +2157,7 @@ class AddAwbScreenState extends State<AddAwbScreen> {
     int? maxLines = 1,
     int? minLines = 1,
     Widget? titleTrailing,
+    ValueChanged<String>? onChanged,
   }) {
     Widget field = TextField(
       controller: ctrl,
@@ -1676,10 +2172,10 @@ class AddAwbScreenState extends State<AddAwbScreen> {
         color: readOnly ? (dark ? const Color(0xFFcbd5e1) : const Color(0xFF6B7280)) : textP,
         fontSize: 13,
       ),
-      onChanged: (ctrl == _refUldCtrl) ? (v) {
+      onChanged: onChanged ?? ((ctrl == _refUldCtrl) ? (v) {
         setState(() => _refUld = v);
         _checkUldBreakStatus();
-      } : null,
+      } : null),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(

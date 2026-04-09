@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_flight_screen.dart';
 import '_flight_print_preview.dart';
+import '_flight_pdf_exporter.dart';
 
 class FlightModule extends StatefulWidget {
   final bool isActive;
@@ -222,11 +223,60 @@ class _FlightModuleState extends State<FlightModule> {
                             const SizedBox(width: 16),
                             Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
                             const SizedBox(width: 16),
-                            IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            IconButton(
+                              onPressed: () async {
+                                final res = await Supabase.instance.client.from('Flight').select().inFilter('id', _selectedFlightIds.toList());
+                                final selected = List<Map<String, dynamic>>.from(res);
+                                if (selected.isNotEmpty) {
+                                  FlightPdfExporter.printFlights(selected);
+                                }
+                              },
+                              icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)),
+                              tooltip: 'Print Selected',
+                              style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15)),
+                            ),
                             const SizedBox(width: 8),
-                            IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            IconButton(
+                              onPressed: () async {
+                                final res = await Supabase.instance.client.from('Flight').select().inFilter('id', _selectedFlightIds.toList());
+                                final selected = List<Map<String, dynamic>>.from(res);
+                                if (selected.isNotEmpty) {
+                                  FlightPdfExporter.downloadPdf(selected);
+                                }
+                              },
+                              icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)),
+                              tooltip: 'Download PDF',
+                              style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15)),
+                            ),
                             const SizedBox(width: 8),
-                            IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                            IconButton(
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Delete Flights'),
+                                    content: Text('Are you sure you want to delete ${_selectedFlightIds.length} flight(s)?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('Delete'),
+                                      )
+                                    ],
+                                  )
+                                );
+                                if (confirm == true) {
+                                  for (var fid in _selectedFlightIds) {
+                                    await Supabase.instance.client.from('Flight').delete().eq('id', fid);
+                                  }
+                                  setState(() => _selectedFlightIds.clear());
+                                }
+                              },
+                              icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                              tooltip: 'Delete Selected',
+                              style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15)),
+                            ),
                           ],
                         ),
                       ),

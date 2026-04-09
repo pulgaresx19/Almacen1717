@@ -482,10 +482,7 @@ class _DriverModuleState extends State<DriverModule> {
                                 const SizedBox(width: 16),
                                 IconButton(
                                   icon: Icon(Icons.close_rounded, color: textS),
-                                  onPressed: () => setState(() {
-                                    _selectedDriver = null;
-                                    _selectedAwbDetails = null;
-                                  }),
+                                  onPressed: () => _showPendingRejectionDialog(context, _selectedDriver!, dark),
                                 )
                               ]
                             )
@@ -814,6 +811,96 @@ class _DriverModuleState extends State<DriverModule> {
       }
     );
   }
+
+  void _showPendingRejectionDialog(BuildContext context, Map<String, dynamic> u, bool dark) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withAlpha(30),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 32),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  appLanguage.value == 'es' ? 'Atención' : 'Attention',
+                  style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  appLanguage.value == 'es' 
+                    ? 'Al cerrar, el estatus de este conductor regresará a pendiente hasta que otro conductor pueda finalizarlo.'
+                    : 'Upon closing, this driver\'s status will return to pending until another driver can finalize it.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: dark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                TextField(
+                  style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 13),
+                  decoration: InputDecoration(
+                    labelText: appLanguage.value == 'es' ? 'Razón de postergación' : 'Reason for postponement',
+                    labelStyle: TextStyle(color: dark ? Colors.white54 : Colors.black54),
+                    filled: true,
+                    fillColor: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: dark ? Colors.white.withAlpha(20) : Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.orange),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                         // Just closing this notification component for now
+                         Navigator.pop(ctx);
+                      },
+                      child: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    );
+  }
+
 
   Widget _confirmDetailRow(IconData icon, String label, String value, bool dark) {
     return Row(

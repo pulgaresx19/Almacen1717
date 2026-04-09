@@ -828,7 +828,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                                               'door': door,
                                               'remarks': remarks,
                                               'time': now,
-                                              'fullname': fullname,
+                                              'user': fullname,
                                           };
 
                                           try {

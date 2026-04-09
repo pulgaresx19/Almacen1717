@@ -1208,28 +1208,13 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                                         child: Row(
                                                           mainAxisSize:
                                                               MainAxisSize.min,
-                                                          children: [
-                                                            const Icon(
+                                                          children: const [
+                                                            Icon(
                                                               Icons
                                                                   .warning_rounded,
-                                                              size: 12,
+                                                              size: 14,
                                                               color: Color(
                                                                 0xFFef4444,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                              width: 4,
-                                                            ),
-                                                            Text(
-                                                              '$discrepantAwbCount Discrepanc${discrepantAwbCount > 1 ? 'ies' : 'y'}',
-                                                              style: const TextStyle(
-                                                                color: Color(
-                                                                  0xFFef4444,
-                                                                ),
-                                                                fontSize: 11,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
                                                               ),
                                                             ),
                                                           ],
@@ -7932,6 +7917,36 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                   .from('AWB')
                                   .insert(payload);
                             }
+
+                            if (uld['id'] != null) {
+                              final uldRow = await Supabase.instance.client
+                                  .from('ULD')
+                                  .select('data-ULD')
+                                  .eq('id', uld['id'])
+                                  .maybeSingle();
+
+                              if (uldRow != null) {
+                                List existingUldData = uldRow['data-ULD'] is List ? uldRow['data-ULD'] : [];
+                                final newUldEntry = {
+                                  'number': newAwb,
+                                  'awb_number': newAwb,
+                                  'AWB-number': newAwb,
+                                  'pieces': int.tryParse(piecesCtrl.text) ?? 1,
+                                  'weight': double.tryParse(weightCtrl.text) ?? 0.0,
+                                  'total': int.tryParse(totalCtrl.text) ?? 1,
+                                  'remarks': remCtrl.text,
+                                  'house_number': houseArr,
+                                  'isNew': true,
+                                };
+                                existingUldData.add(newUldEntry);
+
+                                await Supabase.instance.client
+                                    .from('ULD')
+                                    .update({'data-ULD': existingUldData})
+                                    .eq('id', uld['id']);
+                              }
+                            }
+
                             if (!dialogCtx.mounted) return;
 
                             final fullCreatedAwbObject = {

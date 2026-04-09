@@ -507,7 +507,7 @@ class _SystemModuleState extends State<SystemModule> {
                           ),
                         ),
                       ),
-                      if (!_isSplitView && isLeft) ...[
+                      if (!_isSplitView && isLeft && MediaQuery.of(context).size.width >= 1100) ...[
                         const SizedBox(width: 8),
                         IconButton(
                           onPressed: () {
@@ -1882,6 +1882,13 @@ class _SystemModuleState extends State<SystemModule> {
 
   @override
   Widget build(BuildContext context) {
+    bool isDesktop = MediaQuery.of(context).size.width >= 1100;
+    if (!isDesktop && _isSplitView) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _isSplitView = false);
+      });
+    }
+
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
@@ -1917,8 +1924,8 @@ class _SystemModuleState extends State<SystemModule> {
                         const SizedBox(height: 4),
                         Text(
                           appLanguage.value == 'es'
-                              ? 'Módulo dedicado a la recepción de ULDs y paletas correspondientes a cada vuelo.'
-                              : 'Module dedicated to receiving ULDs and pallets corresponding to each flight.',
+                              ? 'Módulo dedicado a la recepción de ULDs.'
+                              : 'Module dedicated to receiving ULDs.',
                           style: TextStyle(
                             color: dark
                                 ? const Color(0xFF94a3b8)

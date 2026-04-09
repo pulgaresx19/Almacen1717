@@ -1224,6 +1224,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                                                children: bd.entries.map((entry) {
                                                  if (entry.value is List && (entry.value as List).isEmpty) return const SizedBox.shrink();
                                                  if (entry.value is num && entry.value == 0) return const SizedBox.shrink();
+                                                 if (entry.value.toString() == '0') return const SizedBox.shrink();
                                                  return Container(
                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
@@ -1266,7 +1267,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                                  ]),
                                  const SizedBox(height: 12),
                                  ...locList.map((loc) {
-                                    Map itemLocs = (loc['itemLocations'] is Map) ? loc['itemLocations'] as Map : {};
+                                    Map itemLocs = (loc['locations'] is Map) ? loc['locations'] as Map : ((loc['itemLocations'] is Map) ? loc['itemLocations'] as Map : {});
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
                                       padding: const EdgeInsets.all(12),

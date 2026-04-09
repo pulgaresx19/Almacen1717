@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_deliver_screen.dart';
 import '_deliver_print_preview.dart';
+import '_deliver_pdf_exporter.dart';
 
 class DeliversModule extends StatefulWidget {
   final bool isActive;
@@ -572,11 +573,60 @@ class _DeliversModuleState extends State<DeliversModule> {
                         const SizedBox(width: 16),
                         Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
                         const SizedBox(width: 16),
-                        IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                        IconButton(
+                          onPressed: () async {
+                              final res = await Supabase.instance.client.from('Delivers').select().inFilter('id', _selectedDeliverIds.toList());
+                              final selected = List<Map<String, dynamic>>.from(res);
+                              if (selected.isNotEmpty) {
+                                DeliverPdfExporter.printDelivers(selected);
+                              }
+                          }, 
+                          icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), 
+                          tooltip: 'Print Selected', 
+                          style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
+                        ),
                         const SizedBox(width: 8),
-                        IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                        IconButton(
+                          onPressed: () async {
+                              final res = await Supabase.instance.client.from('Delivers').select().inFilter('id', _selectedDeliverIds.toList());
+                              final selected = List<Map<String, dynamic>>.from(res);
+                              if (selected.isNotEmpty) {
+                                DeliverPdfExporter.downloadPdf(selected);
+                              }
+                          }, 
+                          icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), 
+                          tooltip: 'Download PDF', 
+                          style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
+                        ),
                         const SizedBox(width: 8),
-                        IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                        IconButton(
+                          onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (c) => AlertDialog(
+                                  title: const Text('Delete Delivers'),
+                                  content: Text('Are you sure you want to delete ${_selectedDeliverIds.length} Deliver(s)?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                                      onPressed: () => Navigator.pop(c, true),
+                                      child: const Text('Delete'),
+                                    )
+                                  ],
+                                )
+                              );
+                              if (confirm == true) {
+                                for (var id in _selectedDeliverIds) {
+                                  await Supabase.instance.client.from('Delivers').delete().eq('id', id);
+                                }
+                                setState(() => _selectedDeliverIds.clear());
+                              }
+                          }, 
+                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), 
+                          tooltip: 'Delete Selected', 
+                          style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))
+                        ),
                       ],
                     ),
                   ),
@@ -674,6 +724,8 @@ class _DeliversModuleState extends State<DeliversModule> {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
         bool isEditing = false;
+        bool isEditingAwbs = false;
+        List<Map<String, dynamic>> tempAwbsList = [];
         final Map<String, dynamic> tempU = Map.from(u);
         return StatefulBuilder(
           builder: (context, setDrawerState) {
@@ -858,21 +910,71 @@ class _DeliversModuleState extends State<DeliversModule> {
                           const SizedBox(height: 32),
                           
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('List of AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w700)),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(12)),
-                                child: Text('${awbs.length}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  Text('List of AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w700)),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(12)),
+                                    child: Text('${(isEditingAwbs ? tempAwbsList : awbs).length}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
                               ),
+                              if (!isEditingAwbs)
+                                IconButton(
+                                  onPressed: () {
+                                    setDrawerState(() {
+                                      isEditingAwbs = true;
+                                      tempAwbsList = List<Map<String, dynamic>>.from(awbs);
+                                    });
+                                  },
+                                  tooltip: appLanguage.value == 'es' ? 'Editar lista' : 'Edit list',
+                                  icon: Icon(Icons.edit_rounded, color: textP, size: 20),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                )
+                              else
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      onPressed: () => setDrawerState(() => isEditingAwbs = false),
+                                      tooltip: appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
+                                      icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 20),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    IconButton(
+                                      onPressed: () async {
+                                        try {
+                                          await Supabase.instance.client.from('Delivers').update({
+                                            'list-pickup': tempAwbsList
+                                          }).eq('id', u['id']);
+                                          u['list-pickup'] = tempAwbsList;
+                                          setDrawerState(() => isEditingAwbs = false);
+                                          if (mounted) setState(() {});
+                                        } catch (_) {}
+                                      },
+                                      tooltip: appLanguage.value == 'es' ? 'Guardar Cambios' : 'Save Changes',
+                                      icon: const Icon(Icons.check_rounded, color: Color(0xFF22c55e), size: 20),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                )
                             ],
                           ),
                           const SizedBox(height: 16),
-                          if (awbs.isEmpty)
-                            Text('No AWBs assigned.', style: TextStyle(color: textS))
-                          else
-                            ...awbs.asMap().entries.map((entry) {
+                          Builder(builder: (ctx) {
+                            final currentList = isEditingAwbs ? tempAwbsList : awbs;
+                            if (currentList.isEmpty) {
+                              return Text('No AWBs assigned.', style: TextStyle(color: textS));
+                            }
+                            return Column(
+                              children: currentList.asMap().entries.map((entry) {
                               final idx = entry.key;
                               final item = entry.value;
                               final awbN = item['AWB-number']?.toString() ?? '-';
@@ -928,10 +1030,26 @@ class _DeliversModuleState extends State<DeliversModule> {
                                         ]
                                       ) : const SizedBox(),
                                     ),
+                                    if (isEditingAwbs) ...[
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        onPressed: () {
+                                          setDrawerState(() {
+                                            tempAwbsList.removeAt(idx);
+                                          });
+                                        },
+                                        tooltip: appLanguage.value == 'es' ? 'Eliminar' : 'Remove',
+                                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               );
-                            }),
+                            }).toList(),
+                           );
+                          }),
                         ],
                       ),
                     ),

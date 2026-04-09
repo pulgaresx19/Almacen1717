@@ -5,6 +5,7 @@ import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, c
 import 'add_awb_screen.dart';
 import 'package:intl/intl.dart';
 import '_print_preview.dart';
+import '_awb_pdf_exporter.dart';
 
 class AwbModule extends StatefulWidget {
   final bool isActive;
@@ -565,11 +566,60 @@ class _AwbModuleState extends State<AwbModule> {
                           const SizedBox(width: 16),
                           Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
                           const SizedBox(width: 16),
-                          IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                          IconButton(
+                            onPressed: () async {
+                                final res = await Supabase.instance.client.from('AWB').select().inFilter('id', _selectedAwbIds.toList());
+                                final selected = List<Map<String, dynamic>>.from(res);
+                                if (selected.isNotEmpty) {
+                                  AwbPdfExporter.printAwbs(selected);
+                                }
+                            }, 
+                            icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), 
+                            tooltip: 'Print Selected', 
+                            style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
+                          ),
                           const SizedBox(width: 8),
-                          IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                          IconButton(
+                            onPressed: () async {
+                                final res = await Supabase.instance.client.from('AWB').select().inFilter('id', _selectedAwbIds.toList());
+                                final selected = List<Map<String, dynamic>>.from(res);
+                                if (selected.isNotEmpty) {
+                                  AwbPdfExporter.downloadPdf(selected);
+                                }
+                            }, 
+                            icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), 
+                            tooltip: 'Download PDF', 
+                            style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
+                          ),
                           const SizedBox(width: 8),
-                          IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                          IconButton(
+                            onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Delete AWBs'),
+                                    content: Text('Are you sure you want to delete ${_selectedAwbIds.length} AWB(s)?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('Delete'),
+                                      )
+                                    ],
+                                  )
+                                );
+                                if (confirm == true) {
+                                  for (var id in _selectedAwbIds) {
+                                    await Supabase.instance.client.from('AWB').delete().eq('id', id);
+                                  }
+                                  setState(() => _selectedAwbIds.clear());
+                                }
+                            }, 
+                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), 
+                            tooltip: 'Delete Selected', 
+                            style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))
+                          ),
                         ],
                       ),
                     ),
@@ -958,6 +1008,7 @@ class _AwbModuleState extends State<AwbModule> {
                                                children: bd.entries.map((entry) {
                                                  if (entry.value is List && (entry.value as List).isEmpty) return const SizedBox.shrink();
                                                  if (entry.value is num && entry.value == 0) return const SizedBox.shrink();
+                                                 if (entry.value.toString() == '0') return const SizedBox.shrink();
                                                  return Container(
                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                                    decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
@@ -1005,7 +1056,7 @@ class _AwbModuleState extends State<AwbModule> {
                                  ]),
                                  const SizedBox(height: 12),
                                  ...uldLocData.map((loc) {
-                                    Map itemLocs = (loc['itemLocations'] is Map) ? loc['itemLocations'] as Map : {};
+                                    Map itemLocs = (loc['locations'] is Map) ? loc['locations'] as Map : ((loc['itemLocations'] is Map) ? loc['itemLocations'] as Map : {});
                                     return Container(
                                       margin: const EdgeInsets.only(bottom: 8),
                                       padding: const EdgeInsets.all(12),
