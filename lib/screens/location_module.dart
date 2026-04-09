@@ -479,17 +479,6 @@ class _LocationModuleState extends State<LocationModule> {
                   }).toList(),
                 ),
                 if (selectedId != null) ...[
-                  const SizedBox(height: 32),
-                  Text(
-                    appLanguage.value == 'es'
-                        ? 'ULDs del vuelo'
-                        : 'Flight ULDs',
-                    style: TextStyle(
-                      color: textS,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   if (isLeft ? _isLoadingUldsLeft : _isLoadingUldsRight)
                     const Center(

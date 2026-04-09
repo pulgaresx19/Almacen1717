@@ -44,7 +44,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                         flex: isWide ? 1 : 0,
                         child: _buildSystemCard(
                           context: context,
-                          systemName: 'System (Break / No Break)',
+                          systemName: 'ULD Received',
                           tableName: 'System1',
                           stream: _system1Stream,
                           dark: dark,

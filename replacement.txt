@@ -1,0 +1,36 @@
+  bool _isMasterDriver = true;
+  bool _isFetchingUser = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _deliversStream = Supabase.instance.client.from('Delivers').stream(primaryKey: ['id']).order('time-deliver', ascending: true);
+    _fetchMasterDriverStatus();
+  }
+
+  Future<void> _fetchMasterDriverStatus() async {
+    try {
+      final uUser = Supabase.instance.client.auth.currentUser;
+      if (uUser != null) {
+        final userRow = await Supabase.instance.client.from('Users').select('master-driver').eq('id', uUser.id).maybeSingle();
+        if (userRow != null && userRow['master-driver'] != null) {
+          if (mounted) setState(() => _isMasterDriver = userRow['master-driver'] == true || userRow['master-driver'].toString().toLowerCase() == 'true');
+        } else {
+           if (mounted) setState(() => _isMasterDriver = false);
+        }
+      } else {
+         if (mounted) setState(() => _isMasterDriver = false);
+      }
+    } catch (_) {
+       if (mounted) setState(() => _isMasterDriver = false);
+    } finally {
+      if (mounted) setState(() => _isFetchingUser = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _manualFoundCtrl.dispose();
+    super.dispose();
+  }

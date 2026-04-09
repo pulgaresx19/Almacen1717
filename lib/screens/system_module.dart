@@ -420,25 +420,66 @@ class _SystemModuleState extends State<SystemModule> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        _isSplitView
-                            ? (isLeft
+                      if (_isSplitView || dt != null)
+                        Text(
+                          (_isSplitView ? (isLeft ? '[System 1]' : '[System 2]') : '') +
+                              (_isSplitView && dt != null ? ' ' : '') +
+                              (dt != null
                                   ? (appLanguage.value == 'es'
-                                        ? 'Panel Izquierdo'
-                                        : 'Left Panel')
-                                  : (appLanguage.value == 'es'
-                                        ? 'Panel Derecho'
-                                        : 'Right Panel'))
-                            : (widget.titleOverride ?? (appLanguage.value == 'es' ? 'Recibo de Carga' : 'Cargo Reception')),
-                        style: TextStyle(
-                          color: textP,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                                      ? 'Vuelos en esta fecha'
+                                      : 'Flights on this date')
+                                  : ''),
+                          style: TextStyle(
+                            color: textS,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      if (!isFlightReceived &&
+                          (isLeft
+                              ? _lastReceivedUldLeft != null
+                              : _lastReceivedUldRight != null)) ...[
+                        if (_isSplitView || dt != null) const SizedBox(width: 16),
+                        Builder(
+                          builder: (context) {
+                            final uld = isLeft
+                                ? _lastReceivedUldLeft!
+                                : _lastReceivedUldRight!;
+                            final bool isBreak = uld['isBreak'] == true;
+                            final String uldNum =
+                                uld['ULD-number']?.toString() ?? '-';
+                            final Color statusColor = isBreak
+                                ? const Color(0xFF10b981)
+                                : const Color(0xFFef4444);
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: statusColor.withAlpha(20),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: statusColor.withAlpha(80),
+                                ),
+                              ),
+                              child: Text(
+                                uldNum,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ],
                   ),
                   Row(
@@ -521,17 +562,6 @@ class _SystemModuleState extends State<SystemModule> {
                   ),
                 )
               else ...[
-                Text(
-                  appLanguage.value == 'es'
-                      ? 'Vuelos en esta fecha'
-                      : 'Flights on this date',
-                  style: TextStyle(
-                    color: textS,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -642,62 +672,6 @@ class _SystemModuleState extends State<SystemModule> {
                   }).toList(),
                 ),
                 if (selectedId != null) ...[
-                  const SizedBox(height: 32),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        appLanguage.value == 'es'
-                            ? 'ULDs del vuelo'
-                            : 'Flight ULDs',
-                        style: TextStyle(
-                          color: textS,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (!isFlightReceived &&
-                          (isLeft
-                              ? _lastReceivedUldLeft != null
-                              : _lastReceivedUldRight != null))
-                        Builder(
-                          builder: (context) {
-                            final uld = isLeft
-                                ? _lastReceivedUldLeft!
-                                : _lastReceivedUldRight!;
-                            final bool isBreak = uld['isBreak'] == true;
-                            final String uldNum =
-                                uld['ULD-number']?.toString() ?? '-';
-                            final Color statusColor = isBreak
-                                ? const Color(0xFF10b981)
-                                : const Color(0xFFef4444);
-
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: statusColor.withAlpha(20),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: statusColor.withAlpha(80),
-                                ),
-                              ),
-                              child: Text(
-                                uldNum,
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.1,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
                   const SizedBox(height: 16),
                   if (isLeft ? _isLoadingUldsLeft : _isLoadingUldsRight)
                     const Center(

@@ -26,10 +26,34 @@ class _DriverModuleState extends State<DriverModule> {
   final _manualFoundCtrl = TextEditingController(text: '0');
   late Stream<List<Map<String, dynamic>>> _deliversStream;
 
+  bool _isMasterDriver = true;
+  bool _isFetchingUser = true;
+
   @override
   void initState() {
     super.initState();
     _deliversStream = Supabase.instance.client.from('Delivers').stream(primaryKey: ['id']).order('time-deliver', ascending: true);
+    _fetchMasterDriverStatus();
+  }
+
+  Future<void> _fetchMasterDriverStatus() async {
+    try {
+      final uUser = Supabase.instance.client.auth.currentUser;
+      if (uUser != null) {
+        final userRow = await Supabase.instance.client.from('Users').select('master-driver').eq('id', uUser.id).maybeSingle();
+        if (userRow != null && userRow['master-driver'] != null) {
+          if (mounted) setState(() => _isMasterDriver = userRow['master-driver'] == true || userRow['master-driver'].toString().toLowerCase() == 'true');
+        } else {
+           if (mounted) setState(() => _isMasterDriver = false);
+        }
+      } else {
+         if (mounted) setState(() => _isMasterDriver = false);
+      }
+    } catch (_) {
+       if (mounted) setState(() => _isMasterDriver = false);
+    } finally {
+      if (mounted) setState(() => _isFetchingUser = false);
+    }
   }
 
   @override
@@ -38,6 +62,7 @@ class _DriverModuleState extends State<DriverModule> {
     _manualFoundCtrl.dispose();
     super.dispose();
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -72,24 +97,37 @@ class _DriverModuleState extends State<DriverModule> {
                     icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
                   ),
                   const SizedBox(width: 16),
+                  Text(
+                    appLanguage.value == 'es' ? 'Volver' : 'Back',
+                    style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ] else ...[
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        appLanguage.value == 'es' ? 'Coordinador de Chofer' : 'Driver Coordinator',
+                        style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        appLanguage.value == 'es'
+                            ? 'Módulo de asignación para la entrega de mercancías.'
+                            : 'Module for assigning the delivery of goods.',
+                        style: TextStyle(color: textS, fontSize: 13),
+                      ),
+                    ],
+                  ),
                 ],
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(appLanguage.value == 'es' ? 'Choferes y Entregas' : 'Driver / Deliveries', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text(appLanguage.value == 'es' ? 'Administración de choferes, camiones y despachos.' : 'Management of drivers, trucks, and deliveries.', style: TextStyle(color: textS, fontSize: 13)),
-                  ],
-            ),
-            const Spacer(),
+                const Spacer(),
             
             // Search Box
             Container(
-              width: 300,
-              height: 40,
+              width: 320,
+              height: 42,
               decoration: BoxDecoration(
-                color: bgCard,
-                borderRadius: BorderRadius.circular(20),
+                color: dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff),
+                borderRadius: BorderRadius.circular(21),
                 border: Border.all(color: borderCard),
               ),
               child: TextField(
@@ -108,7 +146,7 @@ class _DriverModuleState extends State<DriverModule> {
             const SizedBox(width: 16),
           ],
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 16),
         
         if (_selectedDriver != null)
           Expanded(
@@ -131,12 +169,12 @@ class _DriverModuleState extends State<DriverModule> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: bgCard,
-                borderRadius: BorderRadius.circular(16),
+                color: dark ? const Color(0xFF0f172a).withAlpha(100) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: borderCard),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 child: StreamBuilder<List<Map<String, dynamic>>>(
                   stream: _deliversStream,
                 builder: (context, snapshot) {
@@ -157,7 +195,18 @@ class _DriverModuleState extends State<DriverModule> {
                     );
                   }
 
-                  var delivers = List<Map<String, dynamic>>.from(snapshot.data ?? []);
+                  var delivers = List<Map<String, dynamic>>.from(snapshot.data ?? [])
+                      .where((d) {
+                        if (d['status']?.toString().toLowerCase() != 'waiting') return false;
+                        final currentNoShow = d['no-show'];
+                        if (currentNoShow != null && currentNoShow is List) {
+                          final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+                          bool hasNoShowed = currentNoShow.any((ns) => ns is Map && ns['user'] == currentUserFullName);
+                          if (hasNoShowed) return false;
+                        }
+                        return true;
+                      })
+                      .toList();
                   
                   delivers.sort((a, b) {
                     const statusOrder = ['Waiting', 'In process', 'Ready', 'Canceled'];
@@ -171,6 +220,11 @@ class _DriverModuleState extends State<DriverModule> {
                     
                     int statusComp = indexA.compareTo(indexB);
                     if (statusComp != 0) return statusComp;
+
+                    bool pA = a['isPriority'] == true;
+                    bool pB = b['isPriority'] == true;
+                    if (pA && !pB) return -1;
+                    if (!pA && pB) return 1;
 
                     final taStr = a['time-deliver']?.toString() ?? '';
                     final tbStr = b['time-deliver']?.toString() ?? '';
@@ -191,258 +245,209 @@ class _DriverModuleState extends State<DriverModule> {
                     }).toList();
                   }
 
+                  if (_isFetchingUser) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
+                  }
+
+                  if (!_isMasterDriver) {
+                    if (delivers.isEmpty) {
+                      return Center(child: Text(appLanguage.value == 'es' ? 'No se encontraron registros pendientes.' : 'No pending records found.', style: const TextStyle(color: Color(0xFF94a3b8))));
+                    }
+                    return Center(
+                      child: SingleChildScrollView(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: _buildDriverVerificationCard(delivers.first, dark),
+                        ),
+                      ),
+                    );
+                  }
+
                   if (delivers.isEmpty) return Center(child: Text(appLanguage.value == 'es' ? 'No se encontraron registros.' : 'No records found.', style: const TextStyle(color: Color(0xFF94a3b8))));
 
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                          child: SingleChildScrollView(
-                            child: DataTable(
-                              showCheckboxColumn: false,
-                              headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
-                              dataRowColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.hovered) ? (dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6)) : Colors.transparent),
-                              dataTextStyle: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13),
-                              headingTextStyle: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 12),
-                              columns: [
-                                const DataColumn(label: Text('#')),
-                                DataColumn(label: Text(appLanguage.value == 'es' ? 'Compañía' : 'Truck Co.')),
-                                const DataColumn(label: Text('Driver')),
-                                const DataColumn(label: Text('Door')),
-                                const DataColumn(label: Text('Type')),
-                                const DataColumn(label: Text('ID Pickup')),
-                                const DataColumn(label: Text('Time')),
-                                const DataColumn(label: Text('Priority')),
-                                const DataColumn(label: Text('Remarks')),
-                                const DataColumn(label: Text('AWBs')),
-                                const DataColumn(label: Text('No Show')),
-                                const DataColumn(label: Text('Agent')),
-                                DataColumn(label: Text(appLanguage.value == 'es' ? 'Estado' : 'Status')),
-                              ],
-                              rows: List.generate(delivers.length, (index) {
-                                final u = delivers[index];
-                          
-                                String timeStr = '-';
-                                if (u['time-deliver'] != null) {
-                                  final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
-                                  if (tdt != null) timeStr = DateFormat('hh:mm a').format(tdt);
-                                }
-
-                                String awbsStr = '0';
-                                if (u['list-pickup'] != null) {
-                                  if (u['list-pickup'] is List) {
-                                    awbsStr = (u['list-pickup'] as List).length.toString();
-                                  } else {
-                                    awbsStr = '1';
-                                  }
-                                }
-                                
-                                bool isPriority = u['isPriority'] == true;
-                                
-                                int noShowCount = 0;
-                                if (u['no-show'] != null) {
-                                  if (u['no-show'] is List) {
-                                    noShowCount = (u['no-show'] as List).length;
-                                  } else if (u['no-show'] is Map && (u['no-show'] as Map).isNotEmpty) {
-                                    noShowCount = 1;
-                                  }
-                                }
-
-                                return DataRow(
-                                  onSelectChanged: (selected) {
-                                    if (selected == true) {
-                                      _showDriverConfirmationOverlay(u);
-                                    }
-                                  },
-                                  cells: [
-                                    DataCell(Text('${index + 1}', style: TextStyle(fontWeight: FontWeight.bold, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)))),
-                                    DataCell(Text(u['truck-company']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
-                                    DataCell(Text(u['driver']?.toString() ?? '-')),
-                                    DataCell(Text(u['door']?.toString() ?? '-')),
-                                    DataCell(Text(u['type']?.toString() ?? '-')),
-                                    DataCell(Text(u['id-pickup']?.toString() ?? '-')),
-                                    DataCell(Text(timeStr)),
-                                    DataCell(isPriority ? const Icon(Icons.star_rounded, color: Colors.orange, size: 20) : const Icon(Icons.star_border_rounded, color: Colors.grey, size: 20)),
-                                    DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
-                                    DataCell(
-                                      GestureDetector(
-                                        onTap: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (ctx) {
-                                              List<Map<String, dynamic>> awbItems = [];
-                                              if (u['list-pickup'] is List) {
-                                                awbItems = (u['list-pickup'] as List).map((e) {
-                                                   if (e is Map) return Map<String, dynamic>.from(e);
-                                                   final str = e.toString();
-                                                   final parts = str.split(' - ');
-                                                   return {
-                                                      'AWB-number': parts.isNotEmpty ? parts[0].trim() : '-',
-                                                      'pieces': parts.length > 1 ? parts[1].trim().replaceAll(RegExp(r'[^0-9]'), '') : '-',
-                                                      'weight': '',
-                                                      'remarks': parts.length > 2 ? parts[2].trim() : '',
-                                                   };
-                                                }).toList();
-                                              } else if (u['list-pickup'] != null) {
-                                                final str = u['list-pickup'].toString();
-                                                final parts = str.split(' - ');
-                                                awbItems = [{
-                                                   'AWB-number': parts.isNotEmpty ? parts[0].trim() : '-',
-                                                   'pieces': parts.length > 1 ? parts[1].trim().replaceAll(RegExp(r'[^0-9]'), '') : '-',
-                                                   'weight': '',
-                                                   'remarks': parts.length > 2 ? parts[2].trim() : '',
-                                                }];
-                                              }
-                                              return AlertDialog(
-                                                backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                                                title: Row(
-                                                  children: [
-                                                    const Icon(Icons.inventory_2_rounded, color: Color(0xFF6366f1)),
-                                                    const SizedBox(width: 8),
-                                                    Text('AWBs Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
-                                                  ]
-                                                ),
-                                                content: SizedBox(
-                                                  width: 400,
-                                                  child: ListView.builder(
-                                                    shrinkWrap: true,
-                                                    itemCount: awbItems.length,
-                                                    itemBuilder: (ctx, i) {
-                                                      final item = awbItems[i];
-                                                      final awbN = item['AWB-number']?.toString() ?? '-';
-                                                      final pcs = item['pieces']?.toString() ?? '-';
-                                                      final weight = item['weight']?.toString() ?? '';
-                                                      final rmks = item['remarks']?.toString() ?? '';
-                                                      return Container(
-                                                        margin: const EdgeInsets.only(bottom: 8),
-                                                        padding: const EdgeInsets.all(12),
-                                                        decoration: BoxDecoration(
-                                                          color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-                                                          borderRadius: BorderRadius.circular(8),
-                                                          border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
-                                                        ),
-                                                        child: Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          children: [
-                                                            Row(
-                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                              children: [
-                                                                Expanded(child: Text(awbN, style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold))),
-                                                                SizedBox(
-                                                                  width: 70,
-                                                                  child: Row(
-                                                                    mainAxisAlignment: MainAxisAlignment.end,
-                                                                    children: [
-                                                                      Flexible(child: Text('$pcs pcs', style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                                                                    ],
-                                                                  ),
-                                                                ),
-                                                                if (weight.isNotEmpty && weight != '0.00' && weight != '0')
-                                                                  SizedBox(
-                                                                    width: 80,
-                                                                    child: Row(
-                                                                      mainAxisAlignment: MainAxisAlignment.end,
-                                                                      children: [
-                                                                        Flexible(child: Text('${weight}kg', style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                                                                      ],
-                                                                    ),
-                                                                  ),
-                                                                if (weight.isEmpty || weight == '0.00' || weight == '0')
-                                                                  const SizedBox(width: 80),
-                                                              ]
-                                                            ),
-                                                            if (rmks.isNotEmpty) ...[
-                                                              const SizedBox(height: 4),
-                                                              Text('Remarks: $rmks', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 12)),
-                                                            ]
-                                                          ]
-                                                        )
-                                                      );
-                                                    }
-                                                  )
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () => Navigator.pop(ctx),
-                                                    child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold))
-                                                  )
-                                                ]
-                                              );
-                                            }
-                                          );
-                                        },
-                                        child: Container(
-                                          width: 32,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF6366f1).withAlpha(25),
-                                            shape: BoxShape.circle,
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: delivers.length,
+                    itemBuilder: (context, index) {
+                      final u = delivers[index];
+                      bool isPriority = u['isPriority'] == true;
+                      
+                      String timeStr = '-';
+                      if (u['time-deliver'] != null) {
+                        final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
+                        if (tdt != null) timeStr = DateFormat('hh:mm a').format(tdt);
+                      }
+                      
+                      return InkWell(
+                        onTap: () => _showDriverConfirmationOverlay(u),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: bgCard,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: borderCard),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      // Index circle
+                                      Container(
+                                        width: 28,
+                                        height: 28,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF6366f1).withAlpha(30),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          '${index + 1}',
+                                          style: const TextStyle(
+                                            color: Color(0xFF6366f1),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
                                           ),
-                                          alignment: Alignment.center,
-                                          child: Text(awbsStr, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366f1), fontSize: 13)),
-                                        )
-                                      )
-                                    ),
-                                    DataCell(
-                                      noShowCount > 0 
-                                          ? InkWell(
-                                              onTap: () {
-                                                _showNoShowDetails(context, u['no-show'], dark, dark ? Colors.white : const Color(0xFF111827));
-                                              },
-                                              child: Container(
-                                                width: 32,
-                                                height: 32,
-                                                alignment: Alignment.center,
-                                                decoration: BoxDecoration(color: Colors.redAccent.withAlpha(30), shape: BoxShape.circle),
-                                                child: Text('$noShowCount', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center),
-                                              ),
-                                            )
-                                          : const Text('-', style: TextStyle(color: Colors.grey))
-                                    ),
-                                    DataCell(
-                                      Builder(builder: (ctx) {
-                                        if (u['ref-userDrive'] == null) return const Text('-', style: TextStyle(color: Colors.grey));
-                                        if (u['ref-userDrive'] is Map) {
-                                          final userMap = u['ref-userDrive'] as Map;
-                                          final userName = userMap['user']?.toString() ?? '-';
-                                          String dtStr = '';
-                                          if (userMap['time'] != null) {
-                                            final dt = DateTime.tryParse(userMap['time'].toString())?.toLocal();
-                                            if (dt != null) dtStr = DateFormat('MMM dd, hh:mm a').format(dt);
-                                          }
-                                          final avatarStr = userMap['avatar']?.toString();
-                                          return Tooltip(
-                                            message: 'Agent: $userName',
-                                            child: InkWell(
-                                              onTap: () => _showAgentProfile(context, userName, avatarStr, dtStr, dark),
-                                              borderRadius: BorderRadius.circular(20),
-                                              child: CircleAvatar(
-                                                radius: 16,
-                                                backgroundColor: const Color(0xFF6366f1).withAlpha(50),
-                                                backgroundImage: avatarStr != null && avatarStr.isNotEmpty ? NetworkImage(avatarStr) : null,
-                                                child: avatarStr == null || avatarStr.isEmpty ? Text(
-                                                  userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366f1), fontSize: 13),
-                                                ) : null,
-                                              ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      
+                                      // Truck Company
+                                      SizedBox(
+                                        width: 140,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              appLanguage.value == 'es' ? 'COMPAÑÍA:' : 'COMPANY:',
+                                              style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
                                             ),
-                                          );
-                                        }
-                                        return const Text('-', style: TextStyle(color: Colors.grey));
-                                      })
-                                    ),
-                                    DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
-                                  ],
-                                );
-                        }),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              u['truck-company']?.toString() ?? '-',
+                                              style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      
+                                      // Driver
+                                      SizedBox(
+                                        width: 150,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              appLanguage.value == 'es' ? 'CONDUCTOR:' : 'DRIVER:',
+                                              style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              u['driver']?.toString() ?? '-',
+                                              style: TextStyle(color: textP, fontSize: 13),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+
+                                      // Time
+                                      SizedBox(
+                                        width: 80,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              appLanguage.value == 'es' ? 'TIEMPO:' : 'TIME:',
+                                              style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              timeStr,
+                                              style: TextStyle(color: textP, fontSize: 13),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+
+                                      // Door
+                                      SizedBox(
+                                        width: 80,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              appLanguage.value == 'es' ? 'PUERTA:' : 'DOOR:',
+                                              style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              u['door']?.toString() ?? '-',
+                                              style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+
+                                      // Type
+                                      SizedBox(
+                                        width: 100,
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
+                                              appLanguage.value == 'es' ? 'TIPO:' : 'TYPE:',
+                                              style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              u['type']?.toString() ?? '-',
+                                              style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              if (isPriority) ...[
+                                const SizedBox(width: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withAlpha(30),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.star_rounded, color: Colors.orange, size: 18),
+                                )
+                              ] else ...[
+                                const SizedBox(width: 32),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
           },
         ),
             ),
@@ -454,179 +459,8 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 
-  void _showAgentProfile(BuildContext context, String userName, String? avatarStr, String timeStr, bool dark) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withAlpha(50),
-      builder: (BuildContext modalContext) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 280,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: dark ? const Color(0xFF1e293b) : Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 20, offset: const Offset(0, 10))
-                ],
-                border: Border.all(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: const Color(0xFF4f46e5),
-                    backgroundImage: avatarStr != null && avatarStr.isNotEmpty ? NetworkImage(avatarStr) : null,
-                    child: avatarStr == null || avatarStr.isEmpty ? Text(
-                      userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 24),
-                    ) : null,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    userName,
-                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.w600, fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    timeStr,
-                    style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        backgroundColor: const Color(0xFF6366f1).withAlpha(10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => Navigator.pop(modalContext),
-                      child: Text('Close', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF6366f1), fontWeight: FontWeight.bold)),
-                    ),
-                  )
-                ],
-              ),
-            ),
-          ),
-        );
-      }
-    );
-  }
 
-  Widget _buildStatusBadge(String status) {
-    Color bg = const Color(0xFF334155);
-    Color fg = const Color(0xFFcbd5e1);
-    
-    final s = status.toLowerCase();
-    if (s.contains('waiting')) {
-      bg = const Color(0xFF334155).withAlpha(150); fg = const Color(0xFFcbd5e1);
-    } else if (s.contains('in process') || s.contains('process')) {
-      bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('ready')) {
-      bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
-    } else if (s.contains('canceled')) {
-      bg = const Color(0xFF7f1d1d).withAlpha(51); fg = const Color(0xFFfca5a5);
-    }
-
-    return Container(
-      width: 100,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        status.toUpperCase(), 
-        style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
-
-
-  void _showNoShowDetails(BuildContext context, dynamic noShowData, bool dark, Color textP) {
-    List<Map<String, dynamic>> items = [];
-    if (noShowData is List) {
-      items = noShowData.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    } else if (noShowData is Map) {
-      items = [Map<String, dynamic>.from(noShowData)];
-    }
-
-    showDialog(context: context, builder: (ctx) {
-      return Dialog(
-        backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: 400,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('No Show Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              ...items.map((i) {
-                String tStr = i['time']?.toString() ?? '-';
-                if (tStr != '-') {
-                  final parsed = DateTime.tryParse(tStr)?.toLocal();
-                  if (parsed != null) {
-                    tStr = DateFormat('MMM dd, hh:mm a').format(parsed);
-                  }
-                }
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: dark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: dark ? Colors.white.withAlpha(20) : Colors.grey.shade300)
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.person_rounded, size: 14, color: Colors.grey),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(i['user']?.toString() ?? 'Unknown User', style: TextStyle(color: textP, fontWeight: FontWeight.w600))),
-                        ]
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time_rounded, size: 14, color: Colors.grey),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(tStr, style: const TextStyle(color: Colors.grey, fontSize: 13))),
-                        ]
-                      )
-                    ]
-                  )
-                );
-              }),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        )
-      );
-    });
-  }
-
-  void _showDriverConfirmationOverlay(Map<String, dynamic> u) {
-    bool dark = isDarkMode.value;
-
+  Widget _buildDriverVerificationCard(Map<String, dynamic> u, bool dark, {BuildContext? dialogCtx}) {
     String timeStr = '-';
     if (u['time-deliver'] != null) {
       final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
@@ -642,234 +476,241 @@ class _DriverModuleState extends State<DriverModule> {
       }
     }
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(24),
-          child: Container(
-            width: 440,
+    return Container(
+      width: dialogCtx != null ? 440 : 500,
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF1e293b) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: dialogCtx != null ? [
+          BoxShadow(
+            color: Colors.black.withAlpha(dark ? 100 : 25),
+            blurRadius: 20,
+            spreadRadius: 5,
+            offset: const Offset(0, 8),
+          )
+        ] : [],
+        border: dialogCtx == null ? Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)) : null,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF1e293b) : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(dark ? 100 : 25),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                  offset: const Offset(0, 8),
-                )
-              ]
+              color: dark ? const Color(0xFF0f172a) : const Color(0xFFf8fafc),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+              border: Border(bottom: BorderSide(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)))
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Row(
               children: [
-                // Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: dark ? const Color(0xFF0f172a) : const Color(0xFFf8fafc),
-                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-                    border: Border(bottom: BorderSide(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)))
+                    color: const Color(0xFF6366f1).withAlpha(40),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.verified_user_rounded, color: Color(0xFF6366f1), size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    appLanguage.value == 'es' ? 'Verificar Conductor' : 'Verify Driver', 
+                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF0f172a), fontWeight: FontWeight.bold, fontSize: 18)
+                  ),
+                ),
+                if (u['isPriority'] == true)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 12.0),
+                    child: Icon(Icons.star_rounded, color: Colors.orange, size: 28),
+                  ),
+                if (dialogCtx != null)
+                  IconButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    icon: Icon(Icons.close_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  )
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF0f172a).withAlpha(128) : const Color(0xFFf8fafc),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6366f1).withAlpha(40),
-                          borderRadius: BorderRadius.circular(10),
+                          color: const Color(0xFF10b981).withAlpha(30),
+                          shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.verified_user_rounded, color: Color(0xFF6366f1), size: 24),
+                        child: const Icon(Icons.badge_rounded, color: Color(0xFF10b981), size: 28),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: Text(
-                          appLanguage.value == 'es' ? 'Verificar Conductor' : 'Verify Driver', 
-                          style: TextStyle(color: dark ? Colors.white : const Color(0xFF0f172a), fontWeight: FontWeight.bold, fontSize: 18)
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(u['truck-company']?.toString() ?? 'COMPAÑÍA', style: TextStyle(color: dark ? const Color(0xFF10b981) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text(u['driver']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                          ],
                         ),
                       ),
-                      if (u['isPriority'] == true)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 12.0),
-                          child: Icon(Icons.star_rounded, color: Colors.orange, size: 28),
-                        ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: Icon(Icons.close_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b)),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      )
-                    ],
-                  ),
-                ),
-                // Body
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                  child: Column(
-                    children: [
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: dark ? const Color(0xFF0f172a).withAlpha(128) : const Color(0xFFf8fafc),
+                          color: dark ? Colors.amberAccent.withAlpha(20) : Colors.amber.shade100,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)),
+                          border: Border.all(color: dark ? Colors.amberAccent.withAlpha(50) : Colors.amber.shade300)
                         ),
                         child: Column(
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    children: [
-                                      _confirmDetailRow(Icons.business_rounded, appLanguage.value == 'es' ? 'Compañía' : 'Company', u['truck-company']?.toString().isNotEmpty == true ? u['truck-company'].toString() : '-', dark),
-                                      Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
-                                      _confirmDetailRow(Icons.person_rounded, appLanguage.value == 'es' ? 'Conductor' : 'Driver', u['driver']?.toString().isNotEmpty == true ? u['driver'].toString() : '-', dark),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: dark ? Colors.amberAccent.withAlpha(20) : Colors.amber.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: dark ? Colors.amberAccent.withAlpha(50) : Colors.amber.shade300)
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Text(appLanguage.value == 'es' ? 'PUERTA' : 'DOOR', style: TextStyle(color: dark ? Colors.amberAccent : Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
-                                      Text(u['door']?.toString().isNotEmpty == true ? u['door'].toString() : '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 24, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
-                            Row(
-                              children: [
-                                Expanded(child: _confirmDetailRow(Icons.local_shipping_rounded, appLanguage.value == 'es' ? 'Tipo' : 'Type', u['type']?.toString().isNotEmpty == true ? u['type'].toString() : '-', dark)),
-                                Container(width: 1, height: 40, color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                                Expanded(child: _confirmDetailRow(Icons.qr_code_rounded, 'ID Pickup', u['id-pickup']?.toString().isNotEmpty == true ? u['id-pickup'].toString() : '-', dark)),
-                              ],
-                            ),
-                            Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
-                            Row(
-                              children: [
-                                Expanded(child: _confirmDetailRow(Icons.access_time_rounded, appLanguage.value == 'es' ? 'Hora' : 'Time', timeStr, dark)),
-                                Container(width: 1, height: 40, color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), margin: const EdgeInsets.symmetric(horizontal: 16)),
-                                Expanded(child: _confirmDetailRow(Icons.inventory_2_outlined, 'AWBs', awbsStr, dark)),
-                              ],
-                            ),
-                            if (u['remarks']?.toString().isNotEmpty == true) ...[
-                              Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
-                              _confirmDetailRow(Icons.notes_rounded, appLanguage.value == 'es' ? 'Comentarios' : 'Remarks', u['remarks'].toString(), dark),
-                            ],
+                            Text(appLanguage.value == 'es' ? 'PUERTA' : 'DOOR', style: TextStyle(color: dark ? Colors.amberAccent : Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
+                            Text(u['door']?.toString().isNotEmpty == true ? u['door'].toString() : '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 24, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Footer
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: dark ? const Color(0xFF0f172a) : const Color(0xFFf8fafc),
-                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
-                    border: Border(top: BorderSide(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)))
+                Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                Row(
+                  children: [
+                    Expanded(child: _confirmDetailRow(Icons.local_shipping_rounded, appLanguage.value == 'es' ? 'Tipo' : 'Type', u['type']?.toString().isNotEmpty == true ? u['type'].toString() : '-', dark)),
+                    Container(width: 1, height: 40, color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                    Expanded(child: _confirmDetailRow(Icons.qr_code_rounded, 'ID Pickup', u['id-pickup']?.toString().isNotEmpty == true ? u['id-pickup'].toString() : '-', dark)),
+                  ],
+                ),
+                Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                Row(
+                  children: [
+                    Expanded(child: _confirmDetailRow(Icons.access_time_rounded, appLanguage.value == 'es' ? 'Hora' : 'Time', timeStr, dark)),
+                    Container(width: 1, height: 40, color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), margin: const EdgeInsets.symmetric(horizontal: 16)),
+                    Expanded(child: _confirmDetailRow(Icons.inventory_2_outlined, 'AWBs', awbsStr, dark)),
+                  ],
+                ),
+                if (u['remarks']?.toString().isNotEmpty == true) ...[
+                  Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                  _confirmDetailRow(Icons.notes_rounded, appLanguage.value == 'es' ? 'Comentarios' : 'Remarks', u['remarks'].toString(), dark),
+                ],
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF0f172a) : const Color(0xFFf8fafc),
+              borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(20), bottomRight: Radius.circular(20)),
+              border: Border(top: BorderSide(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)))
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.block_rounded, size: 18),
+                  onPressed: () async {
+                    final currentTime = DateTime.now().toIso8601String();
+                    final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+                    
+                    try {
+                      final currentNoShow = u['no-show'];
+                      List updatedNoShowList = [];
+                      if (currentNoShow is List) {
+                        updatedNoShowList = List.from(currentNoShow);
+                      } else if (currentNoShow is Map && currentNoShow.isNotEmpty) {
+                        updatedNoShowList.add(currentNoShow);
+                      }
+                      updatedNoShowList.add({
+                        'time': currentTime,
+                        'user': currentUserFullName,
+                      });
+                      
+                      Map<String, dynamic> updatePayload = {
+                        'no-show': updatedNoShowList
+                      };
+                      
+                      if (updatedNoShowList.length >= 2) {
+                        updatePayload['status'] = 'Canceled';
+                      }
+                      
+                      await Supabase.instance.client.from('Delivers').update(updatePayload).eq('id', u['id']);
+                    } catch (e) {
+                      debugPrint('NO SHOW Update Error: ');
+                    }
+                    
+                    if (dialogCtx != null && dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFef4444),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.block_rounded, size: 18),
-                        onPressed: () async {
-                          final currentTime = DateTime.now().toIso8601String();
-                          final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
-                          
-                          try {
-                            final currentNoShow = u['no-show'];
-                            List updatedNoShowList = [];
-                            if (currentNoShow is List) {
-                              updatedNoShowList = List.from(currentNoShow);
-                            } else if (currentNoShow is Map && currentNoShow.isNotEmpty) {
-                              updatedNoShowList.add(currentNoShow);
-                            }
-                            updatedNoShowList.add({
-                              'time': currentTime,
-                              'user': currentUserFullName,
-                            });
-                            
-                            Map<String, dynamic> updatePayload = {
-                              'no-show': updatedNoShowList
-                            };
-                            
-                            if (updatedNoShowList.length >= 2) {
-                              updatePayload['status'] = 'Canceled';
-                            }
-                            
-                            await Supabase.instance.client.from('Delivers').update(updatePayload).eq('id', u['id']);
-                          } catch (e) {
-                            debugPrint('NO SHOW Update Error: $e');
-                          }
-                          
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                          }
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFef4444),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        ),
-                        label: const Text('NO SHOW', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final currentTime = DateTime.now().toUtc().toIso8601String();
-                          final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
-                          final currentUserAvatar = currentUserData.value?['avatar-url'];
+                  label: const Text('NO SHOW', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final currentTime = DateTime.now().toUtc().toIso8601String();
+                    final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+                    final currentUserAvatar = currentUserData.value?['avatar-url'];
 
-                          try {
-                            await Supabase.instance.client.from('Delivers').update({
-                              'ref-userDrive': {
-                                'time': currentTime,
-                                'user': currentUserFullName,
-                                'avatar': currentUserAvatar,
-                              }
-                            }).eq('id', u['id']);
-                            u['ref-userDrive'] = {
-                                'time': currentTime,
-                                'user': currentUserFullName,
-                                'avatar': currentUserAvatar,
-                            };
-                          } catch (e) {
-                            debugPrint('Confirm Update Error: $e');
-                          }
-                          
-                          if (ctx.mounted) {
-                            Navigator.pop(ctx);
-                            _loadDriverDetails(u);
-                          }
-                        },
-                        icon: const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366f1),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        label: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                      ),
-                    ],
+                    try {
+                      await Supabase.instance.client.from('Delivers').update({
+                        'ref-userDrive': {
+                          'time': currentTime,
+                          'user': currentUserFullName,
+                          'avatar': currentUserAvatar,
+                        }
+                      }).eq('id', u['id']);
+                      u['ref-userDrive'] = {
+                          'time': currentTime,
+                          'user': currentUserFullName,
+                          'avatar': currentUserAvatar,
+                      };
+                    } catch (e) {
+                      debugPrint('Confirm Update Error: ');
+                    }
+                    
+                    if (dialogCtx != null && dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
+                    }
+                    _loadDriverDetails(u);
+                  },
+                  icon: const Icon(Icons.check_circle_rounded, size: 18, color: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
+                  label: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                 ),
               ],
             ),
-          )
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDriverConfirmationOverlay(Map<String, dynamic> u) {
+    bool dark = isDarkMode.value;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(24),
+          child: _buildDriverVerificationCard(u, dark, dialogCtx: ctx),
         );
       }
     );
