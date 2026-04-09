@@ -75,9 +75,11 @@ class _DriverModuleState extends State<DriverModule> {
         final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
         final Color iconColor = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return Stack(
           children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Main Header Row (Title, Search, Buttons)
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -91,18 +93,7 @@ class _DriverModuleState extends State<DriverModule> {
                     );
                   },
                 ),
-                if (_selectedDriver != null) ...[
-                  IconButton(
-                    onPressed: () => setState(() => _selectedDriver = null),
-                    icon: Icon(Icons.arrow_back_rounded, color: textP, size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    appLanguage.value == 'es' ? 'Volver' : 'Back',
-                    style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold),
-                  ),
-                ] else ...[
-                  Column(
+                                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -118,7 +109,6 @@ class _DriverModuleState extends State<DriverModule> {
                       ),
                     ],
                   ),
-                ],
                 const Spacer(),
             
             // Search Box
@@ -148,25 +138,7 @@ class _DriverModuleState extends State<DriverModule> {
         ),
         const SizedBox(height: 16),
         
-        if (_selectedDriver != null)
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _deliversStream,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return _buildDriverDetailView(_selectedDriver!, dark, textP, textS, bgCard, borderCard, iconColor);
-                }
-                final uList = snapshot.data ?? [];
-                final updatedDriver = uList.firstWhere(
-                  (element) => element['id'] == _selectedDriver!['id'],
-                  orElse: () => _selectedDriver!
-                );
-                return _buildDriverDetailView(updatedDriver, dark, textP, textS, bgCard, borderCard, iconColor);
-              }
-            )
-          )
-        else
-          Expanded(
+                  Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: dark ? const Color(0xFF0f172a).withAlpha(100) : Colors.white,
@@ -453,10 +425,137 @@ class _DriverModuleState extends State<DriverModule> {
             ),
           ),
         ),
+              ],
+            ),
+
+        // --- FIRST OVERLAY: Driver details and AWB List ---
+        if (_selectedDriver != null && _selectedAwbDetails == null)
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => setState(() {
+                  _selectedDriver = null;
+                  _selectedAwbDetails = null;
+              }),
+              child: Container(
+                color: dark ? const Color(0xFF0f172a) : const Color(0xFFf3f4f6), // Solid, opaque background
+                alignment: Alignment.center,
+                child: GestureDetector(
+                  onTap: () {}, // Prevent closing when tapping inside the panel
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 700,
+                      height: MediaQuery.of(context).size.height * 0.85,
+                      padding: const EdgeInsets.all(0),
+                      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderCard)),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                            decoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: borderCard)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(radius: 28, backgroundColor: dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB), child: Icon(Icons.person_rounded, size: 32, color: textS)),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(_selectedDriver!['truck-company']?.toString().isNotEmpty == true ? _selectedDriver!['truck-company'].toString() : 'Unknown Company', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                                      Text(_selectedDriver!['driver']?.toString() ?? 'Unknown Driver', style: TextStyle(color: textS, fontSize: 16)),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                   decoration: BoxDecoration(color: dark ? Colors.amberAccent.withAlpha(20) : Colors.amber.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: dark ? Colors.amberAccent.withAlpha(50) : Colors.amber.shade300)),
+                                   child: Column(
+                                     children: [
+                                       Text('DOOR', style: TextStyle(color: dark ? Colors.amberAccent : Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
+                                       Text(_selectedDriver!['door']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 28, fontWeight: FontWeight.bold)),
+                                     ],
+                                   ),
+                                ),
+                                const SizedBox(width: 16),
+                                IconButton(
+                                  icon: Icon(Icons.close_rounded, color: textS),
+                                  onPressed: () => setState(() {
+                                    _selectedDriver = null;
+                                    _selectedAwbDetails = null;
+                                  }),
+                                )
+                              ]
+                            )
+                          ),
+                          Expanded(
+                            child: Padding(
+                               padding: const EdgeInsets.all(24),
+                               child: StreamBuilder<List<Map<String, dynamic>>>(
+                                 stream: _deliversStream,
+                                 builder: (context, snapshot) {
+                                   if (!snapshot.hasData) {
+                                     return _buildDriverActivityPanel(_selectedDriver!, dark, textP, textS, bgCard, borderCard, iconColor);
+                                   }
+                                   final uList = snapshot.data ?? [];
+                                   final updatedDriver = uList.firstWhere(
+                                     (element) => element['id'] == _selectedDriver!['id'],
+                                     orElse: () => _selectedDriver!
+                                   );
+                                   return _buildDriverActivityPanel(updatedDriver, dark, textP, textS, bgCard, borderCard, iconColor);
+                                 }
+                               )
+                            )
+                          )
+                        ]
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          ),
+
+        // --- SECOND OVERLAY: AWB Details ---
+        if (_selectedAwbDetails != null)
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedAwbDetails = null),
+              child: Container(
+                color: dark ? const Color(0xFF0f172a) : const Color(0xFFf3f4f6), // Solid colored background
+                alignment: Alignment.center,
+                child: GestureDetector(
+                  onTap: () {}, // Prevent closing when tapping inside
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 700,
+                      height: MediaQuery.of(context).size.height * 0.85,
+                      padding: const EdgeInsets.all(0),
+                      decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderCard)),
+                      child: Column(
+                        children: [
+
+                          Expanded(
+                            child: Padding(
+                               padding: const EdgeInsets.all(0),
+                               child: _buildAwbDetailPanel(_selectedAwbDetails!, dark, textP, textS, bgCard, borderCard, onClose: () => setState(() => _selectedAwbDetails = null))
+                            )
+                          )
+                        ]
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          ),
       ],
-    );
-     }
-    );
+    ); // Close Stack
+     } // Close Builder
+    ); // Close ValueListenableBuilder
   }
 
 
@@ -776,7 +875,7 @@ class _DriverModuleState extends State<DriverModule> {
     }
   }
 
-  Widget _buildDriverDetailView(Map<String, dynamic> u, bool dark, Color textP, Color textS, Color bgCard, Color borderCard, Color iconColor) {
+  Widget _buildDriverActivityPanel(Map<String, dynamic> u, bool dark, Color textP, Color textS, Color bgCard, Color borderCard, Color iconColor) {
     bool allDelivered = _driverAwbs.isNotEmpty && _driverAwbs.every((awb) {
       if (awb['data-deliver'] == null) return false;
       if (awb['data-deliver'] is List) {
@@ -788,45 +887,10 @@ class _DriverModuleState extends State<DriverModule> {
       return false;
     });
     
-    return Row(
+        return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left Column: General Information + AWBs List
-        Expanded(
-          flex: 4,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderCard)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(radius: 28, backgroundColor: dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB), child: Icon(Icons.person_rounded, size: 32, color: textS)),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(u['truck-company']?.toString().isNotEmpty == true ? u['truck-company'].toString() : 'Unknown Company', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
-                          Text(u['driver']?.toString() ?? 'Unknown Driver', style: TextStyle(color: textS, fontSize: 16)),
-                        ],
-                      ),
-                    ),
-                    Container(
-                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                       decoration: BoxDecoration(color: dark ? Colors.amberAccent.withAlpha(20) : Colors.amber.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: dark ? Colors.amberAccent.withAlpha(50) : Colors.amber.shade300)),
-                       child: Column(
-                         children: [
-                           Text('DOOR', style: TextStyle(color: dark ? Colors.amberAccent : Colors.orange.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
-                           Text(u['door']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 28, fontWeight: FontWeight.bold)),
-                         ],
-                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
+
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -893,7 +957,7 @@ class _DriverModuleState extends State<DriverModule> {
                           children: [
                             Icon(Icons.inventory_2_rounded, color: textP, size: 20),
                             const SizedBox(width: 8),
-                            Text(appLanguage.value == 'es' ? 'Lista de AWBs' : 'AWBs List', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text(appLanguage.value == 'es' ? 'Lista de Entregas' : 'Delivery List', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -1113,36 +1177,7 @@ class _DriverModuleState extends State<DriverModule> {
                    ),
                  ),
                ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 24),
-             // Right Column
-        Expanded(
-          flex: 6,
-          child: _selectedAwbDetails == null ? Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-               color: dark ? Colors.white.withAlpha(2) : Colors.black.withAlpha(2), 
-               borderRadius: BorderRadius.circular(16), 
-               border: Border.all(color: borderCard, style: BorderStyle.solid)
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.widgets_outlined, size: 48, color: dark ? Colors.white24 : Colors.black26),
-                  const SizedBox(height: 16),
-                  Text('Espacio Reservado', style: TextStyle(color: textS, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Seleccione un AWB de la lista para ver su detalle operativo.', textAlign: TextAlign.center, style: TextStyle(color: textS.withAlpha(150), fontSize: 14)),
-                ],
-              ),
-            ),
-          ) : _buildAwbDetailPanel(_selectedAwbDetails!, dark, textP, textS, bgCard, borderCard),
-        ),
-      ],
-    );
+            );
   }
 
   List<Widget> _buildSavedDeliveryUI(Map? matchingDelivery, String awbNum, bool dark, Color textP, Color textS, Color borderCard) {
@@ -1209,49 +1244,36 @@ class _DriverModuleState extends State<DriverModule> {
                  children: [
                    Expanded(
                      child: Wrap(
-                       spacing: 16,
-                       runSpacing: 8,
+                       spacing: 4, runSpacing: 4,
                        children: [
                          _buildCustomChip(
-                           Row(
-                             children: [
-                               Text('ULD:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
-                               const SizedBox(width: 4),
-                               Expanded(
-                                 child: Text(
-                                   uldNumber,
-                                   style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
-                                   overflow: TextOverflow.ellipsis,
-                                 ),
-                               ),
-                             ],
+                           Center(
+                             child: Text(
+                               uldNumber,
+                               style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                               overflow: TextOverflow.ellipsis,
+                             ),
                            ),
                            dark,
-                           width: 160,
+                           width: 140,
                          ),
                          if (flightStr.isNotEmpty)
                            _buildCustomChip(
-                             Row(
-                               children: [
-                                 Text('Flight:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
-                                 const SizedBox(width: 4),
-                                 Expanded(
-                                   child: RichText(
-                                     overflow: TextOverflow.ellipsis,
-                                     maxLines: 1,
-                                     text: TextSpan(
-                                       children: [
-                                         TextSpan(text: flightStr, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
-                                         if (dateStr.isNotEmpty)
-                                           TextSpan(text: ' / $dateStr', style: TextStyle(color: textS.withAlpha(150), fontSize: 12, fontWeight: FontWeight.normal)),
-                                       ],
-                                     ),
-                                   ),
+                             Center(
+                               child: RichText(
+                                 overflow: TextOverflow.ellipsis,
+                                 maxLines: 1,
+                                 text: TextSpan(
+                                   children: [
+                                     TextSpan(text: flightStr, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+                                     if (dateStr.isNotEmpty)
+                                       TextSpan(text: ' / $dateStr', style: TextStyle(color: textS.withAlpha(150), fontSize: 12, fontWeight: FontWeight.normal)),
+                                   ],
                                  ),
-                               ],
+                               ),
                              ),
                              dark,
-                             width: 170,
+                             width: 140,
                            ),
                            _buildCustomChip(
                              Center(
@@ -1345,7 +1367,9 @@ class _DriverModuleState extends State<DriverModule> {
   Widget _buildCustomChip(Widget child, bool dark, {double width = 140}) {
     return Container(
       width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: dark ? Colors.white.withAlpha(5) : Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -1355,7 +1379,7 @@ class _DriverModuleState extends State<DriverModule> {
     );
   }
 
-  Widget _buildAwbDetailPanel(Map<String, dynamic> awb, bool dark, Color textP, Color textS, Color bgCard, Color borderCard) {
+  Widget _buildAwbDetailPanel(Map<String, dynamic> awb, bool dark, Color textP, Color textS, Color bgCard, Color borderCard, {VoidCallback? onClose}) {
     final awbNum = awb['AWB-number']?.toString() ?? '-';
 
     Map<String, dynamic>? matchingDelivery;
@@ -1502,14 +1526,8 @@ class _DriverModuleState extends State<DriverModule> {
       }
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderCard),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header
           Container(
@@ -1999,51 +2017,37 @@ class _DriverModuleState extends State<DriverModule> {
                                      children: [
                                        Expanded(
                                          child: Wrap(
-                                           spacing: 16,
-                                           runSpacing: 8,
+                                           spacing: 4,
+                                           runSpacing: 4,
                                            children: [
                                              _buildCustomChip(
-                                               Row(
-                                                 mainAxisAlignment: MainAxisAlignment.center,
-                                                 children: [
-                                                   Text('ULD:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
-                                                   const SizedBox(width: 4),
-                                                   Flexible(
-                                                     child: Text(
-                                                       awbItem['refULD']?.toString().isNotEmpty == true ? awbItem['refULD'].toString() : '-',
-                                                       style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
-                                                       overflow: TextOverflow.ellipsis,
-                                                     ),
-                                                   ),
-                                                 ],
+                                               Center(
+                                                 child: Text(
+                                                   awbItem['refULD']?.toString().isNotEmpty == true ? awbItem['refULD'].toString() : '-',
+                                                   style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                                                   overflow: TextOverflow.ellipsis,
+                                                 ),
                                                ),
                                                dark,
-                                               width: 160,
+                                               width: 120,
                                              ),
                                              if (flightStr.isNotEmpty)
                                                _buildCustomChip(
-                                                 Row(
-                                                   mainAxisAlignment: MainAxisAlignment.center,
-                                                   children: [
-                                                     Text('Flight:', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
-                                                     const SizedBox(width: 4),
-                                                     Flexible(
-                                                       child: RichText(
-                                                         overflow: TextOverflow.ellipsis,
-                                                         maxLines: 1,
-                                                         text: TextSpan(
-                                                           children: [
-                                                             TextSpan(text: flightStr, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
-                                                             if (dateStr.isNotEmpty)
-                                                               TextSpan(text: ' / $dateStr', style: TextStyle(color: textS.withAlpha(150), fontSize: 12, fontWeight: FontWeight.normal)),
-                                                           ],
-                                                         ),
-                                                       ),
+                                                 Center(
+                                                   child: RichText(
+                                                     overflow: TextOverflow.ellipsis,
+                                                     maxLines: 1,
+                                                     text: TextSpan(
+                                                       children: [
+                                                         TextSpan(text: flightStr, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                         if (dateStr.isNotEmpty)
+                                                           TextSpan(text: ' / $dateStr', style: TextStyle(color: textS.withAlpha(150), fontSize: 12, fontWeight: FontWeight.normal)),
+                                                       ],
                                                      ),
-                                                   ],
+                                                   ),
                                                  ),
                                                  dark,
-                                                 width: 170,
+                                                 width: 130,
                                                ),
                                              _buildCustomChip(
                                                Center(
@@ -2067,7 +2071,7 @@ class _DriverModuleState extends State<DriverModule> {
                                              ),
                                              if (statusText == 'PENDING')
                                                Padding(
-                                                 padding: const EdgeInsets.only(left: 12.0),
+                                                 padding: const EdgeInsets.only(left: 4.0),
                                                  child: IconButton(
                                                    icon: const Icon(Icons.assignment_add, color: Color(0xFF6366f1), size: 24),
                                                    onPressed: () => _showDriverCoordinatorDialog(awb, awbItem),
@@ -2646,8 +2650,7 @@ class _DriverModuleState extends State<DriverModule> {
           ),
 
         ],
-      ),
-    );
+      );
   }
 
   Future<void> _showDriverCoordinatorDialog(Map<String, dynamic> awb, Map<String, dynamic> awbItem) async {

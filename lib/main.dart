@@ -430,6 +430,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
 
   // Dashboard content placeholder based on selection
@@ -438,6 +439,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _selectedIndex = index;
     });
+    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+      _scaffoldKey.currentState?.closeDrawer();
+    }
   }
 
   Future<void> _logout() async {
@@ -654,41 +658,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = Supabase.instance.client.auth.currentUser;
-    final userEmail = user?.email ?? 'Usuario';
-
-    final apMap = currentUserData.value?['access-page'] as Map?;
-    // Safely parse permissions. If null, we'll allow (backward compatibility for old admin users).
-    bool can(String key) => apMap == null || apMap[key] == true;
-
-    return ValueListenableBuilder<bool>(
-      valueListenable: isDarkMode,
-      builder: (context, dark, _) {
-        final bgMain = dark ? const Color(0xFF0f172a) : const Color(0xFFF4F7F9);
-        final bgSidebar = dark
-            ? const Color(0xFF1e293b)
-            : const Color(0xFFffffff);
-        final borderWhite = dark
-            ? Colors.white.withAlpha(15)
-            : const Color(0xFFE5E7EB);
-        final textP = dark ? Colors.white : const Color(0xFF111827);
-        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-
-        return Scaffold(
-          backgroundColor: bgMain,
-          body: ValueListenableBuilder<String>(
-            valueListenable: appLanguage,
-            builder: (context, lang, child) {
-              return Row(
-                children: [
-                  // Sidebar
-                  ValueListenableBuilder<bool>(
-                    valueListenable: isSidebarExpandedNotifier,
-                    builder: (context, isSidebarExpanded, _) {
-                      if (!isSidebarExpanded) return const SizedBox.shrink();
-                      return Container(
+  Widget _buildSidebarContent(bool dark, Color bgSidebar, Color borderWhite, Color textP, Color textS, Function(String) can, String userEmail, bool isTablet) {
+    return Container(
                         width: 260,
                         decoration: BoxDecoration(
                           color: bgSidebar,
@@ -702,9 +673,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               alignment: Alignment.topRight,
                               padding: const EdgeInsets.only(right: 16, top: 16, bottom: 4),
                               child: IconButton(
-                                icon: const Icon(Icons.menu_open_rounded, color: Color(0xFF64748b), size: 20),
+                                icon: Icon(isTablet ? Icons.close_rounded : Icons.menu_open_rounded, color: const Color(0xFF64748b), size: 20),
                                 onPressed: () {
-                                  isSidebarExpandedNotifier.value = false;
+                                  if (isTablet) { _scaffoldKey.currentState?.closeDrawer(); } else { isSidebarExpandedNotifier.value = false; }
                                 },
                                 padding: const EdgeInsets.all(4),
                                 constraints: const BoxConstraints(),
@@ -994,8 +965,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                   );
-                },
-              ),
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final userEmail = user?.email ?? 'Usuario';
+
+    final apMap = currentUserData.value?['access-page'] as Map?;
+    // Safely parse permissions. If null, we'll allow (backward compatibility for old admin users).
+    bool can(String key) => apMap == null || apMap[key] == true;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (context, dark, _) {
+        final bgMain = dark ? const Color(0xFF0f172a) : const Color(0xFFF4F7F9);
+        final bgSidebar = dark
+            ? const Color(0xFF1e293b)
+            : const Color(0xFFffffff);
+        final borderWhite = dark
+            ? Colors.white.withAlpha(15)
+            : const Color(0xFFE5E7EB);
+        final textP = dark ? Colors.white : const Color(0xFF111827);
+        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+
+        final isTablet = MediaQuery.of(context).size.width <= 1024;
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: bgMain,
+          appBar: isTablet ? AppBar(
+            backgroundColor: bgSidebar,
+            iconTheme: IconThemeData(color: textP),
+            elevation: 0,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366f1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.warehouse_rounded, color: Colors.white, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Text('Warehouse 1717', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1.0),
+              child: Container(color: borderWhite, height: 1.0),
+            )
+          ) : null,
+          drawer: isTablet ? Drawer(
+             width: 260,
+             backgroundColor: bgSidebar,
+             child: _buildSidebarContent(dark, bgSidebar, borderWhite, textP, textS, can, userEmail, true),
+          ) : null,
+          body: ValueListenableBuilder<String>(
+            valueListenable: appLanguage,
+            builder: (context, lang, child) {
+              return Row(
+                children: [
+                  if (!isTablet) ...[
+                    ValueListenableBuilder<bool>(
+                      valueListenable: isSidebarExpandedNotifier,
+                      builder: (context, isSidebarExpanded, _) {
+                        if (!isSidebarExpanded) return const SizedBox.shrink();
+                        return _buildSidebarContent(dark, bgSidebar, borderWhite, textP, textS, can, userEmail, false);
+                      }
+                    ),
+                  ],
 
                   // Main Content Area
                   Expanded(
@@ -1021,7 +1060,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ],
                               ),
                             ),
-                            if (!expanded)
+                            if (!expanded && !isTablet)
                               Positioned(
                                 top: 40,
                                 left: 24,
