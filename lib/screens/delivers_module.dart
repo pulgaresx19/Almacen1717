@@ -20,6 +20,7 @@ class _DeliversModuleState extends State<DeliversModule> {
   bool _showAddForm = false;
   final GlobalKey<AddDeliverScreenState> _addDeliverKey = GlobalKey<AddDeliverScreenState>();
   late Stream<List<Map<String, dynamic>>> _deliversStream;
+  final Set<String> _selectedDeliverIds = {};
 
   @override
   void initState() {
@@ -180,12 +181,15 @@ class _DeliversModuleState extends State<DeliversModule> {
               )
             else
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderCard),
-                  ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: bgCard,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderCard),
+                        ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: StreamBuilder<List<Map<String, dynamic>>>(
@@ -226,13 +230,17 @@ class _DeliversModuleState extends State<DeliversModule> {
                         });
 
                       if (_searchController.text.isNotEmpty) {
-                        final term = _searchController.text.toLowerCase();
+                        final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
                         items = items.where((u) {
                            final comp = (u['truck-company']?.toString() ?? '').toLowerCase();
                            final dr = (u['driver']?.toString() ?? '').toLowerCase();
-                           final dr2 = (u['door']?.toString() ?? '').toLowerCase();
+                           final door = (u['door']?.toString() ?? '').toLowerCase();
                            final pId = (u['id-pickup']?.toString() ?? '').toLowerCase();
-                           return comp.contains(term) || dr.contains(term) || dr2.contains(term) || pId.contains(term);
+                           final status = (u['status']?.toString() ?? 'waiting').toLowerCase();
+                           
+                           final combinedString = '$comp $dr $door $pId $status';
+                           
+                           return terms.every((term) => combinedString.contains(term));
                         }).toList();
                       }
 
@@ -260,23 +268,39 @@ class _DeliversModuleState extends State<DeliversModule> {
                                   headingTextStyle: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 12),
                                   columns: [
                                     const DataColumn(label: Text('#')),
-                                    DataColumn(label: Text(appLanguage.value == 'es' ? 'Compañía' : 'Truck Co.')),
+                                    DataColumn(label: Text(appLanguage.value == 'es' ? 'Compañía' : 'Company')),
                                     const DataColumn(label: Text('Driver')),
                                     const DataColumn(label: Text('Door')),
                                     const DataColumn(label: Text('Type')),
                                     const DataColumn(label: Text('ID Pickup')),
                                     const DataColumn(label: Text('Time')),
                                     const DataColumn(label: Text('Priority')),
-                                    const DataColumn(label: Text('Remarks')),
                                     const DataColumn(label: Text('AWBs')),
                                     const DataColumn(label: Text('No Show')),
                                     const DataColumn(label: Text('Agent')),
+                                    const DataColumn(label: Text('Remarks')),
                                     DataColumn(label: Text(appLanguage.value == 'es' ? 'Estado' : 'Status')),
+                                    DataColumn(
+                                      label: Checkbox(
+                                        value: _selectedDeliverIds.isNotEmpty && items.isNotEmpty && _selectedDeliverIds.length == items.length,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            if (val == true) {
+                                              _selectedDeliverIds.addAll(items.map((e) => e['id'].toString()));
+                                            } else {
+                                              _selectedDeliverIds.clear();
+                                            }
+                                          });
+                                        },
+                                        activeColor: const Color(0xFF6366f1),
+                                        side: BorderSide(color: dark ? Colors.white54 : Colors.black54),
+                                      ),
+                                    ),
                                   ],
                                   rows: List.generate(items.length, (index) {
                                     final u = items[index];
+                                    final dId = u['id']?.toString() ?? '';
                                     
-
                                     String timeStr = '-';
                                     if (u['time-deliver'] != null) {
                                       final tdt = DateTime.tryParse(u['time-deliver'].toString())?.toLocal();
@@ -318,7 +342,6 @@ class _DeliversModuleState extends State<DeliversModule> {
                                         DataCell(Text(u['id-pickup']?.toString() ?? '-')),
                                         DataCell(Text(timeStr)),
                                         DataCell(isPriority ? const Icon(Icons.star_rounded, color: Colors.orange, size: 20) : const Icon(Icons.star_border_rounded, color: Colors.grey, size: 20)),
-                                        DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
                                         DataCell(
                                           GestureDetector(
                                             onTap: () {
@@ -486,7 +509,24 @@ class _DeliversModuleState extends State<DeliversModule> {
                                             return const Text('-', style: TextStyle(color: Colors.grey));
                                           })
                                         ),
+                                        DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
                                         DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
+                                        DataCell(
+                                          Checkbox(
+                                            value: _selectedDeliverIds.contains(dId),
+                                            onChanged: (val) {
+                                              setState(() {
+                                                if (val == true) {
+                                                  _selectedDeliverIds.add(dId);
+                                                } else {
+                                                  _selectedDeliverIds.remove(dId);
+                                                }
+                                              });
+                                            },
+                                            activeColor: const Color(0xFF6366f1),
+                                            side: BorderSide(color: dark ? Colors.white54 : Colors.black54),
+                                          ),
+                                        ),
                                       ],
                                     );
                                   }),
@@ -501,7 +541,51 @@ class _DeliversModuleState extends State<DeliversModule> {
                 ),
               ),
             ),
-          ],
+            if (_selectedDeliverIds.isNotEmpty)
+              Positioned(
+                bottom: 24,
+                left: 24,
+                right: 24,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: dark ? const Color(0xFF1e293b) : Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 8))],
+                      border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366f1).withAlpha(30),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_selectedDeliverIds.length} Selected',
+                            style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                        const SizedBox(width: 16),
+                        IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                        const SizedBox(width: 8),
+                        IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                        const SizedBox(width: 8),
+                        IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
         );
       }
     );

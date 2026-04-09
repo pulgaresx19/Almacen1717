@@ -18,6 +18,7 @@ class _UldModuleState extends State<UldModule> {
   final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
   final GlobalKey<AddUldScreenState> _addUldKey = GlobalKey<AddUldScreenState>();
+  final Set<String> _selectedUldIds = {};
 
   @override
   void didUpdateWidget(covariant UldModule oldWidget) {
@@ -137,7 +138,7 @@ class _UldModuleState extends State<UldModule> {
             ),
             const Spacer(),
             
-            // Search Box
+            // Search Box 
             if (!_showAddForm)
               Container(
                 width: 300,
@@ -199,8 +200,11 @@ class _UldModuleState extends State<UldModule> {
           )
         else
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
                 color: bgCard,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: borderCard),
@@ -221,8 +225,29 @@ class _UldModuleState extends State<UldModule> {
                   var ulds = List<Map<String, dynamic>>.from(snapshot.data ?? []);
                   
                   if (_searchController.text.isNotEmpty) {
-                    final term = _searchController.text.toLowerCase();
-                    ulds = ulds.where((u) => u['ULD-number']?.toString().toLowerCase().contains(term) ?? false).toList();
+                    final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
+                    ulds = ulds.where((u) {
+                      final uldSearch = u['ULD-number']?.toString().toLowerCase() ?? '';
+                      final refCarrier = u['refCarrier']?.toString().toLowerCase() ?? '';
+                      final refNumber = u['refNumber']?.toString().toLowerCase() ?? '';
+                      
+                      String formattedDateCustom = '';
+                      if (u['refDate'] != null) {
+                         try {
+                           final dt = DateTime.parse(u['refDate'].toString());
+                           formattedDateCustom = '${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+                         } catch (_) {}
+                      }
+
+                      final formattedDateShort = u['refDate'] != null ? _formatDateShort(u['refDate'].toString()).toLowerCase() : '';
+                      final formattedDateLong = u['refDate'] != null ? _formatDate(u['refDate'].toString()).toLowerCase() : '';
+                      
+                      final statusStr = u['status']?.toString().toLowerCase() ?? 'waiting';
+                      
+                      final combinedString = '$uldSearch $refCarrier $refNumber $refCarrier$refNumber $formattedDateShort $formattedDateLong $formattedDateCustom $statusStr';
+                      
+                      return terms.every((term) => combinedString.contains(term));
+                    }).toList();
                   }
 
                   ulds.sort((a, b) {
@@ -273,6 +298,21 @@ class _UldModuleState extends State<UldModule> {
                           const DataColumn(label: Text('Break')),
                           const DataColumn(label: SizedBox(width: 250, child: Text('Remarks'))),
                           const DataColumn(numeric: true, label: SizedBox(width: 100, child: Text('Status', textAlign: TextAlign.center))),
+                          DataColumn(
+                            label: Checkbox(
+                              visualDensity: VisualDensity.compact,
+                              value: _selectedUldIds.length == ulds.length && ulds.isNotEmpty,
+                              onChanged: (val) {
+                                setState(() {
+                                  if (val == true) {
+                                    _selectedUldIds.addAll(ulds.map((e) => e['id'].toString()));
+                                  } else {
+                                    _selectedUldIds.clear();
+                                  }
+                                });
+                              },
+                            ),
+                          ),
                         ],
                         rows: List.generate(ulds.length, (index) {
                           final u = ulds[index];
@@ -303,7 +343,22 @@ class _UldModuleState extends State<UldModule> {
                                 width: 250,
                                 child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                               )),
-                              DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Received')),
+                              DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
+                              DataCell(
+                                Checkbox(
+                                  visualDensity: VisualDensity.compact,
+                                  value: _selectedUldIds.contains(u['id']?.toString()),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        _selectedUldIds.add(u['id'].toString());
+                                      } else {
+                                        _selectedUldIds.remove(u['id'].toString());
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
                             ],
                           );
                         }),
@@ -316,8 +371,52 @@ class _UldModuleState extends State<UldModule> {
           },
         ),
             ),
+                  ),
+                ),
+                if (_selectedUldIds.isNotEmpty)
+                  Positioned(
+                    bottom: 24,
+                    left: 24,
+                    right: 24,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: dark ? const Color(0xFF1e293b) : Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 8))],
+                          border: Border.all(color: borderCard),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366f1).withAlpha(30),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_selectedUldIds.length} Selected',
+                                style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Container(height: 24, width: 1, color: borderCard),
+                            const SizedBox(width: 16),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            const SizedBox(width: 8),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            const SizedBox(width: 8),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+              ],
+            ),
           ),
-        ),
       ],
     );
      }

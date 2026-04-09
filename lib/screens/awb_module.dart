@@ -18,6 +18,7 @@ class _AwbModuleState extends State<AwbModule> {
   final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
   final GlobalKey<AddAwbScreenState> _addAwbKey = GlobalKey<AddAwbScreenState>();
+  final Set<String> _selectedAwbIds = {};
   bool _showAddForm = false;
   late Stream<List<Map<String, dynamic>>> _awbStream;
 
@@ -39,6 +40,29 @@ class _AwbModuleState extends State<AwbModule> {
         }
       }
     }
+  }
+
+  String _computeAwbStatus(Map<String, dynamic> u) {
+    int deliveredPieces = 0;
+    if (u['data-deliver'] != null) {
+      if (u['data-deliver'] is List) {
+        for (var item in u['data-deliver']) {
+          if (item is Map && item.containsKey('found')) {
+            deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
+          }
+        }
+      } else if (u['data-deliver'] is Map) {
+        deliveredPieces = int.tryParse(u['data-deliver']['found']?.toString() ?? '0') ?? 0;
+      }
+    }
+    
+    final int totalValInt = int.tryParse(u['total']?.toString() ?? '0') ?? 0;
+    if (deliveredPieces == totalValInt && totalValInt > 0) {
+       return 'Ready';
+    } else if (deliveredPieces > 0) {
+       return 'In Process';
+    }
+    return 'Waiting';
   }
 
   @override
@@ -122,10 +146,19 @@ class _AwbModuleState extends State<AwbModule> {
                     ),
                     child: TextField(
                       controller: _searchController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: TextInputType.text,
                       inputFormatters: [
                         TextInputFormatter.withFunction((oldValue, newValue) {
                           var text = newValue.text;
+                          
+                          if (text.contains(RegExp(r'[a-zA-Z]'))) {
+                             final updatedText = text.toUpperCase();
+                             return TextEditingValue(
+                               text: updatedText,
+                               selection: newValue.selection,
+                             );
+                          }
+                          
                           text = text.replaceAll(RegExp(r'[^0-9]'), '');
                           if (text.length > 11) text = text.substring(0, 11);
 
@@ -192,12 +225,15 @@ class _AwbModuleState extends State<AwbModule> {
               )
             else
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: bgCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderCard),
-                  ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: bgCard,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderCard),
+                        ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: StreamBuilder<List<Map<String, dynamic>>>(
@@ -214,8 +250,15 @@ class _AwbModuleState extends State<AwbModule> {
                   var awbs = snapshot.data ?? [];
                   
                   if (_searchController.text.isNotEmpty) {
-                    final term = _searchController.text.toLowerCase();
-                    awbs = awbs.where((u) => u['AWB-number']?.toString().toLowerCase().contains(term) ?? false).toList();
+                    final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
+                    awbs = awbs.where((u) {
+                      final awbSearch = u['AWB-number']?.toString().toLowerCase() ?? '';
+                      final statusSearch = _computeAwbStatus(u).toLowerCase();
+                      
+                      final combinedString = '$awbSearch $statusSearch';
+                      
+                      return terms.every((term) => combinedString.contains(term));
+                    }).toList();
                   }
 
                   if (awbs.isEmpty) return const Center(child: Text('No AWBs found.', style: TextStyle(color: Color(0xFF94a3b8))));
@@ -240,17 +283,32 @@ class _AwbModuleState extends State<AwbModule> {
                         dataRowColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.hovered) ? (dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6)) : Colors.transparent),
                         dataTextStyle: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13),
                         headingTextStyle: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 12),
-                        columns: const [
-                          DataColumn(label: Text('#')),
-                          DataColumn(label: Text('AWB Number')),
-                          DataColumn(label: Text('Pieces Expected')),
-                          DataColumn(label: Text('Pieces Received')),
-                          DataColumn(label: Text('Delivered Pieces')),
-                          DataColumn(label: Text('Remaining Pieces')),
-                          DataColumn(label: Text('Reject')),
-                          DataColumn(label: Text('Total Pieces')),
-                          DataColumn(label: Text('Total Weight')),
-                          DataColumn(label: Text('Status')),
+                        columns: [
+                          const DataColumn(label: Text('#')),
+                          const DataColumn(label: Text('AWB Number')),
+                          const DataColumn(label: Text('Pieces Expected')),
+                          const DataColumn(label: Text('Pieces Received')),
+                          const DataColumn(label: Text('Delivered Pieces')),
+                          const DataColumn(label: Text('Remaining Pieces')),
+                          const DataColumn(label: Text('Reject')),
+                          const DataColumn(label: Text('Total Pieces')),
+                          const DataColumn(label: Text('Total Weight')),
+                          const DataColumn(label: Text('Status')),
+                          DataColumn(
+                            label: Checkbox(
+                              visualDensity: VisualDensity.compact,
+                              value: _selectedAwbIds.length == awbs.length && awbs.isNotEmpty,
+                              onChanged: (val) {
+                                  setState(() {
+                                    if (val == true) {
+                                      _selectedAwbIds.addAll(awbs.map((e) => e['id'].toString()));
+                                    } else {
+                                      _selectedAwbIds.clear();
+                                    }
+                                  });
+                              },
+                            ),
+                          ),
                         ],
                         rows: List.generate(awbs.length, (index) {
                           final u = awbs[index];
@@ -340,13 +398,7 @@ class _AwbModuleState extends State<AwbModule> {
                              }
                           }
 
-                          final int totalValInt = int.tryParse(u['total']?.toString() ?? '0') ?? 0;
-                          String status = 'Waiting';
-                          if (deliveredPieces == totalValInt && totalValInt > 0) {
-                             status = 'Ready';
-                          } else if (deliveredPieces > 0) {
-                             status = 'In Process';
-                          }
+                          String status = _computeAwbStatus(u);
 
                           return DataRow(
                             onSelectChanged: (_) => _showAwbDrawer(context, u, dark, receivedPieces, expectedPieces, status),
@@ -453,6 +505,21 @@ class _AwbModuleState extends State<AwbModule> {
                               DataCell(Text(u['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
                               DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(_buildStatusBadge(status)),
+                              DataCell(
+                                Checkbox(
+                                  visualDensity: VisualDensity.compact,
+                                  value: _selectedAwbIds.contains(u['id']?.toString()),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        _selectedAwbIds.add(u['id'].toString());
+                                      } else {
+                                        _selectedAwbIds.remove(u['id'].toString());
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
                             ],
                           );
                         }),
@@ -464,7 +531,51 @@ class _AwbModuleState extends State<AwbModule> {
             );
           },
         ),
-            ),
+                  ),
+                ),
+              ),
+              if (_selectedAwbIds.isNotEmpty)
+                Positioned(
+                  bottom: 24,
+                  left: 24,
+                  right: 24,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: dark ? const Color(0xFF1e293b) : Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 8))],
+                        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366f1).withAlpha(30),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_selectedAwbIds.length} Selected',
+                              style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                          const SizedBox(width: 16),
+                          IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                          const SizedBox(width: 8),
+                          IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                          const SizedBox(width: 8),
+                          IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+            ],
           ),
         ),
       ],

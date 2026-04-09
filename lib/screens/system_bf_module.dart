@@ -12,6 +12,7 @@ class SystemBfModule extends StatefulWidget {
 class _SystemBfModuleState extends State<SystemBfModule> {
   late Stream<List<Map<String, dynamic>>> _system1Stream;
   late Stream<List<Map<String, dynamic>>> _system2Stream;
+  bool _isSplitView = false;
 
   @override
   void initState() {
@@ -37,34 +38,51 @@ class _SystemBfModuleState extends State<SystemBfModule> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 700;
-              final childList = [
-                Expanded(
-                  flex: isWide ? 1 : 0,
-                  child: _buildSystemCard(
-                    context: context,
-                    systemName: 'System 1',
-                    tableName: 'System1',
-                    stream: _system1Stream,
-                    dark: dark,
-                    index: 1,
-                  ),
-                ),
-                if (isWide)
-                  const SizedBox(width: 24)
-                else
-                  const SizedBox(height: 24),
-                Expanded(
-                  flex: isWide ? 1 : 0,
-                  child: _buildSystemCard(
-                    context: context,
-                    systemName: 'System 2',
-                    tableName: 'System2',
-                    stream: _system2Stream,
-                    dark: dark,
-                    index: 2,
-                  ),
-                ),
-              ];
+              final childList = !_isSplitView
+                  ? [
+                      Expanded(
+                        flex: isWide ? 1 : 0,
+                        child: _buildSystemCard(
+                          context: context,
+                          systemName: 'System (Break / No Break)',
+                          tableName: 'System1',
+                          stream: _system1Stream,
+                          dark: dark,
+                          index: 1,
+                          isLeft: true,
+                        ),
+                      ),
+                    ]
+                  : [
+                      Expanded(
+                        flex: isWide ? 1 : 0,
+                        child: _buildSystemCard(
+                          context: context,
+                          systemName: 'System 1',
+                          tableName: 'System1',
+                          stream: _system1Stream,
+                          dark: dark,
+                          index: 1,
+                          isLeft: true,
+                        ),
+                      ),
+                      if (isWide)
+                        const SizedBox(width: 24)
+                      else
+                        const SizedBox(height: 24),
+                      Expanded(
+                        flex: isWide ? 1 : 0,
+                        child: _buildSystemCard(
+                          context: context,
+                          systemName: 'System 2',
+                          tableName: 'System2',
+                          stream: _system2Stream,
+                          dark: dark,
+                          index: 2,
+                          isLeft: false,
+                        ),
+                      ),
+                    ];
 
               return isWide
                   ? Row(
@@ -93,6 +111,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
     required Stream<List<Map<String, dynamic>>> stream,
     required bool dark,
     required int index,
+    required bool isLeft,
   }) {
     final bgCard = dark ? const Color(0xFF1E293B) : Colors.white;
     final textP = dark ? Colors.white : const Color(0xFF111827);
@@ -172,15 +191,50 @@ class _SystemBfModuleState extends State<SystemBfModule> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                systemName,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: textP,
-                  letterSpacing: 1.2,
-                ),
-                textAlign: TextAlign.center,
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Text(
+                    systemName,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: textP,
+                      letterSpacing: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Positioned(
+                    right: 0,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!_isSplitView && isLeft)
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _isSplitView = true;
+                              });
+                            },
+                            icon: const Icon(Icons.add_circle_outline_rounded, size: 28),
+                            color: const Color(0xFF6366f1),
+                            tooltip: 'Split view',
+                          ),
+                        if (_isSplitView && !isLeft)
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _isSplitView = false;
+                              });
+                            },
+                            icon: const Icon(Icons.close_rounded, size: 28),
+                            color: Colors.redAccent,
+                            tooltip: 'Close panel',
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 

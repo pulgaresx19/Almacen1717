@@ -77,6 +77,7 @@ class _SystemModuleState extends State<SystemModule> {
 
   Map<String, dynamic>? _globalSearchResult;
   bool _isGlobalSearching = false;
+  bool _isSplitView = false;
 
   Future<void> _performGlobalSearch() async {
     final query = _searchController.text.trim();
@@ -423,18 +424,15 @@ class _SystemModuleState extends State<SystemModule> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.singlePanelMode
-                            ? (widget.titleOverride ??
-                                  (appLanguage.value == 'es'
-                                      ? 'Panel Único'
-                                      : 'Single Panel'))
-                            : (isLeft
+                        _isSplitView
+                            ? (isLeft
                                   ? (appLanguage.value == 'es'
                                         ? 'Panel Izquierdo'
                                         : 'Left Panel')
                                   : (appLanguage.value == 'es'
                                         ? 'Panel Derecho'
-                                        : 'Right Panel')),
+                                        : 'Right Panel'))
+                            : (widget.titleOverride ?? (appLanguage.value == 'es' ? 'Recibo de Carga' : 'Cargo Reception')),
                         style: TextStyle(
                           color: textP,
                           fontSize: 24,
@@ -443,27 +441,58 @@ class _SystemModuleState extends State<SystemModule> {
                       ),
                     ],
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _pickDate(context, isLeft),
-                    icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                    label: Text(
-                      dt == null
-                          ? (appLanguage.value == 'es'
-                                ? 'Seleccionar Fecha'
-                                : 'Select Date')
-                          : DateFormat('MM/dd/yyyy').format(dt),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366f1),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _pickDate(context, isLeft),
+                        icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                        label: Text(
+                          dt == null
+                              ? (appLanguage.value == 'es'
+                                    ? 'Seleccionar Fecha'
+                                    : 'Select Date')
+                              : DateFormat('MM/dd/yyyy').format(dt),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                      if (!_isSplitView && isLeft) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _isSplitView = true;
+                            });
+                          },
+                          icon: const Icon(Icons.add_circle_outline_rounded, size: 28),
+                          color: const Color(0xFF6366f1),
+                          tooltip: appLanguage.value == 'es' ? 'Dividir vista' : 'Split view',
+                        ),
+                      ],
+                      if (_isSplitView && !isLeft) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _isSplitView = false;
+                            });
+                          },
+                          icon: const Icon(Icons.close_rounded, size: 28),
+                          color: Colors.redAccent,
+                          tooltip: appLanguage.value == 'es' ? 'Cerrar panel' : 'Close panel',
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -642,46 +671,26 @@ class _SystemModuleState extends State<SystemModule> {
                             final Color statusColor = isBreak
                                 ? const Color(0xFF10b981)
                                 : const Color(0xFFef4444);
-                            final String statusText = isBreak
-                                ? 'Break'
-                                : 'No Break';
 
                             return Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
+                                horizontal: 16,
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: statusColor.withAlpha(15),
+                                color: statusColor.withAlpha(20),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: statusColor.withAlpha(40),
+                                  color: statusColor.withAlpha(80),
                                 ),
                               ),
-                              child: RichText(
-                                text: TextSpan(
-                                  text: 'Last ULD: ',
-                                  style: TextStyle(
-                                    color: textP,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  children: [
-                                    TextSpan(
-                                      text: uldNum,
-                                      style: TextStyle(
-                                        color: textP,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: ' [$statusText]',
-                                      style: TextStyle(
-                                        color: statusColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                              child: Text(
+                                uldNum,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.1,
                                 ),
                               ),
                             );
@@ -2064,7 +2073,7 @@ class _SystemModuleState extends State<SystemModule> {
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: widget.singlePanelMode
+                      children: !_isSplitView
                           ? [Expanded(child: _buildPanel(true, dark))]
                           : [
                               Expanded(child: _buildPanel(true, dark)),

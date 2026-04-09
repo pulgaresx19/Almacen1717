@@ -193,10 +193,18 @@ class _UsersModuleState extends State<UsersModule> {
                       var users = snapshot.data ?? [];
                       
                       if (_searchController.text.isNotEmpty) {
-                        final term = _searchController.text.toLowerCase();
+                        final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
                         users = users.where((u) {
-                          final str = '${u['full-name']} ${u['email']} ${u['position']} ${u['shift']}'.toLowerCase();
-                          return str.contains(term);
+                          final fn = (u['full-name']?.toString() ?? '').toLowerCase();
+                          final em = (u['email']?.toString() ?? '').toLowerCase();
+                          final ph = (u['phone-number']?.toString() ?? '').toLowerCase();
+                          final bd = (u['building']?.toString() ?? '').toLowerCase();
+                          final sh = (u['shift']?.toString() ?? '').toLowerCase();
+                          final po = (u['position']?.toString() ?? '').toLowerCase();
+
+                          final combinedString = '$fn $em $ph $bd $sh $po';
+                          
+                          return terms.every((term) => combinedString.contains(term));
                         }).toList();
                       }
                       

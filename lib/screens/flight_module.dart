@@ -29,6 +29,7 @@ class _FlightModuleState extends State<FlightModule> {
     }
   }
   final _searchController = TextEditingController();
+  final Set<String> _selectedFlightIds = {};
   bool _showAddForm = false;
   final GlobalKey<AddFlightScreenState> _addFlightKey = GlobalKey<AddFlightScreenState>();
   late Stream<List<Map<String, dynamic>>> _flightStream;
@@ -175,16 +176,63 @@ class _FlightModuleState extends State<FlightModule> {
           )
         else
           Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: bgCard,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderCard),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _buildFlightList(dark),
-              ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderCard),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _buildFlightList(dark),
+                    ),
+                  ),
+                ),
+                if (_selectedFlightIds.isNotEmpty)
+                  Positioned(
+                    bottom: 24,
+                    left: 24,
+                    right: 24,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: dark ? const Color(0xFF1e293b) : Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 8))],
+                          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366f1).withAlpha(30),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_selectedFlightIds.length} Selected',
+                                style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                            const SizedBox(width: 16),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), tooltip: 'Print Selected', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            const SizedBox(width: 8),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), tooltip: 'Download PDF', style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))),
+                            const SizedBox(width: 8),
+                            IconButton(onPressed: () {}, icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), tooltip: 'Delete Selected', style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+              ],
             ),
           ),
       ],
@@ -234,10 +282,35 @@ class _FlightModuleState extends State<FlightModule> {
         });
         
         if (_searchController.text.isNotEmpty) {
-          final term = _searchController.text.toLowerCase();
+          final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
           flights = flights.where((f) {
-            final str = '${f['carrier']} ${f['number']}'.toLowerCase();
-            return str.contains(term);
+            final carrier = f['carrier']?.toString().toLowerCase() ?? '';
+            final number = f['number']?.toString().toLowerCase() ?? '';
+            final carrierNumberStr = '$carrier$number $carrier $number';
+            
+            final bool isDelayed = f['status']?.toString().toLowerCase() == 'delayed';
+            String dateStr = f['date-arrived']?.toString() ?? '';
+            
+            if (isDelayed && f['time-delayed'] != null && f['time-delayed'].toString().isNotEmpty) {
+                try {
+                  final ddt = DateTime.parse(f['time-delayed'].toString()).toLocal();
+                  dateStr = ddt.toIso8601String();
+                } catch (_) {}
+            }
+            
+            String formattedDate = '';
+            try {
+              if (dateStr.isNotEmpty) {
+                final dt = DateTime.parse(dateStr);
+                formattedDate = '${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+              }
+            } catch (_) {}
+            
+            final statusStr = f['status']?.toString().toLowerCase() ?? '';
+            
+            final combinedStr = '$carrierNumberStr $formattedDate $statusStr'.toLowerCase();
+            
+            return terms.every((term) => combinedStr.contains(term));
           }).toList();
         }
 
@@ -276,6 +349,21 @@ class _FlightModuleState extends State<FlightModule> {
                 DataColumn(label: Text(appLanguage.value == 'es' ? 'Último Camión' : 'Last Truck')),
                 DataColumn(label: Text(appLanguage.value == 'es' ? 'Observaciones' : 'Remarks')),
                 DataColumn(label: Text(appLanguage.value == 'es' ? 'Estado' : 'Status')),
+                DataColumn(
+                  label: Checkbox(
+                    visualDensity: VisualDensity.compact,
+                    value: _selectedFlightIds.length == flights.length && flights.isNotEmpty,
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          _selectedFlightIds.addAll(flights.map((e) => e['id'].toString()));
+                        } else {
+                          _selectedFlightIds.clear();
+                        }
+                      });
+                    },
+                  ),
+                ),
               ],
               rows: List.generate(flights.length, (index) {
                 final f = flights[index];
@@ -363,6 +451,22 @@ class _FlightModuleState extends State<FlightModule> {
                     ),
                     // Status
                     DataCell(_buildStatusBadge(f['status']?.toString() ?? 'N/A')),
+                    // Select Checkbox
+                    DataCell(
+                      Checkbox(
+                        visualDensity: VisualDensity.compact,
+                        value: _selectedFlightIds.contains(f['id']?.toString()),
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedFlightIds.add(f['id'].toString());
+                            } else {
+                              _selectedFlightIds.remove(f['id'].toString());
+                            }
+                          });
+                        },
+                      ),
+                    ),
                   ],
                 );
               }),
