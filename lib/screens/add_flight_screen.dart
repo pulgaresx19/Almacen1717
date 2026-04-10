@@ -355,7 +355,15 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                   children: [
                     Expanded(flex: 5, child: _buildTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true)),
                     const SizedBox(width: 8),
-                    Expanded(flex: 3, child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true)),
+                    Expanded(flex: 3, child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true, customFormatters: [
+                      TextInputFormatter.withFunction((oldValue, newValue) {
+                        if (newValue.text.isEmpty) return newValue;
+                        final p = int.tryParse(newValue.text) ?? 0;
+                        final t = int.tryParse(totalCtrl.text) ?? 0;
+                        if (totalCtrl.text.isNotEmpty && t > 0 && p > t) return oldValue;
+                        return newValue;
+                      })
+                    ])),
                     const SizedBox(width: 8),
                     Expanded(
                       flex: 3, 
@@ -394,6 +402,18 @@ class AddFlightScreenState extends State<AddFlightScreen> {
                 if (totalCtrl.text.trim().isEmpty || totalCtrl.text.trim() == '0') {
                   _showRequiredFieldError(ctx, 'Total');
                   return;
+                }
+                
+                final p = int.tryParse(piecesCtrl.text) ?? 0;
+                final t = int.tryParse(totalCtrl.text) ?? 0;
+                if (t < p) {
+                   showDialog(context: ctx, builder: (c) => AlertDialog(
+                     backgroundColor: const Color(0xFF1e293b),
+                     title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
+                     content: const Text('Total pieces cannot be less than the received pieces.', style: TextStyle(color: Color(0xFFcbd5e1))),
+                     actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+                   ));
+                   return;
                 }
                 
                 final existingAwbs = _flightLocalUlds[uldIndex]['awbs'] as List;
@@ -1471,7 +1491,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
    );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines, bool expands = false}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines, bool expands = false, List<TextInputFormatter>? customFormatters}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1479,20 +1499,20 @@ class AddFlightScreenState extends State<AddFlightScreen> {
            mainAxisAlignment: MainAxisAlignment.spaceBetween,
            children: [
              Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)),
-             ?titleTrailing,
+             titleTrailing ?? const SizedBox.shrink(),
            ],
         ),
         const SizedBox(height: 6),
         expands 
         ? Expanded(
-            child: _buildInnerTextField(ctrl, disabled, readOnly, onTap, isNum, allowDecimal, isUpperCase, isAwb, digitsOnly, maxLen, null, null, true, hint, suffixIcon)
+            child: _buildInnerTextField(ctrl, disabled, readOnly, onTap, isNum, allowDecimal, isUpperCase, isAwb, digitsOnly, maxLen, null, null, true, hint, suffixIcon, customFormatters)
           )
-        : _buildInnerTextField(ctrl, disabled, readOnly, onTap, isNum, allowDecimal, isUpperCase, isAwb, digitsOnly, maxLen, maxLines, minLines, false, hint, suffixIcon),
+        : _buildInnerTextField(ctrl, disabled, readOnly, onTap, isNum, allowDecimal, isUpperCase, isAwb, digitsOnly, maxLen, maxLines, minLines, false, hint, suffixIcon, customFormatters),
       ],
     );
   }
 
-  Widget _buildInnerTextField(TextEditingController ctrl, bool disabled, bool readOnly, VoidCallback? onTap, bool isNum, bool allowDecimal, bool isUpperCase, bool isAwb, bool digitsOnly, int? maxLen, int? maxLines, int? minLines, bool expands, String hint, Widget? suffixIcon) {
+  Widget _buildInnerTextField(TextEditingController ctrl, bool disabled, bool readOnly, VoidCallback? onTap, bool isNum, bool allowDecimal, bool isUpperCase, bool isAwb, bool digitsOnly, int? maxLen, int? maxLines, int? minLines, bool expands, String hint, Widget? suffixIcon, List<TextInputFormatter>? customFormatters) {
     return TextField(
       controller: ctrl,
       enabled: !disabled,
@@ -1505,6 +1525,7 @@ class AddFlightScreenState extends State<AddFlightScreen> {
             if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
             if (allowDecimal) FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
             if (isUpperCase) TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection)),
+            ...?customFormatters,
           ],
           maxLength: maxLen,
           maxLines: maxLines,

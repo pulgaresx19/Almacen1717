@@ -7413,6 +7413,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
               bool disabled = false,
               bool isAwb = false,
               bool expands = false,
+              List<TextInputFormatter>? customFormatters,
             }) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -7442,6 +7443,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                             minLines: expands ? null : null,
                             expands: true,
                             inputFormatters: [
+                              ...?customFormatters,
                               if (isUpperCase)
                                 TextInputFormatter.withFunction(
                                   (oldValue, newValue) => newValue.copyWith(
@@ -7533,6 +7535,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               : TextInputType.text,
                           maxLines: 1,
                           inputFormatters: [
+                            ...?customFormatters,
                             if (isUpperCase)
                               TextInputFormatter.withFunction(
                                 (oldValue, newValue) => newValue.copyWith(
@@ -7677,6 +7680,17 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                               '0',
                               isNum: true,
                               digitsOnly: true,
+                              customFormatters: [
+                                TextInputFormatter.withFunction((oldValue, newValue) {
+                                  if (newValue.text.isEmpty) return newValue;
+                                  if (totalLocked.value) {
+                                    final pVal = int.tryParse(newValue.text) ?? 0;
+                                    final tVal = int.tryParse(totalCtrl.text) ?? 0;
+                                    if (pVal > tVal) return oldValue;
+                                  }
+                                  return newValue;
+                                }),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -7772,6 +7786,35 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                 content: Text(
                                   'AWB Number y Total obligatorios',
                                 ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          final piecesVal = int.tryParse(piecesCtrl.text) ?? 1;
+                          final totalVal = int.tryParse(totalCtrl.text) ?? 1;
+                          if (piecesVal > totalVal) {
+                            showDialog(
+                              context: dialogCtx,
+                              builder: (alertCtx) => AlertDialog(
+                                backgroundColor: const Color(0xFF1e293b),
+                                title: Row(
+                                  children: const [
+                                    Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent),
+                                    SizedBox(width: 8),
+                                    Text('Invalid Quantity', style: TextStyle(color: Colors.white)),
+                                  ],
+                                ),
+                                content: const Text(
+                                  '"Pieces" cannot exceed "Total". Please correct the quantities before saving.',
+                                  style: TextStyle(color: Color(0xFF94a3b8)),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(alertCtx),
+                                    child: const Text('OK', style: TextStyle(color: Color(0xFF8b5cf6))),
+                                  ),
+                                ],
                               ),
                             );
                             return;

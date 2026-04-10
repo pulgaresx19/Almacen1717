@@ -308,6 +308,18 @@ class AddAwbScreenState extends State<AddAwbScreen> {
       return;
     }
 
+    final p = int.tryParse(_piecesCtrl.text) ?? 0;
+    final t = int.tryParse(_totalCtrl.text) ?? 0;
+    if (t > 0 && p > t) {
+       showDialog(context: context, builder: (c) => AlertDialog(
+         backgroundColor: const Color(0xFF1e293b),
+         title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
+         content: const Text('Total pieces cannot be less than the received pieces.', style: TextStyle(color: Color(0xFFcbd5e1))),
+         actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+       ));
+       return;
+    }
+
     setState(() {
       String? flightLabel;
       String refCarrierOut = 'WRHS';
@@ -1001,7 +1013,16 @@ class AddAwbScreenState extends State<AddAwbScreen> {
                       ),
                       SizedBox(
                         width: 75,
-                        child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly], onChanged: (_) => setState(() {})),
+                        child: _buildTextField('Pieces', _piecesCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          TextInputFormatter.withFunction((oldValue, newValue) {
+                            if (newValue.text.isEmpty) return newValue;
+                            final p = int.tryParse(newValue.text) ?? 0;
+                            final t = int.tryParse(_totalCtrl.text) ?? 0;
+                            if (_totalCtrl.text.isNotEmpty && t > 0 && p > t) return oldValue;
+                            return newValue;
+                          })
+                        ], onChanged: (_) => setState(() {})),
                       ),
                       SizedBox(
                         width: 75,

@@ -378,7 +378,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                                                       children: [
                                                         const Icon(Icons.inventory_2_rounded, color: Color(0xFF6366f1)),
                                                         const SizedBox(width: 8),
-                                                        Text('AWBs Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
+                                                        Text(appLanguage.value == 'es' ? 'Detalles de Entrega' : 'Delivery Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
                                                       ]
                                                     ),
                                                     content: SizedBox(
@@ -388,7 +388,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                                                         itemCount: awbItems.length,
                                                         itemBuilder: (ctx, i) {
                                                           final item = awbItems[i];
-                                                          final awbN = item['AWB-number']?.toString() ?? '-';
+                                                          final awbN = item['ULD-number']?.toString() ?? item['AWB-number']?.toString() ?? '-';
                                                           final pcs = item['pieces']?.toString() ?? '-';
                                                           final weight = item['weight']?.toString() ?? '';
                                                           final rmks = item['remarks']?.toString() ?? '';
@@ -914,7 +914,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                             children: [
                               Row(
                                 children: [
-                                  Text('List of AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w700)),
+                                  Text(appLanguage.value == 'es' ? 'Lista de Entregas' : 'List of Delivery', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w700)),
                                   const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -971,13 +971,13 @@ class _DeliversModuleState extends State<DeliversModule> {
                           Builder(builder: (ctx) {
                             final currentList = isEditingAwbs ? tempAwbsList : awbs;
                             if (currentList.isEmpty) {
-                              return Text('No AWBs assigned.', style: TextStyle(color: textS));
+                              return Text(appLanguage.value == 'es' ? 'No hay items asignados.' : 'No items assigned.', style: TextStyle(color: textS));
                             }
                             return Column(
                               children: currentList.asMap().entries.map((entry) {
                               final idx = entry.key;
                               final item = entry.value;
-                              final awbN = item['AWB-number']?.toString() ?? '-';
+                              final awbN = item['ULD-number']?.toString() ?? item['AWB-number']?.toString() ?? '-';
                               final pcs = item['pieces']?.toString() ?? '-';
                               final weight = item['weight']?.toString() ?? '';
                               final rem = item['remarks']?.toString() ?? '';

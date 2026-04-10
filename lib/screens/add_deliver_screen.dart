@@ -50,6 +50,12 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
   StreamSubscription<List<Map<String, dynamic>>>? _deliversSub;
   List<Map<String, dynamic>> _allDelivers = [];
 
+  bool _showUldTab = false;
+  List<Map<String, dynamic>> _allUlds = [];
+  final List<Map<String, dynamic>> _selectedUlds = [];
+  bool _isLoadingUlds = true;
+  StreamSubscription<List<Map<String, dynamic>>>? _uldSub;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +82,19 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
       if (mounted) {
         setState(() {
           _allDelivers = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    });
+
+    _uldSub = Supabase.instance.client
+        .from('ULD')
+        .stream(primaryKey: ['id'])
+        .order('id', ascending: false)
+        .listen((data) {
+      if (mounted) {
+        setState(() {
+          _allUlds = List<Map<String, dynamic>>.from(data);
+          _isLoadingUlds = false;
         });
       }
     });
@@ -115,6 +134,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
            _doorCtrl.text.isNotEmpty || 
            _idPickupCtrl.text.isNotEmpty || 
            _selectedAwbs.isNotEmpty ||
+           _selectedUlds.isNotEmpty ||
            _importAwbs.isNotEmpty;
   }
 
@@ -185,6 +205,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
   void dispose() {
     _awbSub?.cancel();
     _deliversSub?.cancel();
+    _uldSub?.cancel();
     for (var c in _deliveryPcsControllers.values) {
       c.dispose();
     }
@@ -328,20 +349,21 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
         return;
       }
     } else {
-      if (_selectedAwbs.isEmpty) {
-        _showMissingFieldAlert('Air Waybills (AWBs)');
+      if (_selectedAwbs.isEmpty && _selectedUlds.isEmpty) {
+        _showMissingFieldAlert('Air Waybills (AWBs) or ULDs');
         return;
       }
-      for (var awb in _selectedAwbs) {
-        final awbNum = awb['AWB-number']?.toString() ?? '';
+      final List<Map<String, dynamic>> combinedToValidate = [..._selectedAwbs, ..._selectedUlds];
+      for (var item in combinedToValidate) {
+        final awbNum = item['AWB-number']?.toString() ?? item['ULD-number']?.toString() ?? '';
         final pcsStr = _deliveryPcsControllers[awbNum]?.text.trim() ?? '';
         final pcs = int.tryParse(pcsStr) ?? 0;
         if (pcs <= 0) {
           _showMissingFieldAlert(
             'Pieces for $awbNum', 
             customMessage: appLanguage.value == 'es'
-                ? 'Las piezas a entregar para la guía $awbNum tienen un valor no válido ($pcsStr).\nPor favor, introduzca un número mayor a 0 para guardar.'
-                : 'The pieces for AWB $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.'
+                ? 'Las piezas a entregar para la guía o ULD $awbNum tienen un valor numérico no válido ($pcsStr).\nPor favor, introduzca un número mayor a 0 para guardar.'
+                : 'The pieces for item $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.'
           );
           return;
         }
@@ -406,28 +428,42 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                 'weight': e['weight']?.toString() ?? '0',
                 'remarks': e['remarks']?.toString() ?? ''
               }).toList() 
-            : _selectedAwbs.map((e) {
-                final awbNum = e['AWB-number']?.toString() ?? '';
-                final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
-                final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
-                final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
-                
-                double expectedWeight = 0.0;
-                if (e['data-AWB'] is List) {
-                  for (var item in e['data-AWB']) {
-                     expectedWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+            : [
+                ..._selectedAwbs.map((e) {
+                  final awbNum = e['AWB-number']?.toString() ?? '';
+                  final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+                  final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
+                  final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
+                  
+                  double expectedWeight = 0.0;
+                  if (e['data-AWB'] is List) {
+                    for (var item in e['data-AWB']) {
+                       expectedWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+                    }
+                  } else if (e['data-AWB'] is Map) {
+                       expectedWeight += double.tryParse(e['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
                   }
-                } else if (e['data-AWB'] is Map) {
-                     expectedWeight += double.tryParse(e['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
-                }
 
-                return {
-                  'AWB-number': awbNum,
-                  'pieces': pcs,
-                  'weight': expectedWeight.toStringAsFixed(2),
-                  'remarks': rem
-                };
-              }).toList(),
+                  return {
+                    'AWB-number': awbNum,
+                    'pieces': pcs,
+                    'weight': expectedWeight.toStringAsFixed(2),
+                    'remarks': rem
+                  };
+                }),
+                ..._selectedUlds.map((e) {
+                   final uNum = e['ULD-number']?.toString() ?? '';
+                   final pcsCtrlText = _deliveryPcsControllers[uNum]?.text.trim() ?? '0';
+                   final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
+                   final rem = _deliveryRemarkControllers[uNum]?.text.trim() ?? '';
+                   return {
+                     'ULD-number': uNum,
+                     'pieces': pcs,
+                     'weight': e['weight']?.toString() ?? '0.00',
+                     'remarks': rem
+                   };
+                })
+              ],
       };
 
       await Supabase.instance.client.from('Delivers').insert(payload);
@@ -765,8 +801,9 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     );
   }
 
-  Widget _buildSelectedAwbsSummary(bool dark) {
-    if (_selectedAwbs.isEmpty) {
+  Widget _buildSelectedItemsSummary(bool dark) {
+    final int selectedCount = _selectedAwbs.length + _selectedUlds.length;
+    if (selectedCount == 0) {
       return Container(
          decoration: BoxDecoration(
            color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6),
@@ -775,12 +812,17 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
          ),
          child: Center(
            child: Text(
-             appLanguage.value == 'es' ? 'Ningún AWB seleccionado' : 'No AWBs selected',
+             appLanguage.value == 'es' ? 'Ningún elemento seleccionado' : 'No items selected',
              style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)),
            )
          ),
        );
     }
+
+    final List<Map<String, dynamic>> combinedList = [
+       ..._selectedAwbs.map((e) => {'type': 'AWB', 'data': e}),
+       ..._selectedUlds.map((e) => {'type': 'ULD', 'data': e}),
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -797,7 +839,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
               children: [
                 const Icon(Icons.check_circle_rounded, color: Color(0xFF6366f1), size: 18),
                 const SizedBox(width: 8),
-                Text('${_selectedAwbs.length} ${appLanguage.value == 'es' ? 'Seleccionados' : 'Selected'}', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 14)),
+                Text('$selectedCount ${appLanguage.value == 'es' ? 'Seleccionados' : 'Selected'}', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 14)),
               ],
             ),
           ),
@@ -805,47 +847,56 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(8),
-              itemCount: _selectedAwbs.length,
+              itemCount: combinedList.length,
               itemBuilder: (context, index) {
-                final awb = _selectedAwbs[index];
-                final String awbNumber = awb['AWB-number']?.toString() ?? 'Unknown';
-
-                      // Calculate pieces/weight for display
-                      int expectedPieces = 0;
-                      if (awb['data-AWB'] is List) {
-                        for (var item in awb['data-AWB']) {
-                           expectedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-                        }
-                      } else if (awb['data-AWB'] is Map) {
-                           expectedPieces += int.tryParse(awb['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
-                      }
-
-                      int deliveredPieces = 0;
-                      if (awb['data-deliver'] != null) {
-                        if (awb['data-deliver'] is List) {
-                          for (var item in awb['data-deliver']) {
-                            if (item is Map && item.containsKey('found')) {
-                              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
+                final item = combinedList[index];
+                final bool isAwb = item['type'] == 'AWB';
+                final data = item['data'];
+                final String itemNumber = isAwb ? (data['AWB-number']?.toString() ?? 'Unknown') : (data['ULD-number']?.toString() ?? 'Unknown');
+                
+                int remainingPieces = 0;
+                if (isAwb) {
+                   int expectedPieces = 0;
+                   if (data['data-AWB'] is List) {
+                     for (var a in data['data-AWB']) {
+                        expectedPieces += int.tryParse(a['pieces']?.toString() ?? '0') ?? 0;
+                     }
+                   } else if (data['data-AWB'] is Map) {
+                        expectedPieces += int.tryParse(data['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
+                   }
+                   int deliveredPieces = 0;
+                   if (data['data-deliver'] != null) {
+                      if (data['data-deliver'] is List) {
+                         for (var d in data['data-deliver']) {
+                            if (d is Map && d.containsKey('found')) {
+                               deliveredPieces += int.tryParse(d['found']?.toString() ?? '0') ?? 0;
                             }
-                          }
-                        } else if (awb['data-deliver'] is Map) {
-                          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
-                        }
+                         }
+                      } else if (data['data-deliver'] is Map) {
+                         deliveredPieces = int.tryParse(data['data-deliver']['found']?.toString() ?? '0') ?? 0;
                       }
-                      int inProcessPieces = getInProcessPieces(awbNumber);
-                      int remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
-                      if (remainingPieces < 0) remainingPieces = 0;
-
-
-
-                      if (!_deliveryPcsControllers.containsKey(awbNumber)) {
-                        _deliveryPcsControllers[awbNumber] = TextEditingController(text: remainingPieces.toString());
+                   }
+                   int inProcessPieces = getInProcessPieces(itemNumber);
+                   remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
+                   if (remainingPieces < 0) remainingPieces = 0;
+                } else {
+                   if (data['data-ULD'] is List) {
+                      for (var d in (data['data-ULD'] as List)) {
+                         if (d is Map) {
+                            remainingPieces += int.tryParse(d['pieces']?.toString() ?? '0') ?? 0;
+                         }
                       }
-                      if (!_deliveryRemarkControllers.containsKey(awbNumber)) {
-                        _deliveryRemarkControllers[awbNumber] = TextEditingController();
-                      }
-                      final pcsCtrl = _deliveryPcsControllers[awbNumber]!;
-                      final remCtrl = _deliveryRemarkControllers[awbNumber]!;
+                   }
+                }
+
+                if (!_deliveryPcsControllers.containsKey(itemNumber)) {
+                  _deliveryPcsControllers[itemNumber] = TextEditingController(text: remainingPieces.toString());
+                }
+                if (!_deliveryRemarkControllers.containsKey(itemNumber)) {
+                  _deliveryRemarkControllers[itemNumber] = TextEditingController();
+                }
+                final pcsCtrl = _deliveryPcsControllers[itemNumber]!;
+                final remCtrl = _deliveryRemarkControllers[itemNumber]!;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -866,7 +917,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                       ),
                       Expanded(
                         flex: 5,
-                        child: Text(awbNumber, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 13)),
+                        child: Text(itemNumber, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                       Container(
                         height: 28,
@@ -894,13 +945,14 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                             Expanded(
                               child: TextField(
                                 controller: pcsCtrl,
+                                readOnly: !isAwb,
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
                                   TextInputFormatter.withFunction((oldValue, newValue) {
                                     if (newValue.text.isEmpty) return newValue;
                                     final val = int.tryParse(newValue.text) ?? 0;
-                                    if (val > remainingPieces) return oldValue;
+                                    if (isAwb && val > remainingPieces) return oldValue;
                                     return newValue;
                                   }),
                                 ],
@@ -929,33 +981,32 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                             ),
                             child: TextField(
                               controller: remCtrl,
-                              inputFormatters: [
-                                TextInputFormatter.withFunction((oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase())),
-                              ],
-                              style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 11),
+                              style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12),
                               decoration: InputDecoration(
-                                hintText: appLanguage.value == 'es' ? 'Comentarios adicionales...' : 'Additional remarks...',
-                                hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(100) : const Color(0xFF9CA3AF), fontSize: 11),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                hintText: 'Remarks...',
+                                hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(90) : const Color(0xFF9CA3AF), fontSize: 12),
                                 border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                isDense: true,
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
                         constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(4),
-                        icon: const Icon(Icons.close_rounded, size: 20, color: Colors.redAccent),
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Remove',
                         onPressed: () {
                           setState(() {
-                            _selectedAwbs.removeWhere((item) => item['AWB-number'] == awbNumber);
-                            _deliveryPcsControllers[awbNumber]?.dispose();
-                            _deliveryPcsControllers.remove(awbNumber);
-                            _deliveryRemarkControllers[awbNumber]?.dispose();
-                            _deliveryRemarkControllers.remove(awbNumber);
+                             if (isAwb) {
+                               _selectedAwbs.removeWhere((e) => e['AWB-number'] == itemNumber);
+                             } else {
+                               _selectedUlds.removeWhere((e) => e['ULD-number'] == itemNumber);
+                             }
+                             _deliveryPcsControllers.remove(itemNumber)?.dispose();
+                             _deliveryRemarkControllers.remove(itemNumber)?.dispose();
                           });
                         },
                       ),
@@ -1741,6 +1792,310 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     );
   }
 
+  Widget _buildUldSelector(bool dark) {
+    if (_isLoadingUlds) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
+    }
+    
+    var filteredUlds = _allUlds.where((uld) {
+      final status = uld['status']?.toString() ?? '';
+      if (status == 'Delivered' || status == 'Canceled') return false;
+      if (uld['isBreak'] == true) return false;
+      
+      if (_searchAwbCtrl.text.isNotEmpty) {
+        final term = _searchAwbCtrl.text.toLowerCase();
+        final uNum = (uld['ULD-number']?.toString() ?? '').toLowerCase();
+        if (!uNum.contains(term)) return false;
+      }
+      return true;
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: SingleChildScrollView(
+                  child: DataTable(
+                    showCheckboxColumn: false,
+                    checkboxHorizontalMargin: 12,
+                    columnSpacing: 16,
+                    horizontalMargin: 16,
+                    dataRowMinHeight: 36,
+                    dataRowMaxHeight: 44,
+                    headingRowHeight: 40,
+                    headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
+                    dataRowColor: WidgetStateProperty.resolveWith((states) {
+                       if (states.contains(WidgetState.selected)) return const Color(0xFF6366f1).withAlpha(40);
+                       if (states.contains(WidgetState.hovered)) return dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6);
+                       return Colors.transparent;
+                    }),
+                    dataTextStyle: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12),
+                    headingTextStyle: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 11),
+                    columns: const [
+                      DataColumn(label: Text('#')),
+                      DataColumn(label: Text('ULD Number')),
+                      DataColumn(label: Text('Total Pieces')),
+                      DataColumn(label: Text('Total Weight')),
+                      DataColumn(label: Text('Flight')),
+                      DataColumn(label: Text('Status')),
+                      DataColumn(label: Text('')),
+                    ],
+                    rows: List.generate(filteredUlds.length, (index) {
+                      final uld = filteredUlds[index];
+                      final String uldNum = uld['ULD-number']?.toString() ?? 'Unknown';
+                      final bool isSelected = _selectedUlds.any((item) => item['ULD-number'] == uldNum);
+
+                      int totalPieces = 0;
+                      if (uld['data-ULD'] is List) {
+                         for (var d in (uld['data-ULD'] as List)) {
+                            if (d is Map) {
+                               totalPieces += int.tryParse(d['pieces']?.toString() ?? '0') ?? 0;
+                            }
+                         }
+                      }
+
+                      String flightStr = '-';
+                      final carrier = uld['refCarrier']?.toString() ?? '';
+                      final flightNum = uld['refNumber']?.toString() ?? '';
+                      final flightDateStr = uld['refDate']?.toString() ?? '';
+                      
+                      if (carrier.isNotEmpty || flightNum.isNotEmpty) {
+                         flightStr = '$carrier$flightNum';
+                         if (flightDateStr.isNotEmpty) {
+                             try {
+                               final d = DateTime.parse(flightDateStr);
+                               flightStr += ' ${DateFormat('MMM dd').format(d)}';
+                             } catch (_) {}
+                         }
+                      }
+
+
+                      return DataRow(
+                        selected: isSelected,
+                        onSelectChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedUlds.add(uld);
+                              if (!_deliveryPcsControllers.containsKey(uldNum)) {
+                                _deliveryPcsControllers[uldNum] = TextEditingController(text: totalPieces.toString());
+                                _deliveryRemarkControllers[uldNum] = TextEditingController();
+                              }
+                            } else {
+                              _selectedUlds.removeWhere((item) => item['ULD-number'] == uldNum);
+                              _deliveryPcsControllers.remove(uldNum)?.dispose();
+                              _deliveryRemarkControllers.remove(uldNum)?.dispose();
+                            }
+                          });
+                        },
+                        cells: [
+                          DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600))),
+                          DataCell(Text(uldNum, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
+                          DataCell(Text('$totalPieces pcs')),
+                          DataCell(Text('${uld['weight']?.toString() ?? '0'} kg', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
+                          DataCell(Text(flightStr.trim() == '' ? '-' : flightStr, style: const TextStyle(fontWeight: FontWeight.w500))),
+                          DataCell(_buildStatusBadge(uld['status']?.toString() ?? 'Received')),
+                          DataCell(
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: Icon(Icons.info_outline_rounded, color: dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af), size: 16),
+                                onPressed: () => _showUldDrawer(context, uld, dark),
+                                tooltip: 'View Info',
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showUldDrawer(BuildContext context, Map<String, dynamic> u, bool dark) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (ctx, anim1, anim2) {
+        final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+        final bg = dark ? const Color(0xFF0f172a) : Colors.white;
+        final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
+        final textP = dark ? Colors.white : const Color(0xFF111827);
+        final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+
+        List dataUld = [];
+        if (u['data-ULD'] is List) dataUld = u['data-ULD'];
+
+        Widget buildInfoBox(String label, String value, IconData icon, [Color? valColor]) {
+           return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Column(
+                 crossAxisAlignment: CrossAxisAlignment.start,
+                 children: [
+                    Row(
+                       children: [
+                          Icon(icon, color: textS, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(child: Text(label, style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                       ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(value, style: TextStyle(color: valColor ?? textP, fontSize: 13, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                 ]
+              )
+           );
+        }
+
+        return StatefulBuilder(
+          builder: (ctxModal, setModalState) {
+            return Align(
+              alignment: Alignment.centerRight,
+              child: Material(
+                color: bg,
+                elevation: 16,
+                child: SizedBox(
+                  width: 450,
+                  height: double.infinity,
+                  child: Column(
+                    children: [
+                       Container(
+                         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                         decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
+                         child: Row(
+                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                           crossAxisAlignment: CrossAxisAlignment.start,
+                           children: [
+                             Column(
+                               crossAxisAlignment: CrossAxisAlignment.start,
+                               children: [
+                                 Text('ULD Details', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
+                                 const SizedBox(height: 4),
+                                 Row(
+                                   children: [
+                                     Icon(Icons.inventory_2_rounded, color: textP, size: 24),
+                                     const SizedBox(width: 8),
+                                     Text('${u['ULD-number'] ?? '-'}', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                                   ]
+                                 )
+                               ],
+                             ),
+                             IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: textP)),
+                           ],
+                         ),
+                       ),
+                       Expanded(
+                         child: SingleChildScrollView(
+                           padding: const EdgeInsets.all(24),
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                       Row(
+                                         children: [
+                                            Icon(Icons.description_rounded, size: 16, color: textP),
+                                            const SizedBox(width: 8),
+                                            Text('General Information', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                         ]
+                                       ),
+                                       const SizedBox(height: 12),
+                                       Row(children: [
+                                         Expanded(child: buildInfoBox('Pieces', '${u['pieces'] ?? '0'}', Icons.extension_outlined)),
+                                         Expanded(child: buildInfoBox('Weight', '${u['weight'] ?? '0'} kg', Icons.scale_outlined)),
+                                       ]),
+                                       const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
+                                       Row(children: [
+                                         Expanded(child: buildInfoBox('Type', u['isBreak'] == true ? 'BREAK' : 'NO BREAK', Icons.broken_image_rounded, u['isBreak'] == true ? const Color(0xFF10b981) : const Color(0xFFef4444))),
+                                         Expanded(child: buildInfoBox('Priority', u['isPriority'] == true ? 'Priority' : 'Normal', Icons.star_outline_rounded, u['isPriority'] == true ? Colors.redAccent : textP)),
+                                       ]),
+                                       const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
+                                       Row(
+                                         crossAxisAlignment: CrossAxisAlignment.start,
+                                         children: [
+                                           Expanded(flex: 2, child: buildInfoBox('Status', u['status']?.toString() ?? 'Waiting', Icons.info_outline)),
+                                           Expanded(flex: 3, child: buildInfoBox('Remarks', u['remarks']?.toString() ?? '-', Icons.notes_rounded)),
+                                       ])
+                                    ]
+                                  )
+                                ),
+                                if (dataUld.isNotEmpty) ...[
+                                   const SizedBox(height: 24),
+                                   Text('Assigned AWBs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                   const SizedBox(height: 12),
+                                   ...dataUld.asMap().entries.map((entry) {
+                                      final index = entry.key;
+                                      final awb = entry.value;
+                                      return Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
+                                        child: Row(
+                                          children: [
+                                             Container(
+                                               width: 20, height: 20,
+                                               alignment: Alignment.center,
+                                               decoration: const BoxDecoration(color: Color(0x326366f1), shape: BoxShape.circle),
+                                               child: Text('${index + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                             ),
+                                             const SizedBox(width: 8),
+                                             Expanded(
+                                               child: Row(
+                                                  children: [
+                                                     SizedBox(width: 120, child: Text(awb['awb_number']?.toString() ?? '', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w500))),
+                                                     const SizedBox(width: 8),
+                                                     Expanded(child: Text('Pieces: ${awb['pieces'] ?? 0}', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                     Expanded(child: Text('Weight: ${awb['weight'] ?? 0} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                                                  ],
+                                               )
+                                             ),
+                                          ],
+                                        ),
+                                      );
+                                   }),
+                                ]
+                             ],
+                           )
+                         )
+                       )
+                    ]
+                  )
+                )
+              )
+            );
+          }
+        );
+      },
+      transitionBuilder: (ctx, anim1, anim2, child) {
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+          child: child,
+        );
+      }
+    );
+  }
+
   Widget _buildImportAwbRightPane(bool dark, Color textP, Color textS, Color borderC) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2096,7 +2451,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                           children: [
                             Icon(Icons.list_alt_rounded, color: textP, size: 20),
                             const SizedBox(width: 8),
-                            Text('Select Air Waybills (list-pickup)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text('Select Items (list-pickup)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
                             const Spacer(),
                             Container(
                                width: 300,
@@ -2131,7 +2486,7 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                                   style: TextStyle(color: textP, fontSize: 13),
                                   onChanged: (v) => setState(() {}),
                                   decoration: InputDecoration(
-                                     hintText: appLanguage.value == 'es' ? 'Buscar AWB...' : 'Search AWB...',
+                                     hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
                                      hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
                                      prefixIcon: Icon(Icons.search_rounded, color: textP.withAlpha(76), size: 16),
                                      border: InputBorder.none,
@@ -2144,23 +2499,55 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
                         const SizedBox(height: 4),
                         Text(
                           appLanguage.value == 'es' 
-                            ? 'Seleccione uno o más AWBs para añadirlos al listado de pickup.' 
-                            : 'Select one or more AWBs to add them to the pickup list.',
+                            ? 'Seleccione uno o más AWBs o ULDs para añadirlos al listado de pickup.' 
+                            : 'Select one or more AWBs or ULDs to add them to the pickup list.',
                           style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 13),
                         ),
                         const SizedBox(height: 16),
+                        if (_typeCtrl.text != 'Import') ...[
+                           Row(
+                             children: [
+                               GestureDetector(
+                                 onTap: () => setState(() => _showUldTab = false),
+                                 child: Container(
+                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                   decoration: BoxDecoration(
+                                      color: !_showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                   ),
+                                   child: Text('AWB Numbers', style: TextStyle(color: !_showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
+                                 ),
+                               ),
+                               const SizedBox(width: 8),
+                               GestureDetector(
+                                 onTap: () => setState(() => _showUldTab = true),
+                                 child: Container(
+                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                   decoration: BoxDecoration(
+                                      color: _showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                   ),
+                                   child: Text('No Break ULDs', style: TextStyle(color: _showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
+                                 ),
+                               ),
+                             ]
+                           ),
+                           const SizedBox(height: 16),
+                        ],
                         Expanded(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Expanded(
                                 flex: 6,
-                                child: _buildAwbSelector(dark),
+                                child: _typeCtrl.text == 'Import' 
+                                      ? _buildAwbSelector(dark) 
+                                      : (_showUldTab ? _buildUldSelector(dark) : _buildAwbSelector(dark)),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 flex: 4,
-                                child: _typeCtrl.text == 'Import' ? _buildImportAwbRightPane(dark, textP, textS, borderC) : _buildSelectedAwbsSummary(dark),
+                                child: _typeCtrl.text == 'Import' ? _buildImportAwbRightPane(dark, textP, textS, borderC) : _buildSelectedItemsSummary(dark),
                               ),
                             ],
                           ),
