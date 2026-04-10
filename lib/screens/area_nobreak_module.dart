@@ -832,11 +832,21 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                                           };
 
                                           try {
-                                            for(int uId in _selectedUldIds) {
+                                            for (var su in selectedUlds) {
+                                                final uId = su['id'] as int;
+                                                final uldName = su['ULD-number']?.toString() ?? '';
+
                                                 await Supabase.instance.client.from('ULD').update({
                                                    'data-delivery': deliveryData,
                                                    'status': 'Delivered'
                                                 }).eq('id', uId);
+
+                                                if (uldName.isNotEmpty) {
+                                                  await Supabase.instance.client.rpc('process_uld_delivery', params: {
+                                                    'p_uld_name': uldName,
+                                                    'p_delivery_data': deliveryData,
+                                                  });
+                                                }
                                             }
 
                                             if (!context.mounted) return;

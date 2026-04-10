@@ -38,10 +38,9 @@ class _SystemBfModuleState extends State<SystemBfModule> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 700;
-              final childList = !_isSplitView
+              final childListWidgets = !_isSplitView
                   ? [
                       Expanded(
-                        flex: isWide ? 1 : 0,
                         child: _buildSystemCard(
                           context: context,
                           systemName: 'ULD Received',
@@ -55,7 +54,6 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     ]
                   : [
                       Expanded(
-                        flex: isWide ? 1 : 0,
                         child: _buildSystemCard(
                           context: context,
                           systemName: 'System 1',
@@ -66,12 +64,8 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                           isLeft: true,
                         ),
                       ),
-                      if (isWide)
-                        const SizedBox(width: 24)
-                      else
-                        const SizedBox(height: 24),
+                      const SizedBox(width: 24, height: 24),
                       Expanded(
-                        flex: isWide ? 1 : 0,
                         child: _buildSystemCard(
                           context: context,
                           systemName: 'System 2',
@@ -84,19 +78,18 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                       ),
                     ];
 
-              return isWide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: childList,
-                    )
-                  : SingleChildScrollView(
-                      child: Column(
+              return SizedBox(
+                height: constraints.maxHeight,
+                child: isWide
+                    ? Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: childList
-                            .map((e) => e is Expanded ? e.child : e)
-                            .toList(),
+                        children: childListWidgets,
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: childListWidgets,
                       ),
-                    );
+              );
             },
           ),
         );

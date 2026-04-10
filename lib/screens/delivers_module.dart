@@ -100,7 +100,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                         ],
                       )
                     else
-                      Text('Delivers', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                      Text('Delivers / Transfers', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
                     if (_showAddForm)
                       Text(
@@ -511,7 +511,7 @@ class _DeliversModuleState extends State<DeliversModule> {
                                           })
                                         ),
                                         DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
-                                        DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting')),
+                                        DataCell(_buildStatusBadge(u['status']?.toString() ?? 'Waiting', itemData: u)),
                                         DataCell(
                                           Checkbox(
                                             value: _selectedDeliverIds.contains(dId),
@@ -1347,13 +1347,15 @@ class _DeliversModuleState extends State<DeliversModule> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, {Map<String, dynamic>? itemData}) {
     Color bg = const Color(0xFF334155);
     Color fg = const Color(0xFFcbd5e1);
     
     final s = status.toLowerCase();
     if (s.contains('waiting')) {
       bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
+    } else if (s.contains('pending')) {
+      bg = const Color(0xFFca8a04).withAlpha(51); fg = const Color(0xFFfef08a);
     } else if (s.contains('in process') || s.contains('process')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
     } else if (s.contains('ready')) {
@@ -1362,7 +1364,7 @@ class _DeliversModuleState extends State<DeliversModule> {
       bg = const Color(0xFF7f1d1d).withAlpha(51); fg = const Color(0xFFfca5a5);
     }
 
-    return Container(
+    Widget badgeContainer = Container(
       width: 100,
       height: 32,
       alignment: Alignment.center,
@@ -1374,6 +1376,118 @@ class _DeliversModuleState extends State<DeliversModule> {
         status.toUpperCase(), 
         style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
       ),
+    );
+
+    if (itemData != null && itemData['report-pending'] != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          badgeContainer,
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              bool dark = isDarkMode.value;
+              final reportField = itemData['report-pending'];
+              List<dynamic> reports = [];
+              if (reportField is List) {
+                reports = reportField;
+              } else if (reportField is Map) {
+                reports = [reportField];
+              }
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFca8a04).withAlpha(51), shape: BoxShape.circle),
+                        child: const Icon(Icons.info_outline_rounded, color: Color(0xFFfef08a), size: 24)
+                      ),
+                      const SizedBox(width: 12),
+                      Text(appLanguage.value == 'es' ? 'Detalles de postergación' : 'Pending Context', style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  content: SizedBox(
+                    width: 400,
+                    height: reports.length > 2 ? 300 : null,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: reports.map((report) => Padding(
+                          padding: const EdgeInsets.only(bottom: 24.0),
+                          child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               _buildReportRow(Icons.access_time_rounded, appLanguage.value == 'es' ? 'Hora' : 'Time', report['time'] ?? 'Unknown', dark),
+                               const SizedBox(height: 16),
+                               _buildReportRow(Icons.person_rounded, appLanguage.value == 'es' ? 'Usuario' : 'User', report['user'] ?? 'Unknown', dark),
+                               const SizedBox(height: 16),
+                               _buildReportRow(Icons.comment_rounded, appLanguage.value == 'es' ? 'Razón' : 'Reason', report['reason'] ?? 'No reason provided', dark),
+                               if (report != reports.last) ...[
+                                 const SizedBox(height: 12),
+                                 Divider(color: dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                               ]
+                             ]
+                          )
+                        )).toList(),
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: TextStyle(color: dark ? const Color(0xFFfcd34d) : const Color(0xFFb45309), fontWeight: FontWeight.bold)),
+                      onPressed: () => Navigator.pop(ctx),
+                    )
+                  ],
+                )
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isDarkMode.value ? const Color(0xFFca8a04).withAlpha(40) : const Color(0xFFfef08a).withAlpha(150),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.info_outline_rounded, color: isDarkMode.value ? const Color(0xFFfde047) : const Color(0xFFb45309), size: 18),
+            ),
+          )
+        ],
+      );
+    }
+
+    return badgeContainer;
+  }
+
+  Widget _buildReportRow(IconData icon, String label, String value, bool dark) {
+    if ((label == 'Time' || label == 'Hora') && value != 'Unknown') {
+      try {
+        final d = DateTime.parse(value).toLocal();
+        value = DateFormat('MMM dd, yyyy - hh:mm a').format(d);
+      } catch (_) {}
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: dark ? Colors.white54 : Colors.black54),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 12, color: dark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(value, style: TextStyle(fontSize: 14, color: dark ? Colors.white : Colors.black, height: 1.4)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

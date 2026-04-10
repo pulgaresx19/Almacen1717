@@ -28,6 +28,7 @@ class _DriverModuleState extends State<DriverModule> {
 
   bool _isMasterDriver = true;
   bool _isFetchingUser = true;
+  bool _driverRequested = false;
 
   @override
   void initState() {
@@ -97,7 +98,7 @@ class _DriverModuleState extends State<DriverModule> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        appLanguage.value == 'es' ? 'Coordinador de Chofer' : 'Driver Coordinator',
+                        appLanguage.value == 'es' ? 'Entregas / Traslados' : 'Deliver / Transfer',
                         style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 4),
@@ -169,7 +170,8 @@ class _DriverModuleState extends State<DriverModule> {
 
                   var delivers = List<Map<String, dynamic>>.from(snapshot.data ?? [])
                       .where((d) {
-                        if (d['status']?.toString().toLowerCase() != 'waiting') return false;
+                        final st = d['status']?.toString().toLowerCase();
+                        if (st != 'waiting' && st != 'pending') return false;
                         final currentNoShow = d['no-show'];
                         if (currentNoShow != null && currentNoShow is List) {
                           final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
@@ -181,12 +183,12 @@ class _DriverModuleState extends State<DriverModule> {
                       .toList();
                   
                   delivers.sort((a, b) {
-                    const statusOrder = ['Waiting', 'In process', 'Ready', 'Canceled'];
+                    const statusOrder = ['Pending', 'Waiting', 'In process', 'Ready', 'Canceled'];
                     final statusA = a['status']?.toString() ?? 'Waiting';
                     final statusB = b['status']?.toString() ?? 'Waiting';
                     
-                    int indexA = statusOrder.indexOf(statusA);
-                    int indexB = statusOrder.indexOf(statusB);
+                    int indexA = statusOrder.indexWhere((element) => element.toLowerCase() == statusA.toLowerCase());
+                    int indexB = statusOrder.indexWhere((element) => element.toLowerCase() == statusB.toLowerCase());
                     if (indexA == -1) indexA = 999;
                     if (indexB == -1) indexB = 999;
                     
@@ -225,6 +227,67 @@ class _DriverModuleState extends State<DriverModule> {
                     if (delivers.isEmpty) {
                       return Center(child: Text(appLanguage.value == 'es' ? 'No se encontraron registros pendientes.' : 'No pending records found.', style: const TextStyle(color: Color(0xFF94a3b8))));
                     }
+                    if (!_driverRequested) {
+                      return Center(
+                        child: Container(
+                          width: 440,
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: dark ? const Color(0xFF1e293b) : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                            boxShadow: [
+                              BoxShadow(color: Colors.black.withAlpha(dark ? 50 : 10), blurRadius: 20, offset: const Offset(0, 10))
+                            ]
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366f1).withAlpha(30),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.local_shipping_rounded, color: Color(0xFF6366f1), size: 48),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                appLanguage.value == 'es' ? 'Solicitar Conductor' : 'Request Driver',
+                                style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 24, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                appLanguage.value == 'es' 
+                                  ? 'Pulsa el botón de abajo para solicitar y revisar el próximo conductor para entrega.'
+                                  : 'Press the button below to request and review the next driver for delivery.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, height: 1.5),
+                              ),
+                              const SizedBox(height: 32),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 50,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF6366f1),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () => setState(() => _driverRequested = true),
+                                  child: Text(
+                                    appLanguage.value == 'es' ? 'Solicitar Ahora' : 'Request Now',
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
                     return Center(
                       child: SingleChildScrollView(
                         child: Padding(
@@ -432,10 +495,7 @@ class _DriverModuleState extends State<DriverModule> {
         if (_selectedDriver != null && _selectedAwbDetails == null)
           Positioned.fill(
             child: GestureDetector(
-              onTap: () => setState(() {
-                  _selectedDriver = null;
-                  _selectedAwbDetails = null;
-              }),
+              onTap: () {}, // Prevent minimizing when tapping outside
               child: Container(
                 color: dark ? const Color(0xFF0f172a) : const Color(0xFFf3f4f6), // Solid, opaque background
                 alignment: Alignment.center,
@@ -519,7 +579,7 @@ class _DriverModuleState extends State<DriverModule> {
         if (_selectedAwbDetails != null)
           Positioned.fill(
             child: GestureDetector(
-              onTap: () => setState(() => _selectedAwbDetails = null),
+              onTap: () {}, // Prevent minimizing when tapping outside
               child: Container(
                 color: dark ? const Color(0xFF0f172a) : const Color(0xFFf3f4f6), // Solid colored background
                 alignment: Alignment.center,
@@ -619,6 +679,83 @@ class _DriverModuleState extends State<DriverModule> {
                     padding: EdgeInsets.only(right: 12.0),
                     child: Icon(Icons.star_rounded, color: Colors.orange, size: 28),
                   ),
+                if (u['report-pending'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12.0),
+                    child: GestureDetector(
+                      onTap: () {
+                        final reportField = u['report-pending'];
+                        List<dynamic> reports = [];
+                        if (reportField is List) {
+                          reports = reportField;
+                        } else if (reportField is Map) {
+                          reports = [reportField];
+                        }
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            title: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(color: const Color(0xFFca8a04).withAlpha(51), shape: BoxShape.circle),
+                                  child: const Icon(Icons.info_outline_rounded, color: Color(0xFFfef08a), size: 24)
+                                ),
+                                const SizedBox(width: 12),
+                                Text(appLanguage.value == 'es' ? 'Detalles de postergación' : 'Pending Context', style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            content: SizedBox(
+                              width: 400,
+                              height: reports.length > 2 ? 300 : null,
+                              child: SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: reports.map((report) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 24.0),
+                                    child: Column(
+                                       crossAxisAlignment: CrossAxisAlignment.start,
+                                       children: [
+                                         _buildReportRow(Icons.access_time_rounded, appLanguage.value == 'es' ? 'Hora' : 'Time', report['time'] ?? 'Unknown', dark),
+                                         const SizedBox(height: 16),
+                                         _buildReportRow(Icons.person_rounded, appLanguage.value == 'es' ? 'Usuario' : 'User', report['user'] ?? 'Unknown', dark),
+                                         const SizedBox(height: 16),
+                                         _buildReportRow(Icons.comment_rounded, appLanguage.value == 'es' ? 'Razón' : 'Reason', report['reason'] ?? 'No reason provided', dark),
+                                         if (report != reports.last) ...[
+                                           const SizedBox(height: 12),
+                                           Divider(color: dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                                         ]
+                                       ]
+                                    )
+                                  )).toList(),
+                                ),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: TextStyle(color: dark ? const Color(0xFFfcd34d) : const Color(0xFFb45309), fontWeight: FontWeight.bold)),
+                                onPressed: () => Navigator.pop(ctx),
+                              )
+                            ],
+                          )
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: dark ? const Color(0xFFca8a04).withAlpha(40) : const Color(0xFFfef08a).withAlpha(150),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.info_outline_rounded, color: dark ? const Color(0xFFfde047) : const Color(0xFFb45309), size: 18),
+                      ),
+                    ),
+                  ),
                 if (dialogCtx != null)
                   IconButton(
                     onPressed: () => Navigator.pop(dialogCtx),
@@ -633,33 +770,37 @@ class _DriverModuleState extends State<DriverModule> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: dark ? const Color(0xFF0f172a).withAlpha(128) : const Color(0xFFf8fafc),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10b981).withAlpha(30),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.badge_rounded, color: Color(0xFF10b981), size: 28),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: dark ? const Color(0xFF0f172a).withAlpha(128) : const Color(0xFFf8fafc),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(u['truck-company']?.toString() ?? 'COMPAÑÍA', style: TextStyle(color: dark ? const Color(0xFF10b981) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
-                            Text(u['driver']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10b981).withAlpha(30),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.badge_rounded, color: Color(0xFF10b981), size: 28),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(u['truck-company']?.toString() ?? 'COMPAÑÍA', style: TextStyle(color: dark ? const Color(0xFF10b981) : Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 2),
+                                Text(u['driver']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
+                          ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
@@ -677,7 +818,36 @@ class _DriverModuleState extends State<DriverModule> {
                     ],
                   ),
                 ),
-                Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
+                Positioned(
+                  top: -12,
+                  left: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (u['status']?.toString().toLowerCase().contains('pending') == true)
+                        ? (dark ? const Color(0xFFca8a04) : const Color(0xFFfef08a))
+                        : (dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 4, offset: const Offset(0, 2))
+                      ]
+                    ),
+                    child: Text(
+                      (u['status']?.toString() ?? 'WAITING').toUpperCase(),
+                      style: TextStyle(
+                        color: (u['status']?.toString().toLowerCase().contains('pending') == true)
+                          ? (dark ? const Color(0xFFfef08a) : const Color(0xFFb45309))
+                          : (dark ? const Color(0xFFe2e8f0) : const Color(0xFF475569)),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFe2e8f0), height: 24),
                 Row(
                   children: [
                     Expanded(child: _confirmDetailRow(Icons.local_shipping_rounded, appLanguage.value == 'es' ? 'Tipo' : 'Type', u['type']?.toString().isNotEmpty == true ? u['type'].toString() : '-', dark)),
@@ -744,6 +914,8 @@ class _DriverModuleState extends State<DriverModule> {
                     
                     if (dialogCtx != null && dialogCtx.mounted) {
                       Navigator.pop(dialogCtx);
+                    } else if (dialogCtx == null) {
+                      if (mounted) setState(() => _driverRequested = false);
                     }
                   },
                   style: TextButton.styleFrom(
@@ -764,19 +936,23 @@ class _DriverModuleState extends State<DriverModule> {
                           'time': currentTime,
                           'user': currentUserFullName,
                           'avatar': currentUserAvatar,
-                        }
+                        },
+                        'status': 'In Process'
                       }).eq('id', u['id']);
                       u['ref-userDrive'] = {
                           'time': currentTime,
                           'user': currentUserFullName,
                           'avatar': currentUserAvatar,
                       };
+                      u['status'] = 'In Process';
                     } catch (e) {
                       debugPrint('Confirm Update Error: ');
                     }
                     
                     if (dialogCtx != null && dialogCtx.mounted) {
                       Navigator.pop(dialogCtx);
+                    } else if (dialogCtx == null) {
+                      if (mounted) setState(() => _driverRequested = false);
                     }
                     _loadDriverDetails(u);
                   },
@@ -813,89 +989,137 @@ class _DriverModuleState extends State<DriverModule> {
   }
 
   void _showPendingRejectionDialog(BuildContext context, Map<String, dynamic> u, bool dark) {
+    TextEditingController reasonController = TextEditingController();
+    bool isError = false;
+
     showDialog(
       context: context,
       builder: (ctx) {
-        return Dialog(
-          backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: 400,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withAlpha(30),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 32),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  appLanguage.value == 'es' ? 'Atención' : 'Attention',
-                  style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  appLanguage.value == 'es' 
-                    ? 'Al cerrar, el estatus de este conductor regresará a pendiente hasta que otro conductor pueda finalizarlo.'
-                    : 'Upon closing, this driver\'s status will return to pending until another driver can finalize it.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: dark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.5),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 13),
-                  decoration: InputDecoration(
-                    labelText: appLanguage.value == 'es' ? 'Razón de postergación' : 'Reason for postponement',
-                    labelStyle: TextStyle(color: dark ? Colors.white54 : Colors.black54),
-                    filled: true,
-                    fillColor: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: dark ? Colors.white.withAlpha(20) : Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.orange),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Container(
+                width: 400,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withAlpha(30),
+                        shape: BoxShape.circle,
                       ),
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 32),
                     ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        elevation: 0,
-                      ),
-                      onPressed: () {
-                         // Just closing this notification component for now
-                         Navigator.pop(ctx);
+                    const SizedBox(height: 16),
+                    Text(
+                      appLanguage.value == 'es' ? 'Atención' : 'Attention',
+                      style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      appLanguage.value == 'es' 
+                        ? 'Al cerrar, el estatus de este conductor regresará a pendiente hasta que otro conductor pueda finalizarlo.'
+                        : 'Upon closing, this driver\'s status will return to pending until another driver can finalize it.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: dark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.5),
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: reasonController,
+                      style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 13),
+                      onChanged: (_) {
+                        if (isError) setDialogState(() => isError = false);
                       },
-                      child: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      decoration: InputDecoration(
+                        labelText: appLanguage.value == 'es' ? 'Razón de postergación 🤔' : 'Reason for postponement 🤔',
+                        labelStyle: TextStyle(color: isError ? Colors.redAccent : (dark ? Colors.white54 : Colors.black54)),
+                        filled: true,
+                        fillColor: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: isError ? Colors.redAccent : (dark ? Colors.white.withAlpha(20) : Colors.grey.shade300)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: isError ? Colors.redAccent : Colors.orange),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        errorText: isError ? (appLanguage.value == 'es' ? 'Este campo es requerido' : 'This field is required') : null,
+                      ),
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            backgroundColor: Colors.orange,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                          onPressed: () async {
+                             if (reasonController.text.trim().isEmpty) {
+                               setDialogState(() => isError = true);
+                               return;
+                             }
+
+                             final currentTime = DateTime.now().toUtc().toIso8601String();
+                             final currentUserFullName = currentUserData.value?['full-name'] ?? 'Unknown';
+
+                             List<dynamic> existingReports = [];
+                             if (u['report-pending'] is List) {
+                               existingReports = List<dynamic>.from(u['report-pending']);
+                             } else if (u['report-pending'] is Map) {
+                               existingReports = [u['report-pending']];
+                             }
+                             
+                             existingReports.add({
+                               'time': currentTime,
+                               'user': currentUserFullName,
+                               'reason': reasonController.text.trim(),
+                             });
+
+                             try {
+                               await Supabase.instance.client.from('Delivers').update({
+                                 'report-pending': existingReports,
+                                 'status': 'Pending'
+                               }).eq('id', u['id']);
+                             } catch (error) {
+                               debugPrint('Error updating pending status: $error');
+                             }
+
+                             setState(() {
+                               _selectedDriver = null;
+                               _selectedAwbDetails = null;
+                               if (!_isMasterDriver) {
+                                 _driverRequested = false;
+                               }
+                             });
+                             if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                          child: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          }
         );
       }
     );
@@ -918,6 +1142,32 @@ class _DriverModuleState extends State<DriverModule> {
           ),
         )
       ]
+    );
+  }
+
+  Widget _buildReportRow(IconData icon, String label, String value, bool dark) {
+    if ((label == 'Time' || label == 'Hora') && value != 'Unknown') {
+      try {
+        final d = DateTime.parse(value).toLocal();
+        value = DateFormat('MMM dd, yyyy - hh:mm a').format(d);
+      } catch (_) {}
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: dark ? Colors.white54 : Colors.black54),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 12, color: dark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(value, style: TextStyle(fontSize: 14, color: dark ? Colors.white : Colors.black, height: 1.4)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
