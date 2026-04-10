@@ -49,6 +49,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                           dark: dark,
                           index: 1,
                           isLeft: true,
+                          isWide: isWide,
                         ),
                       ),
                     ]
@@ -62,6 +63,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                           dark: dark,
                           index: 1,
                           isLeft: true,
+                          isWide: isWide,
                         ),
                       ),
                       const SizedBox(width: 24, height: 24),
@@ -74,6 +76,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                           dark: dark,
                           index: 2,
                           isLeft: false,
+                          isWide: isWide,
                         ),
                       ),
                     ];
@@ -105,6 +108,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
     required bool dark,
     required int index,
     required bool isLeft,
+    required bool isWide,
   }) {
     final bgCard = dark ? const Color(0xFF1E293B) : Colors.white;
     final textP = dark ? Colors.white : const Color(0xFF111827);
@@ -202,7 +206,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (!_isSplitView && isLeft)
+                        if (!_isSplitView && isLeft && isWide)
                           IconButton(
                             onPressed: () {
                               setState(() {
@@ -262,7 +266,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     const SizedBox(height: 8),
                     Text(
                       carrier == 'N/A' && number == 'N/A'
-                          ? 'Sin vuelo asignado'
+                          ? 'No flight assigned'
                           : '$carrier $number',
                       style: TextStyle(
                         fontSize: 26,

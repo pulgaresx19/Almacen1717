@@ -31,6 +31,9 @@ class _DriverModuleState extends State<DriverModule> {
   bool _isFetchingUser = true;
   bool _driverRequested = false;
 
+  RealtimeChannel? _awbChannel;
+  RealtimeChannel? _uldChannel;
+
   @override
   void initState() {
     super.initState();
@@ -38,8 +41,39 @@ class _DriverModuleState extends State<DriverModule> {
         .from('Delivers')
         .stream(primaryKey: ['id'])
         .order('time-deliver', ascending: true);
+        
+    _awbChannel = Supabase.instance.client
+        .channel('public:AWB')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'AWB',
+          callback: (payload) {
+            if (_selectedDriver != null && mounted) {
+              _refreshDriverAwbsOnly();
+            }
+          },
+        )
+        .subscribe();
+        
+    _uldChannel = Supabase.instance.client
+        .channel('public:ULD')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'ULD',
+          callback: (payload) {
+            if (_selectedDriver != null && mounted) {
+              _refreshDriverAwbsOnly();
+            }
+          },
+        )
+        .subscribe();
+
     _fetchMasterDriverStatus();
   }
+
+
 
   Future<void> _fetchMasterDriverStatus() async {
     try {
@@ -75,6 +109,8 @@ class _DriverModuleState extends State<DriverModule> {
   void dispose() {
     _searchController.dispose();
     _manualFoundCtrl.dispose();
+    _awbChannel?.unsubscribe();
+    _uldChannel?.unsubscribe();
     super.dispose();
   }
 
@@ -2040,6 +2076,75 @@ class _DriverModuleState extends State<DriverModule> {
     }
   }
 
+  Future<void> _refreshDriverAwbsOnly() async {
+    if (_selectedDriver == null) return;
+    final u = _selectedDriver!;
+    
+    List<String> awbsToFetch = [];
+    List<String> uldsToFetch = [];
+    if (u['list-pickup'] != null && u['list-pickup'] is List) {
+      for (var e in (u['list-pickup'] as List)) {
+        if (e is Map) {
+          if (e['AWB-number'] != null &&
+              e['AWB-number'].toString().isNotEmpty &&
+              e['AWB-number'].toString() != '-') {
+            awbsToFetch.add(e['AWB-number'].toString());
+          }
+          if (e['ULD-number'] != null &&
+              e['ULD-number'].toString().isNotEmpty &&
+              e['ULD-number'].toString() != '-') {
+            uldsToFetch.add(e['ULD-number'].toString());
+          }
+        } else {
+          String displayStr = e.toString();
+          if (displayStr.contains(' - ')) {
+            displayStr = displayStr.split(' - ').first.trim();
+          }
+          awbsToFetch.add(displayStr);
+        }
+      }
+    }
+
+    if (awbsToFetch.isNotEmpty || uldsToFetch.isNotEmpty) {
+      try {
+        final List<Map<String, dynamic>> combined = [];
+        if (awbsToFetch.isNotEmpty) {
+          final resAwb = await Supabase.instance.client
+              .from('AWB')
+              .select()
+              .inFilter('AWB-number', awbsToFetch);
+          combined.addAll(List<Map<String, dynamic>>.from(resAwb));
+        }
+        if (uldsToFetch.isNotEmpty) {
+          final resUld = await Supabase.instance.client
+              .from('ULD')
+              .select()
+              .inFilter('ULD-number', uldsToFetch);
+          combined.addAll(List<Map<String, dynamic>>.from(resUld));
+        }
+
+        if (mounted) {
+          setState(() {
+            _driverAwbs = combined;
+            if (_selectedAwbDetails != null) {
+              final isSelectedUld = _selectedAwbDetails!['ULD-number'] != null;
+              final selectedId = _selectedAwbDetails!['id'];
+              final updatedAwb = combined.cast<Map<String,dynamic>?>().firstWhere(
+                (element) => element?['id'] == selectedId && (element?['ULD-number'] != null) == isSelectedUld,
+                orElse: () => null,
+              );
+              if (updatedAwb != null) {
+                _selectedAwbDetails = updatedAwb;
+              }
+            }
+          });
+        }
+      } catch (e) {
+        // Silent fail for background refresh
+      }
+    }
+  }
+
   Widget _buildDriverActivityPanel(
     Map<String, dynamic> u,
     bool dark,
@@ -2052,16 +2157,25 @@ class _DriverModuleState extends State<DriverModule> {
     bool allDelivered =
         _driverAwbs.isNotEmpty &&
         _driverAwbs.every((awb) {
-          if (awb['data-deliver'] == null) return false;
-          if (awb['data-deliver'] is List) {
-            return (awb['data-deliver'] as List).any(
-              (d) => d is Map && d['pickup_id'] == u['id-pickup'],
-            );
+          final isUld = awb['ULD-number'] != null;
+          if (isUld) {
+            bool delivered = awb['status'] == 'Delivered';
+            if (!delivered && awb['data-delivery'] != null) {
+              delivered = awb['data-delivery'] is Map && awb['data-delivery']['id'] == u['id-pickup'];
+            }
+            return delivered;
+          } else {
+            if (awb['data-deliver'] == null) return false;
+            if (awb['data-deliver'] is List) {
+              return (awb['data-deliver'] as List).any(
+                (d) => d is Map && d['pickup_id'] == u['id-pickup'],
+              );
+            }
+            if (awb['data-deliver'] is Map) {
+              return awb['data-deliver']['pickup_id'] == u['id-pickup'];
+            }
+            return false;
           }
-          if (awb['data-deliver'] is Map) {
-            return awb['data-deliver']['pickup_id'] == u['id-pickup'];
-          }
-          return false;
         });
 
     return Column(
@@ -2247,14 +2361,21 @@ class _DriverModuleState extends State<DriverModule> {
                     }
 
                     bool isThisDelivered = false;
-                    if (awb['data-deliver'] != null) {
-                      if (awb['data-deliver'] is List) {
-                        isThisDelivered = (awb['data-deliver'] as List).any(
-                          (d) => d is Map && d['pickup_id'] == u['id-pickup'],
-                        );
-                      } else if (awb['data-deliver'] is Map) {
-                        isThisDelivered =
-                            awb['data-deliver']['pickup_id'] == u['id-pickup'];
+                    if (isUld) {
+                      isThisDelivered = awb['status'] == 'Delivered';
+                      if (!isThisDelivered && awb['data-delivery'] != null) {
+                        isThisDelivered = awb['data-delivery'] is Map && awb['data-delivery']['id'] == u['id-pickup'];
+                      }
+                    } else {
+                      if (awb['data-deliver'] != null) {
+                        if (awb['data-deliver'] is List) {
+                          isThisDelivered = (awb['data-deliver'] as List).any(
+                            (d) => d is Map && d['pickup_id'] == u['id-pickup'],
+                          );
+                        } else if (awb['data-deliver'] is Map) {
+                          isThisDelivered =
+                              awb['data-deliver']['pickup_id'] == u['id-pickup'];
+                        }
                       }
                     }
 
@@ -3055,11 +3176,6 @@ class _DriverModuleState extends State<DriverModule> {
     String digitsOnly = deliverPiecesStr.replaceAll(RegExp(r'[^0-9]'), '');
     int expectedDeliver = int.tryParse(digitsOnly) ?? 0;
 
-    if (isUld && _autoFoundPieces) {
-      foundPieces = expectedDeliver;
-      calculatedFoundPieces = expectedDeliver;
-    }
-
     int rejectedQty = 0;
     String rejectReason = '';
     String rejectUser = '';
@@ -3649,12 +3765,23 @@ class _DriverModuleState extends State<DriverModule> {
                         String statusText = 'PENDING';
                         Color statusColor = const Color(0xFFf59e0b);
 
-                        if (hasCoord && hasLoc) {
-                          statusText = 'READY';
-                          statusColor = const Color(0xFF10b981);
-                        } else if (hasCoord && !hasLoc) {
-                          statusText = 'CHECKED';
-                          statusColor = const Color(0xFF3b82f6);
+                        if (isUld && awbItem['status'] != null) {
+                          statusText = awbItem['status'].toString().toUpperCase();
+                          if (statusText == 'READY' || statusText == 'DELIVERED') {
+                            statusColor = const Color(0xFF10b981);
+                          } else if (statusText == 'WAITING' || statusText == 'PENDING') {
+                            statusColor = const Color(0xFFf59e0b);
+                          } else {
+                            statusColor = const Color(0xFF3b82f6);
+                          }
+                        } else {
+                          if (hasCoord && hasLoc) {
+                            statusText = 'READY';
+                            statusColor = const Color(0xFF10b981);
+                          } else if (hasCoord && !hasLoc) {
+                            statusText = 'CHECKED';
+                            statusColor = const Color(0xFF3b82f6);
+                          }
                         }
 
                         String dateStr =
@@ -5000,13 +5127,15 @@ class _DriverModuleState extends State<DriverModule> {
 
                             try {
                               List<dynamic> currentDeliveries = [];
-                              if (awb['data-deliver'] != null) {
-                                if (awb['data-deliver'] is List) {
-                                  currentDeliveries = List.from(
-                                    awb['data-deliver'],
-                                  );
-                                } else if (awb['data-deliver'] is Map) {
-                                  currentDeliveries = [awb['data-deliver']];
+                              if (!isUld) {
+                                if (awb['data-deliver'] != null) {
+                                  if (awb['data-deliver'] is List) {
+                                    currentDeliveries = List.from(
+                                      awb['data-deliver'],
+                                    );
+                                  } else if (awb['data-deliver'] is Map) {
+                                    currentDeliveries = [awb['data-deliver']];
+                                  }
                                 }
                               }
 
@@ -5028,20 +5157,53 @@ class _DriverModuleState extends State<DriverModule> {
                                   'rejection': _localRejections[awbNum],
                               };
 
-                              currentDeliveries.add(newDeliveryObj);
+                              if (!isUld) {
+                                currentDeliveries.add(newDeliveryObj);
+                                await Supabase.instance.client
+                                    .from('AWB')
+                                    .update({'data-deliver': currentDeliveries})
+                                    .eq('AWB-number', awbNum);
+                              } else {
+                                final rpcDeliveryData = {
+                                  'id': _selectedDriver?['id-pickup'],
+                                  'company': _selectedDriver?['truck-company'],
+                                  'door': _selectedDriver?['door'],
+                                  'remarks': _selectedDriver?['remarks'],
+                                  'time': timeStr,
+                                  'user': userFullName,
+                                };
+                                
+                                await Supabase.instance.client
+                                    .from('ULD')
+                                    .update({
+                                      'data-delivery': rpcDeliveryData,
+                                      'status': 'Delivered'
+                                    })
+                                    .eq('ULD-number', awbNum);
 
-                              await Supabase.instance.client
-                                  .from(isUld ? 'ULD' : 'AWB')
-                                  .update({'data-deliver': currentDeliveries})
-                                  .eq(
-                                    isUld ? 'ULD-number' : 'AWB-number',
-                                    awbNum,
-                                  );
+                                await Supabase.instance.client.rpc('process_uld_delivery', params: {
+                                  'p_uld_name': awbNum,
+                                  'p_delivery_data': rpcDeliveryData,
+                                });
+                              }
 
                               if (mounted && context.mounted) {
                                 setState(() {
-                                  awb['data-deliver'] = currentDeliveries;
-                                  if (!isUld) awb.remove('data-reject');
+                                  if (isUld) {
+                                    final uldDeliveryData = {
+                                      'id': _selectedDriver?['id-pickup'],
+                                      'company': _selectedDriver?['truck-company'],
+                                      'door': _selectedDriver?['door'],
+                                      'remarks': _selectedDriver?['remarks'],
+                                      'time': timeStr,
+                                      'user': userFullName,
+                                    };
+                                    awb['data-delivery'] = uldDeliveryData;
+                                    awb['status'] = 'Delivered';
+                                  } else {
+                                    awb['data-deliver'] = currentDeliveries;
+                                    awb.remove('data-reject');
+                                  }
                                 });
 
                                 bool dialogOpen = true;
@@ -5169,9 +5331,9 @@ class _DriverModuleState extends State<DriverModule> {
                             } catch (e) {
                               if (mounted && context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text(
-                                      'Error registering delivery.',
+                                      'Error registering delivery: $e',
                                     ),
                                     backgroundColor: Colors.redAccent,
                                   ),
@@ -5199,7 +5361,9 @@ class _DriverModuleState extends State<DriverModule> {
                             size: 20,
                           ),
                     label: Text(
-                      _isDelivering ? 'Delivering...' : 'Deliver AWB',
+                      _isDelivering
+                          ? 'Delivering...'
+                          : (isUld ? 'Deliver ULD' : 'Deliver AWB'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,

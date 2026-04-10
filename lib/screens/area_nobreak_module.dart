@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:intl/intl.dart';
+
 import '../main.dart' show appLanguage, isDarkMode;
 
 class AreaNobreakModule extends StatefulWidget {
@@ -89,15 +89,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
     );
   }
 
-  String _formatDate(String? raw) {
-    if (raw == null || raw.isEmpty) return '-';
-    try {
-      final dt = DateTime.parse(raw);
-      return DateFormat('MM/dd/yyyy').format(dt);
-    } catch (_) {
-      return raw;
-    }
-  }
+
 
   Widget _buildStatusBadge(String status) {
     Color bg = const Color(0xFF334155);
@@ -186,8 +178,8 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                   children: [
                     Text(
                       appLanguage.value == 'es'
-                          ? 'Módulo Área (NO BREAK)'
-                          : 'Area (NO BREAK) Module',
+                          ? 'Área (NO BREAK)'
+                          : 'Area (NO BREAK)',
                       style: TextStyle(
                         color: textP,
                         fontSize: 32,
@@ -322,264 +314,13 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                       .where((u) => _selectedUldIds.contains(u['id'] as int))
                       .toList();
 
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: bgCard,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: borderCard),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: ulds.isEmpty
-                                ? Center(
-                                    child: Text(
-                                      appLanguage.value == 'es'
-                                          ? 'No se encontraron ULDs NO BREAK.'
-                                          : 'No NO BREAK ULDs found.',
-                                      style: const TextStyle(
-                                        color: Color(0xFF94a3b8),
-                                      ),
-                                    ),
-                                  )
-                                : LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      return SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: ConstrainedBox(
-                                          constraints: BoxConstraints(
-                                            minWidth: constraints.maxWidth,
-                                          ),
-                                          child: SingleChildScrollView(
-                                            child: DataTable(
-                                              showCheckboxColumn: true,
-                                              headingRowColor:
-                                                  WidgetStateProperty.all(
-                                                    dark
-                                                        ? Colors.white
-                                                              .withAlpha(13)
-                                                        : const Color(
-                                                            0xFFF9FAFB,
-                                                          ),
-                                                  ),
-                                              dataRowColor:
-                                                  WidgetStateProperty.resolveWith(
-                                                    (states) =>
-                                                        states.contains(
-                                                          WidgetState.hovered,
-                                                        )
-                                                        ? (dark
-                                                              ? Colors.white
-                                                                    .withAlpha(
-                                                                      8,
-                                                                    )
-                                                              : const Color(
-                                                                  0xFFF3F4F6,
-                                                                ))
-                                                        : Colors.transparent,
-                                                  ),
-                                              dataTextStyle: TextStyle(
-                                                color: dark
-                                                    ? const Color(0xFFcbd5e1)
-                                                    : const Color(0xFF4B5563),
-                                                fontSize: 13,
-                                              ),
-                                              headingTextStyle: TextStyle(
-                                                color: dark
-                                                    ? const Color(0xFF94a3b8)
-                                                    : const Color(0xFF6B7280),
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 12,
-                                              ),
-                                              columns: const [
-                                                DataColumn(label: Text('#')),
-                                                DataColumn(
-                                                  label: Text('ULD Number'),
-                                                ),
-                                                DataColumn(
-                                                  label: Text('Ref. Flight'),
-                                                ),
-                                                DataColumn(label: Text('Pcs')),
-                                                DataColumn(
-                                                  label: Text('Weight'),
-                                                ),
-
-                                                DataColumn(
-                                                  label: Text('Break'),
-                                                ),
-                                                DataColumn(
-                                                  label: SizedBox(
-                                                    width: 150,
-                                                    child: Text('Remarks'),
-                                                  ),
-                                                ),
-                                                DataColumn(
-                                                  numeric: true,
-                                                  label: SizedBox(
-                                                    width: 100,
-                                                    child: Text(
-                                                      'Status',
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                              rows: List.generate(ulds.length, (
-                                                index,
-                                              ) {
-                                                final u = ulds[index];
-                                                final uId = u['id'] as int;
-                                                return DataRow(
-                                                  selected: _selectedUldIds
-                                                      .contains(uId),
-                                                  onSelectChanged: (val) {
-                                                    setState(() {
-                                                      if (val == true) {
-                                                        _selectedUldIds.add(
-                                                          uId,
-                                                        );
-                                                      } else {
-                                                        _selectedUldIds.remove(
-                                                          uId,
-                                                        );
-                                                      }
-                                                    });
-                                                  },
-                                                  cells: [
-                                                    DataCell(
-                                                      Text('${index + 1}'),
-                                                    ),
-                                                    DataCell(
-                                                      Text(
-                                                        u['ULD-number']
-                                                                ?.toString() ??
-                                                            '-',
-                                                        style: TextStyle(
-                                                          color: dark
-                                                              ? Colors.white
-                                                              : const Color(
-                                                                  0xFF111827,
-                                                                ),
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            u['refCarrier'] ==
-                                                                    null
-                                                                ? 'Standalone ULD'
-                                                                : '${u['refCarrier']} ${u['refNumber'] ?? ''}',
-                                                            style:
-                                                                const TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                ),
-                                                          ),
-                                                          Text(
-                                                            u['refCarrier'] ==
-                                                                        null &&
-                                                                    u['created_at'] !=
-                                                                        null
-                                                                ? _formatDate(
-                                                                    u['created_at']
-                                                                        .toString(),
-                                                                  )
-                                                                : _formatDate(
-                                                                    u['refDate']
-                                                                        ?.toString(),
-                                                                  ),
-                                                            style: TextStyle(
-                                                              color: dark
-                                                                  ? const Color(
-                                                                      0xFF94a3b8,
-                                                                    )
-                                                                  : const Color(
-                                                                      0xFF6B7280,
-                                                                    ),
-                                                              fontSize: 11,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      Text(
-                                                        u['pieces']
-                                                                ?.toString() ??
-                                                            '0',
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      Text(
-                                                        '${u['weight']?.toString() ?? '0'} kg',
-                                                      ),
-                                                    ),
-
-                                                    DataCell(
-                                                      const Text(
-                                                        'NO BREAK',
-                                                        style: TextStyle(
-                                                          color: Color(
-                                                            0xFFef4444,
-                                                          ),
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      SizedBox(
-                                                        width: 150,
-                                                        child: Text(
-                                                          u['remarks']
-                                                                  ?.toString() ??
-                                                              '-',
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      _buildStatusBadge(
-                                                        u['status']?.toString() ?? 'Received',
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              }),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        flex: 1,
-                        child: Container(
+                  return Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: bgCard,
-                            borderRadius: BorderRadius.circular(16),
+                            color: dark
+                                ? const Color(0xFF0f172a).withAlpha(100)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: borderCard),
                           ),
                           child: Column(
@@ -660,8 +401,8 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                               const SizedBox(height: 24),
                               Text(
                                 appLanguage.value == 'es'
-                                    ? 'ULDs Seleccionados (${selectedUlds.length})'
-                                    : 'Selected ULDs (${selectedUlds.length})',
+                                    ? 'Seleccionar ULDs NO BREAK (${_selectedUldIds.length} selecc.)'
+                                    : 'Select NO BREAK ULDs (${_selectedUldIds.length} selected)',
                                 style: TextStyle(
                                   color: textS,
                                   fontSize: 14,
@@ -671,124 +412,215 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                               ),
                               const SizedBox(height: 16),
                               Expanded(
-                                child: selectedUlds.isEmpty
+                                child: ulds.isEmpty
                                     ? Center(
                                         child: Text(
                                           appLanguage.value == 'es'
-                                              ? 'Seleccione ULDs de la tabla'
-                                              : 'Select ULDs from table',
+                                              ? 'No hay ULDs disponibles'
+                                              : 'No ULDs available',
                                           style: TextStyle(
                                             color: textP.withAlpha(76),
                                           ),
                                         ),
                                       )
                                     : ListView.builder(
-                                        itemCount: selectedUlds.length,
+                                        itemCount: ulds.length,
                                         itemBuilder: (context, index) {
-                                          final su = selectedUlds[index];
-                                          return Container(
-                                            margin: const EdgeInsets.only(
-                                              bottom: 12,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 12,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: dark
-                                                  ? Colors.white.withAlpha(10)
-                                                  : const Color(0xFFF3F4F6),
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              border: Border.all(
-                                                color: borderCard,
+                                          final su = ulds[index];
+                                          final isSelected = _selectedUldIds.contains(su['id'] as int);
+                                          return GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                if (isSelected) {
+                                                  _selectedUldIds.remove(su['id'] as int);
+                                                } else {
+                                                  _selectedUldIds.add(su['id'] as int);
+                                                }
+                                              });
+                                            },
+                                            child: Container(
+                                              margin: const EdgeInsets.only(
+                                                bottom: 12,
                                               ),
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                Container(
-                                                  width: 32,
-                                                  height: 32,
-                                                  alignment: Alignment.center,
-                                                  decoration: BoxDecoration(
-                                                    color: dark
-                                                        ? Colors.white
-                                                              .withAlpha(20)
-                                                        : const Color(
-                                                            0xFFE5E7EB,
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 12,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: isSelected 
+                                                    ? (dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFFe0e7ff)) 
+                                                    : bgCard,
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: isSelected ? const Color(0xFF6366f1) : borderCard,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 28,
+                                                    height: 28,
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: isSelected 
+                                                          ? const Color(0xFF6366f1) 
+                                                          : const Color(0xFF6366f1).withAlpha(30),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Text(
+                                                      '${index + 1}',
+                                                      style: TextStyle(
+                                                        color: isSelected ? Colors.white : const Color(0xFF6366f1),
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 16),
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'ULD NUMBER:',
+                                                          style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          su['ULD-number']?.toString() ?? '-',
+                                                          style: TextStyle(
+                                                            color: textP,
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 13,
                                                           ),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: Text(
-                                                    '${index + 1}',
-                                                    style: TextStyle(
-                                                      color: textP,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 13,
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  flex: 3,
-                                                  child: Text(
-                                                    su['ULD-number']
-                                                            ?.toString() ??
-                                                        '-',
-                                                    style: TextStyle(
-                                                      color: textP,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'FLIGHT:',
+                                                          style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Row(
+                                                          children: [
+                                                            const Icon(Icons.flight_takeoff_rounded, size: 12, color: Colors.grey),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              su['refCarrier'] == null 
+                                                                  ? 'Standalone ULD' 
+                                                                  : '${su['refCarrier']} ${su['refNumber'] ?? ''}',
+                                                              style: TextStyle(
+                                                                color: textP,
+                                                                fontSize: 13,
+                                                                fontWeight: FontWeight.w600,
+                                                              ),
+                                                            ),
+                                                          ]
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ),
-                                                Expanded(
-                                                  flex: 2,
-                                                  child: Text(
-                                                    'Pcs: ${su['pieces']?.toString() ?? '0'}',
-                                                    style: TextStyle(
-                                                      color: textS,
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w500,
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'PIECES:',
+                                                          style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          su['pieces']?.toString() ?? '0',
+                                                          style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ),
-                                                Expanded(
-                                                  flex: 2,
-                                                  child: Text(
-                                                    'Wt: ${su['weight']?.toString() ?? '0'} kg',
-                                                    style: TextStyle(
-                                                      color: textS,
-                                                      fontSize: 13,
-                                                      fontWeight:
-                                                          FontWeight.w500,
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'WEIGHT:',
+                                                          style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          '${su['weight']?.toString() ?? '0'} kg',
+                                                          style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
-                                                ),
-                                                IconButton(
-                                                  onPressed: () {
-                                                    setState(() {
-                                                      _selectedUldIds.remove(
-                                                        su['id'] as int,
-                                                      );
-                                                    });
-                                                  },
-                                                  icon: const Icon(
-                                                    Icons.close_rounded,
-                                                    size: 18,
+                                                  const SizedBox(width: 8),
+
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          'REMARKS:',
+                                                          style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          (su['remarks'] == null || su['remarks'].toString().trim().isEmpty)
+                                                              ? 'No remarks' 
+                                                              : su['remarks'].toString(),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: TextStyle(color: textP, fontSize: 13),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
-                                                  color: const Color(
-                                                    0xFFef4444,
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: Align(
+                                                      alignment: Alignment.centerLeft,
+                                                      child: _buildStatusBadge(
+                                                        su['status']?.toString() ?? 'Received',
+                                                      ),
+                                                    ),
                                                   ),
-                                                  splashRadius: 20,
-                                                  padding: EdgeInsets.zero,
-                                                  constraints:
-                                                      const BoxConstraints(),
-                                                ),
-                                              ],
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    width: 24,
+                                                    height: 24,
+                                                    decoration: BoxDecoration(
+                                                      color: isSelected 
+                                                          ? const Color(0xFF6366f1) 
+                                                          : (dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: isSelected 
+                                                          ? null 
+                                                          : Border.all(color: dark ? Colors.white.withAlpha(50) : Colors.black.withAlpha(30)),
+                                                    ),
+                                                    child: isSelected 
+                                                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 16) 
+                                                        : null,
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           );
                                         },
@@ -970,10 +802,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                    ],
-                  );
+                        );
                 },
               ),
             ),

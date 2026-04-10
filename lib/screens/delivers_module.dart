@@ -1358,7 +1358,7 @@ class _DeliversModuleState extends State<DeliversModule> {
       bg = const Color(0xFFca8a04).withAlpha(51); fg = const Color(0xFFfef08a);
     } else if (s.contains('in process') || s.contains('process')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('ready')) {
+    } else if (s.contains('ready') || s.contains('delivered')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
     } else if (s.contains('canceled')) {
       bg = const Color(0xFF7f1d1d).withAlpha(51); fg = const Color(0xFFfca5a5);
