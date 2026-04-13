@@ -4,8 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_flight_screen.dart';
-import '_flight_print_preview.dart';
-import '_flight_pdf_exporter.dart';
+import 'flights_v2/flights_v2_print_preview.dart';
+import 'flights_v2/flights_v2_pdf_exporter.dart';
 
 class FlightModule extends StatefulWidget {
   final bool isActive;

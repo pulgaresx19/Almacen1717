@@ -276,11 +276,27 @@ class AddFlightV2Logic extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchAwbTotalAsync(String text, ValueNotifier<bool> totalLocked, TextEditingController totalCtrl) async {
+  int getLocalUsedPieces(String awbNumber) {
+    int total = 0;
+    for (var uld in flightLocalUlds) {
+      List awbs = uld['awbs'] ?? [];
+      for (var awb in awbs) {
+        if (awb['awb_number'] == awbNumber) {
+          total += (awb['pieces'] as num?)?.toInt() ?? 0;
+        }
+      }
+    }
+    return total;
+  }
+
+  Future<void> fetchAwbTotalAsync(String text, ValueNotifier<bool> totalLocked, TextEditingController totalCtrl, ValueNotifier<int> dbExpectedPieces) async {
     final res = await _service.fetchAwbTotal(text);
     if (res != null && res['total'] != null) {
       totalLocked.value = true;
       totalCtrl.text = res['total'].toString();
+      dbExpectedPieces.value = (res['total_expected'] as num?)?.toInt() ?? 0;
+    } else {
+       dbExpectedPieces.value = 0;
     }
   }
 

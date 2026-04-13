@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'screens/add_flight_v2/add_flight_v2_screen.dart';
 import 'screens/users_module.dart';
 import 'screens/flight_module.dart';
 import 'screens/dashboard_view_module.dart';
@@ -13,6 +12,7 @@ import 'screens/driver_module.dart';
 import 'screens/other_modules.dart';
 import 'screens/system_bf_module.dart';
 import 'screens/area_nobreak_module.dart';
+import 'screens/flights_v2/flights_v2_screen.dart';
 
 
 
@@ -688,25 +688,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
                           child: Row(
                             children: [
-                              InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const AddFlightV2Screen()),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF6366f1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(
-                                    Icons.warehouse_rounded,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF6366f1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.warehouse_rounded,
+                                  color: Colors.white,
+                                  size: 24,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -741,6 +732,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Icons.flight_land_rounded,
                                   'Flight',
                                   1,
+                                ),
+                              if (can('flights'))
+                                _buildNavItem(
+                                  Icons.flight_outlined,
+                                  'Flights V2',
+                                  12,
                                 ),
                               if (can('ulds'))
                                 _buildNavItem(
@@ -1127,6 +1124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const DriverModule(),
         const SystemBfModule(),
         const AreaNobreakModule(),
+        FlightsV2Screen(isActive: _selectedIndex == 12),
 
       ],
     );

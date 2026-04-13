@@ -12,21 +12,20 @@ class FlightPdfExporter {
     for (var flightEditor in flights) {
       final flight = Map<String, dynamic>.from(flightEditor);
       
-      final fCarrier = flight['carrier']?.toString() ?? '';
-      final fNumber = flight['number']?.toString() ?? '';
-      final fDate = flight['date-arrived']?.toString() ?? '';
-
+      final flightId = flight['id_flight']?.toString() ?? '';
       List uldList = [];
-      try {
-        final resUlds = await Supabase.instance.client
-            .from('ULD')
-            .select()
-            .eq('refCarrier', fCarrier)
-            .eq('refNumber', fNumber)
-            .eq('refDate', fDate);
-        uldList = List.from(resUlds);
-      } catch (e) {
-        // Error fetching ULDS, ignore and print empty list
+      if (flightId.isNotEmpty) {
+        try {
+          final resUlds = await Supabase.instance.client
+              .from('ulds')
+              .select('*, awb_splits(*, awbs(*))')
+              .eq('id_flight', flightId)
+              .order('is_break', ascending: false)
+              .order('uld_number', ascending: true);
+          uldList = List.from(resUlds);
+        } catch (e) {
+          // Error fetching ULDS, ignore and print empty list
+        }
       }
 
       _addDetailedFlightPage(pdf, flight, uldList);
@@ -114,7 +113,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('DATE ARRIVED', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text(formatDate(flight['date-arrived']?.toString()), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(formatDate(flight['date']?.toString()), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                     ]
                   ),
                   pw.Column(
@@ -122,7 +121,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('TIME ARRIVED', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text(formatTime(flight['time-arrived']?.toString()), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(formatTime(flight['date']?.toString()), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                     ]
                   ),
                   pw.Column(
@@ -130,7 +129,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('TOTAL ULD', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text('${(int.tryParse(flight["cant-break"]?.toString() ?? "0") ?? 0) + (int.tryParse(flight["cant-noBreak"]?.toString() ?? "0") ?? 0)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF4F46E5))),
+                      pw.Text('${(int.tryParse(flight["cant_break"]?.toString() ?? "0") ?? 0) + (int.tryParse(flight["cant_nobreak"]?.toString() ?? "0") ?? 0)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF4F46E5))),
                     ]
                   ),
                 ]
@@ -154,7 +153,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('START BREAK', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text(formatTime(flight['start-break']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
+                      pw.Text(formatTime(flight['start_break']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
                     ]
                   ),
                   pw.Container(width: 1, height: 20, color: PdfColor.fromInt(0xFFE2E8F0)),
@@ -163,7 +162,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('END BREAK', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text(formatTime(flight['end-break']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
+                      pw.Text(formatTime(flight['end_break']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
                     ]
                   ),
                   pw.Container(width: 1, height: 20, color: PdfColor.fromInt(0xFFE2E8F0)),
@@ -172,7 +171,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('FIRST TRUCK', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text(formatTime(flight['first-truck']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
+                      pw.Text(formatTime(flight['first_truck']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
                     ]
                   ),
                   pw.Container(width: 1, height: 20, color: PdfColor.fromInt(0xFFE2E8F0)),
@@ -181,7 +180,7 @@ class FlightPdfExporter {
                     children: [
                       pw.Text('LAST TRUCK', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
                       pw.SizedBox(height: 2),
-                      pw.Text(formatTime(flight['last-truck']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
+                      pw.Text(formatTime(flight['last_truck']?.toString()), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(0xFF334155))),
                     ]
                   ),
                 ]
@@ -203,10 +202,10 @@ class FlightPdfExporter {
                  final u = e.value as Map;
                  return [
                    '${idx + 1}',
-                   u['ULD-number']?.toString() ?? '-',
-                   (u['isBreak'] == true || u['isBreak']?.toString().toLowerCase() == 'true') ? 'BREAK' : 'NO BREAK',
-                   u['pieces']?.toString() ?? '0',
-                   '${u['weight'] ?? 0} kg',
+                   u['uld_number']?.toString() ?? '-',
+                   (u['is_break'] == true || u['is_break']?.toString().toLowerCase() == 'true') ? 'BREAK' : 'NO BREAK',
+                   u['pieces_total']?.toString() ?? '0',
+                   '${u['weight_total'] ?? 0} kg',
                    u['remarks']?.toString() ?? ''
                  ];
               }).toList(),

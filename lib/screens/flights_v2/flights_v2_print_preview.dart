@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import '_flight_pdf_exporter.dart';
+import 'flights_v2_pdf_exporter.dart';
 
 void showFlightPrintPreviewDialog(BuildContext context, Map<String, dynamic> flight, List uldList) {
   showDialog(
