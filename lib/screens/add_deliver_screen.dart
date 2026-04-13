@@ -244,6 +244,18 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
       return;
     }
 
+    final int pcs = int.tryParse(_importPiecesCtrl.text) ?? 1;
+    final int tot = int.tryParse(_importTotalCtrl.text) ?? 1;
+    if (tot < pcs) {
+      _showMissingFieldAlert(
+        'Invalid Total', 
+        customMessage: appLanguage.value == 'es'
+          ? 'El campo Total ($tot) no puede ser menor a la cantidad de Pieces ($pcs).'
+          : 'Total ($tot) cannot be less than Pieces ($pcs).'
+      );
+      return;
+    }
+
     setState(() {
       _importAwbs.add({
          'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
@@ -626,6 +638,16 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     
     if (label == 'Pieces' || label == 'Total') {
       formatters.add(FilteringTextInputFormatter.digitsOnly);
+    }
+
+    if (controller == _importPiecesCtrl) {
+      formatters.add(TextInputFormatter.withFunction((oldValue, newValue) {
+        if (newValue.text.isEmpty) return newValue;
+        final pcs = int.tryParse(newValue.text) ?? 0;
+        final tot = int.tryParse(_importTotalCtrl.text) ?? 0;
+        if (tot > 0 && pcs > tot) return oldValue;
+        return newValue;
+      }));
     }
     if (label == 'Weight') {
       formatters.add(FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')));

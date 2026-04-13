@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'screens/add_flight_v2/add_flight_v2_screen.dart';
 import 'screens/users_module.dart';
 import 'screens/flight_module.dart';
 import 'screens/dashboard_view_module.dart';
@@ -687,16 +688,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
                           child: Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF6366f1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.warehouse_rounded,
-                                  color: Colors.white,
-                                  size: 24,
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const AddFlightV2Screen()),
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF6366f1),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(
+                                    Icons.warehouse_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -812,6 +822,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Area (No break)',
                                   11,
                                 ),
+
 
                             ],
                           ),

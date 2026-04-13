@@ -1,0 +1,666 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../main.dart' show isDarkMode, appLanguage;
+import 'add_flight_v2_logic.dart';
+
+class AddFlightV2Screen extends StatefulWidget {
+  final Function(bool)? onPop;
+  final bool isInline;
+  const AddFlightV2Screen({super.key, this.onPop, this.isInline = false});
+
+  @override
+  State<AddFlightV2Screen> createState() => _AddFlightV2ScreenState();
+}
+
+class _AddFlightV2ScreenState extends State<AddFlightV2Screen> {
+  late AddFlightV2Logic logic;
+
+  @override
+  void initState() {
+    super.initState();
+    logic = AddFlightV2Logic();
+  }
+
+  @override
+  void dispose() {
+    logic.disposeAll();
+    super.dispose();
+  }
+
+
+
+  Future<void> _showAddAwbDialog(int uldIndex) async {
+    final awbNumCtrl = TextEditingController();
+    final piecesCtrl = TextEditingController();
+    final weightCtrl = TextEditingController();
+    final totalCtrl = TextEditingController();
+    final houseCtrl = TextEditingController();
+    final remCtrl = TextEditingController();
+    final totalLocked = ValueNotifier<bool>(false);
+    final awbErrors = ValueNotifier<Map<String, String>>({});
+
+
+    awbNumCtrl.addListener(() {
+      final text = awbNumCtrl.text.toUpperCase();
+      if (text.length == 13) {
+        bool foundLocally = false;
+        String foundTotal = '';
+        for (var u in logic.flightLocalUlds) {
+          for (var a in (u['awbs'] as List)) {
+            if (a['awb_number'] == text) {
+              foundLocally = true;
+              foundTotal = a['total'].toString();
+              break;
+            }
+          }
+          if (foundLocally) break;
+        }
+
+        if (foundLocally) {
+          totalLocked.value = true;
+          if (totalCtrl.text != foundTotal) {
+            totalCtrl.text = foundTotal;
+          }
+        } else {
+          logic.fetchAwbTotalAsync(text, totalLocked, totalCtrl);
+        }
+      } else {
+        if (totalLocked.value) {
+          totalLocked.value = false;
+          totalCtrl.text = '0';
+        }
+      }
+    });
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          title: Text('Add AWB to ${logic.flightLocalUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: 380,
+            child: ValueListenableBuilder<Map<String, String>>(
+              valueListenable: awbErrors,
+              builder: (ctx, err, _) {
+                return SingleChildScrollView(
+                  child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 5, child: _buildTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true, hasError: err.containsKey('AWB Number'), errorText: err['AWB Number'])),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 3, child: _buildTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true, hasError: err.containsKey('Pieces'), errorText: err['Pieces'], customFormatters: [
+                          TextInputFormatter.withFunction((oldValue, newValue) {
+                            if (newValue.text.isEmpty) return newValue;
+                            final p = int.tryParse(newValue.text) ?? 0;
+                            final t = int.tryParse(totalCtrl.text) ?? 0;
+                            if (totalCtrl.text.isNotEmpty && t > 0 && p > t) return oldValue;
+                            return newValue;
+                          })
+                        ])),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3, 
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: totalLocked,
+                            builder: (ctx, locked, _) => _buildTextField('Total', totalCtrl, '0', isNum: true, digitsOnly: true, disabled: locked, hasError: err.containsKey('Total'), errorText: err['Total']),
+                          )
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 3, child: _buildTextField('Weight', weightCtrl, '0.0', isNum: true, allowDecimal: true)),
+                      ]
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField('Remarks', remCtrl, 'Additional remarks...'),
+                    const SizedBox(height: 12),
+                    _buildTextField('House Number', houseCtrl, 'HAWB', maxLines: 3, minLines: 1, isUpperCase: true),
+                  ],
+                ),
+                );
+              }
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF94a3b8)))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1)),
+              onPressed: () {
+                awbErrors.value = {};
+                final newAwb = awbNumCtrl.text.trim().toUpperCase();
+                Map<String, String> currentErrors = {};
+                if (newAwb.isEmpty) currentErrors['AWB Number'] = 'Required';
+                if (piecesCtrl.text.trim().isEmpty || piecesCtrl.text.trim() == '0') currentErrors['Pieces'] = 'Required';
+                if (totalCtrl.text.trim().isEmpty || totalCtrl.text.trim() == '0') currentErrors['Total'] = 'Required';
+                if (currentErrors.isNotEmpty) { awbErrors.value = currentErrors; return; }
+                
+                final p = int.tryParse(piecesCtrl.text) ?? 0;
+                final t = int.tryParse(totalCtrl.text) ?? 0;
+                if (t < p) {
+                   showDialog(context: ctx, builder: (c) => AlertDialog(
+                     backgroundColor: const Color(0xFF1e293b),
+                     title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
+                     content: const Text('Total pieces cannot be less than the received pieces.', style: TextStyle(color: Color(0xFFcbd5e1))),
+                     actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+                   ));
+                   return;
+                }
+                
+                final existingAwbs = logic.flightLocalUlds[uldIndex]['awbs'] as List;
+                if (existingAwbs.any((a) => a['awb_number'] == newAwb)) {
+                    showDialog(
+                      context: ctx,
+                      builder: (c) => AlertDialog(
+                        backgroundColor: const Color(0xFF1e293b),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        title: const Row(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b)), SizedBox(width: 8), Text('Duplicate AWB', style: TextStyle(color: Colors.white))]),
+                        content: Text('The AWB "$newAwb" is already registered under this ULD. Please verify or modify the existing entry.', style: const TextStyle(color: Color(0xFFcbd5e1))),
+                        actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+                      )
+                    );
+                    return;
+                }
+
+                logic.onAwbAddedToUld(uldIndex, {
+                  'awb_number': newAwb,
+                  'pieces': int.tryParse(piecesCtrl.text) ?? 0,
+                  'weight': double.tryParse(weightCtrl.text) ?? 0.0,
+                  'total': int.tryParse(totalCtrl.text) ?? 1,
+                  'house_number': houseCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+                  'remarks': remCtrl.text,
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text('Add AWB', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  Future<bool> _onBackPressed() async {
+    bool hasData = logic.hasDataSync;
+    if (!hasData) {
+      if (widget.onPop != null) { widget.onPop!(false); return false; }
+      return true;
+    }
+
+    final bool? shouldPop = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1e293b),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
+        title: const Column(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 60), SizedBox(height: 16), Text('Discard Data?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22))]),
+        content: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text('Any unsaved data entered for the flight, ULDs, and AWBs will be permanently lost.\n\nDo you want to discard your changes and continue?', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4)),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0)), onPressed: () => Navigator.pop(context, false), child: const Text('STAY', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold, letterSpacing: 1.2))),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFef4444), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0)), onPressed: () => Navigator.pop(context, true), child: const Text('DISCARD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2))),
+        ],
+      ),
+    );
+
+    if (shouldPop == true) {
+      if (widget.onPop != null) { widget.onPop!(false); return false; }
+      return true;
+    }
+    return false;
+  }
+
+  void _saveEverything() {
+    logic.saveEverything(
+      context, 
+      showValidationError: (msg) {
+        showDialog(context: context, builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF1e293b),
+          title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
+          content: Text(msg, style: const TextStyle(color: Color(0xFFcbd5e1))),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+        ));
+      }, 
+      onError: (err) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $err'), backgroundColor: Colors.red));
+      },
+      onSuccess: () async {
+        bool dialogOpen = true;
+        showGeneralDialog(
+          context: context,
+          barrierDismissible: false,
+          barrierColor: Colors.black54,
+          transitionDuration: const Duration(milliseconds: 350),
+          pageBuilder: (context, anim1, anim2) {
+            final dark = isDarkMode.value;
+            return Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  decoration: BoxDecoration(color: dark ? const Color(0xFF1e293b) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                      const SizedBox(height: 24),
+                      Text(appLanguage.value == 'es' ? '¡Vuelo Creado!' : 'Flight Created!', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                      const SizedBox(height: 8),
+                      Text(appLanguage.value == 'es' ? 'La estructura del vuelo se ha guardado exitosamente.' : 'Flight structure created successfully.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+          transitionBuilder: (context, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+        ).then((_) => dialogOpen = false);
+
+        await Future.delayed(const Duration(milliseconds: 2000));
+        if (mounted) {
+          if (dialogOpen) Navigator.of(context).pop();
+          if (widget.onPop != null) { widget.onPop!(true); } else if (Navigator.canPop(context)) { Navigator.pop(context, true); }
+        }
+      }
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final bool shouldPop = await _onBackPressed();
+        if (shouldPop && context.mounted) Navigator.of(context).pop();
+      },
+      child: ValueListenableBuilder<bool>(
+        valueListenable: isDarkMode,
+        builder: (context, dark, child) {
+          return AnimatedBuilder(
+            animation: logic,
+            builder: (context, _) {
+              final textP = dark ? Colors.white : const Color(0xFF111827);
+              final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+              final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+              final content = _buildFormContent(dark, textP, bgCard, borderC);
+              if (widget.isInline) return content;
+              return Scaffold(
+                backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
+                appBar: AppBar(
+                  title: Text('Add New Flight Process (V2)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
+                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                  elevation: 0, iconTheme: IconThemeData(color: textP),
+                  bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),
+                ),
+                body: Padding(padding: const EdgeInsets.all(24), child: content),
+              );
+            }
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFormContent(bool dark, Color textP, Color bgCard, Color borderC) {
+    return Column(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: double.infinity, padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderC)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [Icon(Icons.flight_takeoff_rounded, color: textP, size: 20), const SizedBox(width: 8), Text('Flight Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold))],
+                    ),
+                    const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            double rWidth = constraints.maxWidth - 775; if (rWidth < 180) rWidth = 180;
+            return Wrap(
+              spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                SizedBox(width: 90, child: _buildTextField('Carrier', logic.carrierCtrl, 'AMERICAN', maxLen: 10, isUpperCase: true, hasError: logic.fieldErrors.containsKey('Carrier'), errorText: logic.fieldErrors['Carrier'])),
+                SizedBox(width: 80, child: _buildTextField('Number', logic.numberCtrl, '204', isUpperCase: true, maxLen: 10, hasError: logic.fieldErrors.containsKey('Number'), errorText: logic.fieldErrors['Number'])),
+                SizedBox(width: 85, child: _buildTextField('Break', logic.breakCtrl, '', disabled: logic.isBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
+                  width: 20, height: 20, child: Checkbox(value: logic.isBreakAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.setBreakAuto(v ?? true))
+                ))),
+                SizedBox(width: 85, child: _buildTextField('No Break', logic.noBreakCtrl, '', disabled: logic.isNoBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
+                  width: 20, height: 20, child: Checkbox(value: logic.isNoBreakAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.setNoBreakAuto(v ?? true))
+                ))),
+                SizedBox(width: 130, child: _buildTextField('Date Arrived', logic.dateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDate(context), suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70), hasError: logic.fieldErrors.containsKey('Date Arrived'), errorText: logic.fieldErrors['Date Arrived'])),
+                SizedBox(width: 120, child: _buildTextField('Time Arrived', logic.timeCtrl, '__:__ --', readOnly: true, onTap: () => logic.selectTime(context), suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
+                SizedBox(width: rWidth, child: _buildTextField('Remarks', logic.remarksCtrl, 'Additional remarks...')),
+                SizedBox(width: 100, child: _buildDropdown('Status', dark)),
+                if (logic.status == 'Delayed') ...[
+                   SizedBox(width: 130, child: _buildTextField('Delayed Date', logic.delayedDateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDelayedDate(context), suffixIcon: const Icon(Icons.event_busy, size: 16, color: Color(0xFFfdba74)))),
+                   SizedBox(width: 120, child: _buildTextField('Delayed Time', logic.delayedTimeCtrl, '__:__ --', readOnly: true, onTap: () => logic.selectDelayedTime(context), suffixIcon: const Icon(Icons.timer_off, size: 16, color: Color(0xFFfdba74)))),
+                ],
+              ]
+            );
+          }
+        ),
+        const SizedBox(height: 24), Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB)), const SizedBox(height: 16),
+        Row(children: [Icon(Icons.inventory_2_rounded, color: textP, size: 20), const SizedBox(width: 8), Text('Add ULD To Flight', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w600))]),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            double uldRWidth = constraints.maxWidth - 764; if (uldRWidth < 200) uldRWidth = 200;
+            return Wrap(
+              spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                SizedBox(width: 130, child: _buildTextField('ULD Number', logic.uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true, hasError: logic.fieldErrors.containsKey('ULD Number'), errorText: logic.fieldErrors['ULD Number'])),
+                SizedBox(width: 95, child: _buildTextField('Pieces', logic.uldPiecesCtrl, '0', isNum: true, digitsOnly: true, disabled: logic.isUldPiecesAuto, titleTrailing: SizedBox(
+                  width: 20, height: 20, child: Checkbox(value: logic.isUldPiecesAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.toggleUldPiecesAuto(v ?? true))
+                ))),
+                SizedBox(width: 95, child: _buildTextField('Weight', logic.uldWeightCtrl, '0.0', isNum: true, allowDecimal: true, disabled: logic.isUldWeightAuto, titleTrailing: SizedBox(
+                  width: 20, height: 20, child: Checkbox(value: logic.isUldWeightAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.toggleUldWeightAuto(v ?? true))
+                ))),
+                SizedBox(width: uldRWidth, child: _buildTextField('Remarks', logic.uldRemarksCtrl, 'ULD remarks...')),
+                SizedBox(
+                  width: 125,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Priority?', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), const SizedBox(height: 6),
+                      Container(
+                        height: 48, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withAlpha(25))),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Icon(Icons.star_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                            Switch(value: logic.uldPriority, onChanged: logic.setUldPriority, activeThumbColor: Colors.white, activeTrackColor: const Color(0xFFf59e0b), inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 125,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Break?', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), const SizedBox(height: 6),
+                      Container(
+                        height: 48, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withAlpha(25))),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Icon(Icons.broken_image_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                            Switch(
+                              value: logic.uldBreak, onChanged: logic.setUldBreak, activeThumbColor: Colors.white, activeTrackColor: const Color(0xFF22c55e), inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                              trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) { if (states.contains(WidgetState.selected)) return Colors.transparent; return const Color(0xFFef4444).withAlpha(180); }),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 120, height: 48,
+                  child: ElevatedButton(
+                    onPressed: () { logic.addLocalUld(context, showDuplicateError: (msg) {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: const Color(0xFF1e293b), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), title: const Row(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b)), SizedBox(width: 8), Text('Duplicate ULD', style: TextStyle(color: Colors.white))]), content: Text('The ULD "$msg" is already in this flight list. Please enter a different ULD number.', style: const TextStyle(color: Color(0xFFcbd5e1))), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
+                        )
+                      );
+                    });},
+                    style: ElevatedButton.styleFrom(backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15), foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 16), side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    child: const Text('+ Add ULD', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            );
+          }
+        ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Expanded(
+                  child: Container(
+                    width: double.infinity, decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderC)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.list_alt_rounded, color: textP, size: 20), const SizedBox(width: 8), Text('Linked ULDs (flight-manifest)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)), const Spacer(),
+                                  Container(
+                                     width: 300, height: 40, decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(20), border: Border.all(color: borderC)),
+                                     child: TextField(
+                                        controller: logic.searchUldCtrl, style: TextStyle(color: textP, fontSize: 13), onChanged: (v) => logic.rebuild(), decoration: InputDecoration(hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...', hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13), prefixIcon: Icon(Icons.search_rounded, color: textP.withAlpha(76), size: 16), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12))
+                                     ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text('View and manage all ULDs assigned to this flight.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+                            child: Container(
+                              decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: logic.flightLocalUlds.isNotEmpty
+                                ? SingleChildScrollView(
+                                child: Column(
+                                  children: logic.flightLocalUlds.asMap().entries.where((e) {
+                                    if (logic.searchUldCtrl.text.isEmpty) return true;
+                                    final term = logic.searchUldCtrl.text.toLowerCase();
+                                    return (e.value['uldNumber'] ?? '').toString().toLowerCase().contains(term);
+                                  }).map((entry) {
+                      int i = entry.key;
+                      var u = entry.value;
+                      List awbs = u['awbs'];
+                      bool isLast = i == logic.flightLocalUlds.length - 1;
+                      
+                      return Container(
+                        decoration: BoxDecoration(border: isLast ? null : Border(bottom: BorderSide(color: borderC))),
+                        child: Column(
+                          children: [
+                            Container(
+                              color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: dark ? const Color(0x326366f1) : const Color(0xFFEEF2FF), shape: BoxShape.circle), child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 13))), const SizedBox(width: 12),
+                                        SizedBox(width: 115, child: Text(u['uldNumber'] ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 15, letterSpacing: 0.5))), const SizedBox(width: 16),
+                                        Container(width: 95, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB), borderRadius: BorderRadius.circular(6)), child: Text('Pieces: ${u['pieces'] ?? 'Auto'}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12))), const SizedBox(width: 12),
+                                        Container(width: 95, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB), borderRadius: BorderRadius.circular(6)), child: Text('Weight: ${u['weight'] ?? 'Auto'}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12))), const SizedBox(width: 12),
+                                        Container(width: 90, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: (u['priority'] == true) ? const Color(0xFFf59e0b).withAlpha(50) : (dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)), borderRadius: BorderRadius.circular(6)), child: Text('Priority: ${(u['priority'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['priority'] == true) ? (dark ? const Color(0xFFfde68a) : const Color(0xFFd97706)) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: (u['priority'] == true) ? FontWeight.bold : FontWeight.normal))), const SizedBox(width: 12),
+                                        Container(width: 80, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: (u['break'] == true) ? const Color(0xFF10b981).withAlpha(50) : const Color(0xFFef4444).withAlpha(50), borderRadius: BorderRadius.circular(6)), child: Text('Break: ${(u['break'] == true) ? 'Yes' : 'No'}', style: TextStyle(color: (u['break'] == true) ? (dark ? const Color(0xFF6ee7b7) : const Color(0xFF059669)) : (dark ? const Color(0xFFfca5a5) : const Color(0xFFdc2626)), fontSize: 12, fontWeight: FontWeight.bold))), const SizedBox(width: 16),
+                                        if (u['remarks'] != null && u['remarks'].toString().isNotEmpty)
+                                          Expanded(child: Text('Rem: ${u['remarks']}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontStyle: FontStyle.italic), overflow: TextOverflow.ellipsis)),
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(width: 32, height: 32, alignment: Alignment.center, decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB), shape: BoxShape.circle), child: Text('${awbs.length}', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13))), const SizedBox(width: 8),
+                                      IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: Icon((u['showAwbs'] ?? true) ? Icons.visibility : Icons.visibility_off, color: (u['showAwbs'] ?? true) ? (dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)) : (dark ? const Color(0xFF64748b) : const Color(0xFF9CA3AF)), size: 20), onPressed: () => logic.toggleUldAwbsVisibility(i)), const SizedBox(width: 12),
+                                      ElevatedButton.icon(onPressed: () => _showAddAwbDialog(i), icon: const Icon(Icons.add, size: 16), label: const Text('Add AWB', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10b981), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10))), const SizedBox(width: 8),
+                                      IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFef4444), size: 20), tooltip: 'Eliminar ULD', onPressed: () => logic.removeLocalUld(i)),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                            if (awbs.isNotEmpty && (u['showAwbs'] ?? true))
+                              Table(
+                                columnWidths: const { 0: IntrinsicColumnWidth(), 1: IntrinsicColumnWidth(), 2: IntrinsicColumnWidth(), 3: IntrinsicColumnWidth(), 4: IntrinsicColumnWidth(), 5: FlexColumnWidth(), 6: IntrinsicColumnWidth(), 7: IntrinsicColumnWidth() },
+                                children: awbs.asMap().entries.map((entry) {
+                                  final aInt = entry.key; final a = entry.value;
+                                  return TableRow(
+                                    children: [
+                                      Padding(padding: const EdgeInsets.all(8), child: Container(width: 24, height: 24, decoration: BoxDecoration(color: dark ? const Color(0x14ffffff) : const Color(0xFFE5E7EB), shape: BoxShape.circle), child: Center(child: Text('${aInt + 1}', style: TextStyle(color: textP, fontSize: 11, fontWeight: FontWeight.bold))))),
+                                      Padding(padding: const EdgeInsets.only(left: 8, right: 32, top: 8, bottom: 8), child: Text(a['awb_number'], style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600))),
+                                      Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [TextSpan(text: 'PIECES: ', style: TextStyle(color: dark ? const Color(0xFF64748b) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)), TextSpan(text: '${a['pieces']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13))]))),
+                                      Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [TextSpan(text: 'TOTAL: ', style: TextStyle(color: dark ? const Color(0xFF64748b) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)), TextSpan(text: '${a['total'] ?? 0}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13))]))),
+                                      Padding(padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8), child: RichText(text: TextSpan(children: [TextSpan(text: 'WEIGHT: ', style: TextStyle(color: dark ? const Color(0xFF64748b) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)), TextSpan(text: '${a['weight']}', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13))]))),
+                                      Padding(padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8), child: RichText(maxLines: 1, overflow: TextOverflow.ellipsis, text: TextSpan(children: [TextSpan(text: 'REMARKS: ', style: TextStyle(color: dark ? const Color(0xFF64748b) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)), TextSpan(text: a['remarks']?.isNotEmpty == true ? a['remarks'] : '-', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontStyle: FontStyle.italic, fontSize: 12))]))),
+                                      Padding(padding: const EdgeInsets.all(8), child: Builder(
+                                        builder: (ctx) {
+                                          final rawH = a['house_number']; final List<String> items = (rawH is List) ? rawH.map((e) => e.toString()).toList() : [];
+                                          if (items.isEmpty) return const SizedBox.shrink();
+                                          return Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: InkWell(
+                                              onTap: () {
+                                                showDialog(
+                                                  context: ctx,
+                                                  builder: (c) => Dialog(
+                                                    backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: borderC)),
+                                                    child: Container(
+                                                      width: 320, padding: const EdgeInsets.all(20),
+                                                      child: Column(
+                                                        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text('House Numbers (${items.length})', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)), const SizedBox(height: 16),
+                                                          Flexible(child: SingleChildScrollView(child: Column(children: items.asMap().entries.map((ent) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Container(width: 20, height: 20, alignment: Alignment.center, decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle), child: Text('${ent.key + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold))), const SizedBox(width: 12), Expanded(child: Text(ent.value, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 14)))]))).toList()))),
+                                                          const SizedBox(height: 12), Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1)))))
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              borderRadius: BorderRadius.circular(12),
+                                              child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: dark ? const Color(0xFF1e293b) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(12), border: Border.all(color: dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB))), child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.maps_home_work_outlined, size: 12, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF6B7280)), const SizedBox(width: 4), Text('${items.length} HAWB', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF6B7280), fontSize: 11))])),
+                                            ),
+                                          );
+                                        }
+                                      )),
+                                      Padding(padding: const EdgeInsets.all(6), child: InkWell(borderRadius: BorderRadius.circular(4), onTap: () => logic.removeAwbFromUld(i, aInt), child: Padding(padding: const EdgeInsets.all(4.0), child: Icon(Icons.close, color: Colors.redAccent.withAlpha(200), size: 16)))),
+                                    ]
+                                  );
+                                }).toList(),
+                              ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                )
+                : Center(child: Text('No ULDs linked to this flight', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 13, fontWeight: FontWeight.w500))),
+              ),
+            ),
+          ),
+        ),
+       ],
+      ),
+     ),
+    ),
+        const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerRight,
+          child: SizedBox(
+            height: 50,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 32)),
+              onPressed: logic.isSaving ? null : _saveEverything,
+              icon: logic.isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.check_rounded),
+              label: Text(logic.isSaving ? 'Processing...' : 'Save Flight', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ),
+          ),
+        ),
+       ],
+      ),
+     ),
+    ],
+   );
+  }
+
+  Widget _buildTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines, bool expands = false, List<TextInputFormatter>? customFormatters, bool hasError = false, String? errorText}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: TextStyle(color: hasError ? Colors.redAccent : const Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), titleTrailing ?? const SizedBox.shrink()]), const SizedBox(height: 6),
+        TextField(
+          controller: ctrl, enabled: !disabled, readOnly: readOnly, onTap: onTap, keyboardType: (maxLines == null || maxLines > 1) ? TextInputType.multiline : (isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text), textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
+          inputFormatters: [
+            if (isAwb) AwbTextInputFormatter(),
+            if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
+            if (allowDecimal) FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            if (isUpperCase) TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection)),
+            ...?customFormatters,
+          ],
+          maxLength: maxLen, maxLines: maxLines, minLines: minLines, expands: expands, textAlignVertical: expands ? TextAlignVertical.top : null, style: TextStyle(color: disabled ? Colors.white.withAlpha(120) : Colors.white, fontSize: 12),
+          decoration: InputDecoration(hintText: hint, hintStyle: TextStyle(color: Colors.white.withAlpha(76), fontSize: 12), filled: true, fillColor: disabled ? Colors.white.withAlpha(5) : Colors.white.withAlpha(13), counterText: '', contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: hasError ? Colors.redAccent : Colors.white.withAlpha(25))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: hasError ? Colors.redAccent : const Color(0xFF8b5cf6), width: 1.5)), disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withAlpha(10))), suffixIcon: suffixIcon),
+        ),
+        if (hasError && errorText != null)
+          Padding(padding: const EdgeInsets.only(top: 4.0), child: Text(errorText, style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold))),
+      ],
+    );
+  }
+
+  Widget _buildDropdown(String label, bool dark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0), decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withAlpha(25))),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: logic.status, isExpanded: true, dropdownColor: const Color(0xFF1e293b), style: const TextStyle(color: Colors.white, fontSize: 12), icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFcbd5e1), size: 20),
+              items: ['Waiting', 'Received', 'Pending', 'Checked', 'Ready', 'Delayed', 'Canceled'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) { if (v != null) logic.setStatus(v); },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AwbTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String raw = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (raw.length > 11) raw = raw.substring(0, 11);
+    String formatted = '';
+    for (int i = 0; i < raw.length; i++) {
+        if (i == 3) formatted += '-';
+        if (i == 7) formatted += ' ';
+        formatted += raw[i];
+    }
+    return TextEditingValue(text: formatted, selection: TextSelection.collapsed(offset: formatted.length));
+  }
+}
+
+class ResizeHandlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFF94a3b8)..strokeWidth = 1.2..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(0, size.height), Offset(size.width, 0), paint);
+    canvas.drawLine(Offset(size.width * 0.45, size.height), Offset(size.width, size.height * 0.45), paint);
+    canvas.drawLine(Offset(size.width * 0.9, size.height), Offset(size.width, size.height * 0.9), paint);
+  }
+  @override bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
