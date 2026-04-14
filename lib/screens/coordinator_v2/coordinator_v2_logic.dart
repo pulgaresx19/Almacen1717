@@ -18,6 +18,39 @@ class CoordinatorV2Logic extends ChangeNotifier {
   Map<String, dynamic>? globalSearchResult;
   bool isGlobalSearching = false;
 
+  String? selectedUldId;
+  bool isLoadingUldAwbs = false;
+  List<Map<String, dynamic>> uldAwbs = [];
+
+  void selectUld(String uldId) {
+    if (selectedUldId == uldId) {
+      selectedUldId = null;
+      uldAwbs = [];
+    } else {
+      selectedUldId = uldId;
+      fetchAwbsForUld(uldId);
+    }
+    notifyListeners();
+  }
+
+  Future<void> fetchAwbsForUld(String uldId) async {
+    isLoadingUldAwbs = true;
+    notifyListeners();
+    try {
+      final res = await supabase
+          .from('awb_splits')
+          .select('*, awbs(*)')
+          .eq('uld_id', uldId)
+          .order('created_at', ascending: false);
+      uldAwbs = List<Map<String, dynamic>>.from(res);
+    } catch (e) {
+      debugPrint('Error fetching AWBs for ULD: $e');
+      uldAwbs = [];
+    }
+    isLoadingUldAwbs = false;
+    notifyListeners();
+  }
+
   void disposeLogic() {
     // any subscriptions
   }

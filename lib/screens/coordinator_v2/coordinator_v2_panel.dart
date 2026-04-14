@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import 'coordinator_v2_logic.dart';
+import 'coordinator_v2_uld_awbs.dart';
 
 class CoordinatorV2Panel extends StatelessWidget {
   final CoordinatorV2Logic logic;
@@ -190,14 +191,24 @@ class CoordinatorV2Panel extends StatelessWidget {
                             margin: const EdgeInsets.only(bottom: 6),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: bgCard,
+                              color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(10) : bgCard,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: borderC),
+                              border: Border.all(
+                                color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(50) : borderC
+                              ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            child: Column(
                               children: [
-                                Expanded(
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () {
+                                    final id = uld['id_uld']?.toString() ?? '';
+                                    if (id.isNotEmpty) logic.selectUld(id);
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
                                   child: Row(
                                     children: [
                                       Container(
@@ -287,10 +298,19 @@ class CoordinatorV2Panel extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                // Pending indicators implementation if needed
+                                Icon(
+                                  logic.selectedUldId == uld['id_uld']?.toString() ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                  color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1) : textS,
+                                  size: 20,
+                                ),
                               ],
                             ),
-                          );
+                          ),
+                          if (logic.selectedUldId == uld['id_uld']?.toString())
+                            CoordinatorV2UldAwbs(logic: logic, dark: dark),
+                        ],
+                      ),
+                    );
                         },
                       ),
                     ),
