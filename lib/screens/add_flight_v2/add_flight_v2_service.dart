@@ -50,10 +50,25 @@ class AddFlightV2Service {
       } catch (_) {}
     }
 
+    DateTime? delayDate;
+    if (delayedDate.isNotEmpty) {
+      try {
+        final parsedDate = DateFormat('MM/dd/yyyy').parse(delayedDate);
+        if (delayedTime.isNotEmpty) {
+          final parsedTime = DateFormat('hh:mm a').parse(delayedTime);
+          delayDate = DateTime(parsedDate.year, parsedDate.month, parsedDate.day,
+              parsedTime.hour, parsedTime.minute);
+        } else {
+          delayDate = parsedDate;
+        }
+      } catch (_) {}
+    }
+
     final flightPayload = {
       'carrier': carrier,
       'number': number,
-      if (flightDate != null) 'date': flightDate.toIso8601String(),
+      if (flightDate != null) 'date': flightDate.toUtc().toIso8601String(),
+      if (delayDate != null) 'time_delayed': delayDate.toUtc().toIso8601String(),
       'cant_break': breakCount,
       'cant_nobreak': noBreakCount,
       'remarks': remarks,

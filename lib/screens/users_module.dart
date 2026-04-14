@@ -22,7 +22,7 @@ class _UsersModuleState extends State<UsersModule> {
   @override
   void initState() {
     super.initState();
-    _usersStream = Supabase.instance.client.from('Users').stream(primaryKey: ['id']).order('full-name', ascending: true);
+    _usersStream = Supabase.instance.client.from('users').stream(primaryKey: ['id']).order('full-name', ascending: true);
   }
 
   @override
@@ -437,7 +437,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
 
   Future<void> _saveContact() async {
     try {
-      await Supabase.instance.client.from('Users').update({'phone-number': _phoneCtrl.text.trim()}).eq('id', widget.user['id']);
+      await Supabase.instance.client.from('users').update({'phone-number': _phoneCtrl.text.trim()}).eq('id', widget.user['id']);
       setState(() {
         widget.user['phone-number'] = _phoneCtrl.text.trim();
         _isEditingContact = false;
@@ -450,7 +450,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
 
   Future<void> _saveOp() async {
     try {
-      await Supabase.instance.client.from('Users').update({
+      await Supabase.instance.client.from('users').update({
         'building': _buildingCtrl.text.trim(),
         'shift': _shift,
         'position': _position,
@@ -471,7 +471,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
 
   Future<void> _saveAccess() async {
     try {
-      await Supabase.instance.client.from('Users').update({'access-page': _accessMap}).eq('id', widget.user['id']);
+      await Supabase.instance.client.from('users').update({'access-page': _accessMap}).eq('id', widget.user['id']);
       setState(() {
         widget.user['access-page'] = _accessMap;
         _isEditingAccess = false;

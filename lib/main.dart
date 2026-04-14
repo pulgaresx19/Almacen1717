@@ -14,6 +14,9 @@ import 'screens/system_bf_module.dart';
 import 'screens/area_nobreak_module.dart';
 import 'screens/flights_v2/flights_v2_screen.dart';
 import 'screens/ulds_v2/ulds_v2_screen.dart';
+import 'screens/system_v2/system_v2_screen.dart';
+import 'screens/coordinator_v2/coordinator_v2_screen.dart';
+
 // import 'screens/add_uld_v2/add_uld_v2_screen.dart';
 
 
@@ -126,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen>
         // Fetch detailed user info from public "Users" table
         try {
           final userData = await Supabase.instance.client
-              .from('Users')
+              .from('users')
               .select()
               .eq('email', email)
               .maybeSingle();
@@ -590,7 +593,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                                 final publicUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
 
-                                await Supabase.instance.client.from('Users').update({
+                                await Supabase.instance.client.from('users').update({
                                   'avatar-url': publicUrl,
                                 }).eq('id', userId);
 
@@ -797,12 +800,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'System',
                                   6,
                                 ),
+                              if (can('system'))
+                                _buildNavItem(
+                                  Icons.settings_system_daydream_outlined,
+                                  'System V2',
+                                  14,
+                                ),
                               if (can('coordinator'))
                                 _buildNavItem(
                                   Icons.support_agent_rounded,
                                   'Coordinator',
                                   7,
                                 ),
+                              if (can('coordinator'))
+                                _buildNavItem(
+                                  Icons.support_agent_outlined,
+                                  'Coordinator V2',
+                                  15,
+                                ),
+
                               if (can('location'))
                                 _buildNavItem(
                                   Icons.location_on_rounded,
@@ -1134,6 +1150,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const AreaNobreakModule(),
         FlightsV2Screen(isActive: _selectedIndex == 12),
         UldsV2Screen(isActive: _selectedIndex == 13),
+        const SystemV2Screen(),
+        const CoordinatorV2Screen(),
 
       ],
     );

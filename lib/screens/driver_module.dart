@@ -80,7 +80,7 @@ class _DriverModuleState extends State<DriverModule> {
       final uUser = Supabase.instance.client.auth.currentUser;
       if (uUser != null) {
         final userRow = await Supabase.instance.client
-            .from('Users')
+            .from('users')
             .select('master-driver')
             .eq('id', uUser.id)
             .maybeSingle();
@@ -5012,7 +5012,7 @@ class _DriverModuleState extends State<DriverModule> {
                                     uUser.email?.split('@')[0] ?? 'Driver';
                                 try {
                                   final userRow = await Supabase.instance.client
-                                      .from('Users')
+                                      .from('users')
                                       .select('full-name')
                                       .eq('id', uUser.id)
                                       .maybeSingle();
@@ -5100,7 +5100,7 @@ class _DriverModuleState extends State<DriverModule> {
                                   uUser.email?.split('@')[0] ?? 'Driver';
                               try {
                                 final userRow = await Supabase.instance.client
-                                    .from('Users')
+                                    .from('users')
                                     .select('full-name')
                                     .eq('id', uUser.id)
                                     .maybeSingle();
@@ -5596,7 +5596,7 @@ class _DriverModuleState extends State<DriverModule> {
                                 uUser.email?.split('@')[0] ?? 'Driver';
                             try {
                               final userRow = await Supabase.instance.client
-                                  .from('Users')
+                                  .from('users')
                                   .select('full-name')
                                   .eq('id', uUser.id)
                                   .maybeSingle();

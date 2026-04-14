@@ -237,7 +237,7 @@ class AddUserScreenState extends State<AddUserScreen> {
         };
 
         // Try to insert (sometimes signUp trigger creates it, so we upsert or just update)
-        await Supabase.instance.client.from('Users').upsert(userData);
+        await Supabase.instance.client.from('users').upsert(userData);
 
         if (mounted) {
           bool dialogOpen = true;

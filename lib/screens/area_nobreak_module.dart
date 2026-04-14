@@ -646,7 +646,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
                                           try {
                                               final uUser = Supabase.instance.client.auth.currentUser;
                                               if (uUser != null) {
-                                                final profile = await Supabase.instance.client.from('Users').select('full-name').eq('email', uUser.email!).maybeSingle();
+                                                final profile = await Supabase.instance.client.from('users').select('full-name').eq('email', uUser.email!).maybeSingle();
                                                 if (profile != null && profile['full-name'] != null) {
                                                   fullname = profile['full-name'].toString();
                                                 }

@@ -97,7 +97,7 @@ class _LocationModuleState extends State<LocationModule> {
       final uUser = Supabase.instance.client.auth.currentUser;
       if (uUser != null) {
         final userRow = await Supabase.instance.client
-            .from('Users')
+            .from('users')
             .select('full-name')
             .eq('id', uUser.id)
             .maybeSingle();

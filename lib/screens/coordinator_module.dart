@@ -7151,7 +7151,7 @@ class _CoordinatorModuleState extends State<CoordinatorModule> {
                                     final userRow = await Supabase
                                         .instance
                                         .client
-                                        .from('Users')
+                                        .from('users')
                                         .select('full-name')
                                         .eq('id', uUser.id)
                                         .maybeSingle();
