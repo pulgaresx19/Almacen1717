@@ -1,27 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'add_flight_v2_logic.dart';
-import 'add_flight_v2_widgets.dart';
+import '../../main.dart' show isDarkMode, appLanguage;
+import 'add_uld_v2_logic.dart';
+import 'add_uld_v2_service.dart';
+import 'add_uld_v2_widgets.dart';
 
-Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int uldIndex) async {
+void showRequiredFieldError(BuildContext context, String fieldName) {
+  showDialog(
+    context: context,
+    builder: (alertCtx) => AlertDialog(
+      backgroundColor: const Color(0xFF1e293b),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.redAccent.withAlpha(50)),
+      ),
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+          const SizedBox(height: 16),
+          const Text('Action Required', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Text('The field "$fieldName" is missing.\nPlease provide this information to proceed.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14, height: 1.5)),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFef4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: () => Navigator.pop(alertCtx),
+              child: const Text('UNDERSTOOD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 14)),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> showAddAwbDialog(BuildContext context, AddUldV2Logic logic, int uldIndex) async {
   final awbNumCtrl = TextEditingController();
   final piecesCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
   final totalCtrl = TextEditingController();
   final houseCtrl = TextEditingController();
   final remCtrl = TextEditingController();
-  
+
   final totalLocked = ValueNotifier<bool>(false);
   final dbExpected = ValueNotifier<int>(0);
   final awbErrors = ValueNotifier<Map<String, String>>({});
   final houseNumbers = ValueNotifier<List<String>>([]);
 
-  awbNumCtrl.addListener(() {
+  awbNumCtrl.addListener(() async {
     final text = awbNumCtrl.text.toUpperCase();
     if (text.length == 13) {
       bool foundLocally = false;
       String foundTotal = '';
-      for (var u in logic.flightLocalUlds) {
+      for (var u in logic.localUlds) {
         for (var a in (u['awbs'] as List)) {
           if (a['awb_number'] == text) {
             foundLocally = true;
@@ -32,13 +72,22 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
         if (foundLocally) break;
       }
 
-      logic.fetchAwbTotalAsync(text, totalLocked, totalCtrl, dbExpected);
-
       if (foundLocally) {
         totalLocked.value = true;
         if (totalCtrl.text != foundTotal) {
           totalCtrl.text = foundTotal;
         }
+      }
+
+      final res = await AddUldV2Service().checkAwbTotal(text);
+      if (res != null && awbNumCtrl.text.toUpperCase() == text) {
+        totalLocked.value = true;
+        if (!foundLocally) {
+          totalCtrl.text = res['total'].toString();
+        }
+        dbExpected.value = res['total_expected'] as int;
+      } else {
+        dbExpected.value = 0;
       }
     } else {
       if (totalLocked.value) {
@@ -62,12 +111,12 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
     builder: (ctx) {
       return AlertDialog(
         backgroundColor: const Color(0xFF1e293b),
-        title: Text('Add AWB to ${logic.flightLocalUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
+        title: Text('Add AWB to ${logic.localUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
         content: SizedBox(
           width: 380,
           child: ValueListenableBuilder<Map<String, String>>(
             valueListenable: awbErrors,
-            builder: (ctx, err, _) {
+            builder: (c, err, _) {
               return SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -75,23 +124,23 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(flex: 5, child: buildTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true, hasError: err.containsKey('AWB Number'), errorText: err['AWB Number'])),
+                        Expanded(flex: 5, child: buildUldTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true, hasError: err.containsKey('AWB Number'), errorText: err['AWB Number'])),
                         const SizedBox(width: 8),
-                        Expanded(flex: 3, child: buildTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true, hasError: err.containsKey('Pieces'), errorText: err['Pieces'])),
+                        Expanded(flex: 3, child: buildUldTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true, hasError: err.containsKey('Pieces'), errorText: err['Pieces'])),
                         const SizedBox(width: 8),
                         Expanded(
                           flex: 3, 
                           child: ValueListenableBuilder<bool>(
                             valueListenable: totalLocked,
-                            builder: (ctx, locked, _) => buildTextField('Total', totalCtrl, '0', isNum: true, digitsOnly: true, disabled: locked, hasError: err.containsKey('Total'), errorText: err['Total']),
+                            builder: (c, locked, _) => buildUldTextField('Total', totalCtrl, '0', isNum: true, digitsOnly: true, disabled: locked, hasError: err.containsKey('Total'), errorText: err['Total']),
                           )
                         ),
                         const SizedBox(width: 8),
-                        Expanded(flex: 3, child: buildTextField('Weight', weightCtrl, '0.0', isNum: true, allowDecimal: true)),
+                        Expanded(flex: 3, child: buildUldTextField('Weight', weightCtrl, '0.0', isNum: true, allowDecimal: true)),
                       ]
                     ),
                     const SizedBox(height: 12),
-                    buildTextField('Remarks', remCtrl, 'Additional remarks...'),
+                    buildUldTextField('Remarks', remCtrl, 'Additional remarks...'),
                     const SizedBox(height: 12),
                     
                     // Chips based House Number Field
@@ -169,10 +218,15 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
               awbErrors.value = {};
               final newAwb = awbNumCtrl.text.trim().toUpperCase();
               Map<String, String> currentErrors = {};
+
               if (newAwb.isEmpty) currentErrors['AWB Number'] = 'Required';
               if (piecesCtrl.text.trim().isEmpty || piecesCtrl.text.trim() == '0') currentErrors['Pieces'] = 'Required';
               if (totalCtrl.text.trim().isEmpty || totalCtrl.text.trim() == '0') currentErrors['Total'] = 'Required';
-              if (currentErrors.isNotEmpty) { awbErrors.value = currentErrors; return; }
+
+              if (currentErrors.isNotEmpty) {
+                 awbErrors.value = currentErrors;
+                 return;
+              }
               
               final p = int.tryParse(piecesCtrl.text) ?? 0;
               final t = int.tryParse(totalCtrl.text) ?? 0;
@@ -189,9 +243,9 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
                  }
                  awbErrors.value = currentErrors;
                  return;
-               }
+              }
               
-              final existingAwbs = logic.flightLocalUlds[uldIndex]['awbs'] as List;
+              final existingAwbs = logic.localUlds[uldIndex]['awbs'] as List;
               if (existingAwbs.any((a) => a['awb_number'] == newAwb)) {
                   showDialog(
                     context: ctx,
@@ -214,23 +268,23 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
                     )
                   );
                   return;
-              }
+                }
 
-              // Include any text left in the input field
-              if (houseCtrl.text.trim().isNotEmpty) {
-                 final val = houseCtrl.text.trim().toUpperCase();
-                 if (!houseNumbers.value.contains(val)) houseNumbers.value = [...houseNumbers.value, val];
-              }
+                // Include any text left in the input field
+                if (houseCtrl.text.trim().isNotEmpty) {
+                   final val = houseCtrl.text.trim().toUpperCase();
+                   if (!houseNumbers.value.contains(val)) houseNumbers.value = [...houseNumbers.value, val];
+                }
 
-              logic.onAwbAddedToUld(uldIndex, {
-                'awb_number': newAwb,
-                'pieces': int.tryParse(piecesCtrl.text) ?? 0,
-                'weight': double.tryParse(weightCtrl.text) ?? 0.0,
-                'total': int.tryParse(totalCtrl.text) ?? 1,
-                'house_number': houseNumbers.value,
-                'remarks': remCtrl.text,
-              });
-              Navigator.pop(ctx);
+                logic.addAwbToUld(uldIndex, {
+                  'awb_number': newAwb,
+                  'pieces': int.tryParse(piecesCtrl.text) ?? 0,
+                  'weight': double.tryParse(weightCtrl.text) ?? 0.0,
+                  'total': int.tryParse(totalCtrl.text) ?? 1,
+                  'house_number': houseNumbers.value,
+                  'remarks': remCtrl.text.trim().isEmpty ? null : remCtrl.text.trim(),
+                });
+                Navigator.pop(ctx);
             },
             child: const Text('Add AWB', style: TextStyle(color: Colors.white)),
           ),
@@ -238,4 +292,91 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
       );
     }
   );
+}
+
+Future<bool> showDiscardDialog(BuildContext context) async {
+  final bool? shouldPop = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF1e293b),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
+      title: const Column(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 60),
+          SizedBox(height: 16),
+          Text('Discard Data?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+        ],
+      ),
+      content: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.0),
+        child: Text('Any unsaved data entered for the ULD will be permanently lost.\n\nDo you want to discard your changes and continue?', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 16, height: 1.4)),
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0)),
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('STAY', style: TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFef4444),
+            foregroundColor: Colors.white,
+            elevation: 8,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 12.0),
+          ),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('DISCARD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        ),
+      ],
+    ),
+  );
+
+  return shouldPop == true;
+}
+
+Future<void> showSaveSuccessDialog(BuildContext context) async {
+  bool dialogOpen = true;
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 350),
+    pageBuilder: (context, anim1, anim2) {
+      final dark = isDarkMode.value;
+      return Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 320,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF1e293b) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))],
+              border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                const SizedBox(height: 24),
+                Text(appLanguage.value == 'es' ? '¡ULD Guardado!' : 'ULD Saved!', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(appLanguage.value == 'es' ? 'Los ULDs se guardaron exitosamente.' : 'ULDs saved successfully.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14), textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (c, a1, a2, child) => Transform.scale(scale: Curves.easeOutBack.transform(a1.value), child: FadeTransition(opacity: a1, child: child)),
+  ).then((_) => dialogOpen = false);
+
+  await Future.delayed(const Duration(milliseconds: 2000));
+  
+  if (context.mounted && dialogOpen) {
+    Navigator.of(context).pop();
+  }
 }

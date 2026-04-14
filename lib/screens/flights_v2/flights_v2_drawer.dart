@@ -86,7 +86,7 @@ class _FlightsV2DrawerState extends State<FlightsV2Drawer> {
                   children: [
                     IconButton(
                       icon: Icon(Icons.print_rounded, color: textP),
-                      onPressed: _isLoading ? null : () => showFlightPrintPreviewDialog(context, widget.flight, _ulds),
+                      onPressed: _isLoading ? null : () => showFlightPrintPreviewDialog(context, widget.flight, _ulds, widget.dark),
                     ),
                     const SizedBox(width: 8),
                     IconButton(

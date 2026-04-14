@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'flights_v2_pdf_exporter.dart';
+import 'ulds_v2_pdf_exporter.dart';
 
-void showFlightPrintPreviewDialog(BuildContext context, Map<String, dynamic> flight, List uldList, bool dark) {
+void showUldV2PrintPreviewDialog(BuildContext context, Map<String, dynamic> uld, List<Map<String, dynamic>> awbList, Map<String, dynamic> flightsMap, bool dark) {
   showDialog(
     context: context,
     builder: (context) {
@@ -41,11 +41,7 @@ void showFlightPrintPreviewDialog(BuildContext context, Map<String, dynamic> fli
                          children: [
                             IconButton(
                                onPressed: () async {
-                                  final bytes = await FlightPdfExporter.generateDetailedFlightPdf(flight, uldList);
-                                  await Printing.layoutPdf(
-                                     onLayout: (format) async => bytes,
-                                     name: 'flight_detailed_${flight["number"] ?? "report"}.pdf',
-                                  );
+                                  await UldsV2PdfExporter.printSingleUld(uld, awbList, flightsMap);
                                },
                                icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)),
                                tooltip: 'Print',
@@ -54,10 +50,10 @@ void showFlightPrintPreviewDialog(BuildContext context, Map<String, dynamic> fli
                             const SizedBox(width: 8),
                             IconButton(
                                onPressed: () async {
-                                  final bytes = await FlightPdfExporter.generateDetailedFlightPdf(flight, uldList);
+                                  final bytes = await UldsV2PdfExporter.generateDetailedUldPdf(uld, awbList, flightsMap);
                                   await Printing.sharePdf(
                                      bytes: bytes,
-                                     filename: 'flight_detailed_${flight["number"] ?? "report"}.pdf',
+                                     filename: 'uld_detailed_${uld["uld_number"] ?? "report"}_v2.pdf',
                                   );
                                },
                                icon: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFF6366f1)),
@@ -75,7 +71,7 @@ void showFlightPrintPreviewDialog(BuildContext context, Map<String, dynamic> fli
                  child: Container(
                    color: dark ? const Color(0xFF334155) : const Color(0xFF94a3b8), 
                    child: PdfPreview(
-                     build: (format) => FlightPdfExporter.generateDetailedFlightPdf(flight, uldList),
+                     build: (format) => UldsV2PdfExporter.generateDetailedUldPdf(uld, awbList, flightsMap),
                      useActions: false,
                      allowPrinting: false,
                      allowSharing: false,

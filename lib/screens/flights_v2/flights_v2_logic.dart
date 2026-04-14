@@ -1,10 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'flights_v2_service.dart';
 
 class FlightsV2Logic extends ChangeNotifier {
   final FlightsV2Service _service = FlightsV2Service();
   bool isLoading = false;
   List<Map<String, dynamic>> flightsList = [];
+  RealtimeChannel? _realtimeChannel;
+
+  FlightsV2Logic() {
+    _initRealtime();
+  }
+
+  void _initRealtime() {
+    _realtimeChannel = Supabase.instance.client
+        .channel('public:flights_v2_channel')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'flights',
+          callback: (payload) {
+            fetchFlights(silent: true);
+          },
+        )
+        .subscribe();
+  }
+
+  @override
+  void dispose() {
+    _realtimeChannel?.unsubscribe();
+    super.dispose();
+  }
 
   Future<void> fetchFlights({bool silent = false}) async {
     if (!silent) {

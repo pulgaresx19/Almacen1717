@@ -278,7 +278,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               DataColumn(label: Text(appLanguage.value == 'es' ? 'Fin Desarme' : 'End Break')),
               DataColumn(label: Text(appLanguage.value == 'es' ? 'Primer Cam.' : 'First Truck')),
               DataColumn(label: Text(appLanguage.value == 'es' ? 'Último Cam.' : 'Last Truck')),
-              DataColumn(label: Text(appLanguage.value == 'es' ? 'Remarks' : 'Remarks')),
+              DataColumn(label: SizedBox(width: 200, child: Text(appLanguage.value == 'es' ? 'Remarks' : 'Remarks'))),
               DataColumn(label: Text(appLanguage.value == 'es' ? 'Estado' : 'Status')),
               DataColumn(
                 label: Checkbox(
@@ -293,6 +293,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                       }
                     });
                   },
+                  activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)),
                 ),
               ),
             ],
@@ -304,7 +305,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               final cantNoBreak = flight['cant_nobreak'] ?? 0;
               final status = flight['status']?.toString() ?? 'Waiting';
               final remarks = flight['remarks']?.toString() ?? '-';
-              Widget buildFormatTimestamp(String? val) {
+              Widget buildFormatTimestamp(String? val, {Color? customColor}) {
                 if (val == null || val.isEmpty || val == '-') return const Text('-');
                 try {
                   final dt = DateTime.parse(val).toLocal();
@@ -313,17 +314,17 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                   return RichText(
                     text: TextSpan(
                       text: timeStr,
-                      style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontFamily: 'Inter'),
+                      style: TextStyle(color: customColor ?? (dark ? Colors.white : const Color(0xFF111827)), fontWeight: FontWeight.bold, fontFamily: 'Inter'),
                       children: [
                         TextSpan(
                           text: ' ($dateStr)',
-                          style: TextStyle(color: dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af), fontSize: 11, fontWeight: FontWeight.normal),
+                          style: TextStyle(color: customColor?.withAlpha(150) ?? (dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af)), fontSize: 11, fontWeight: FontWeight.normal),
                         )
                       ]
                     ),
                   );
                 } catch (_) {
-                  return Text(val, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827)));
+                  return Text(val, style: TextStyle(color: customColor ?? (dark ? Colors.white : const Color(0xFF111827))));
                 }
               }
 
@@ -340,7 +341,11 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                       Text('$carrier $number', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
                     ],
                   )),
-                  DataCell(buildFormatTimestamp(flight['date']?.toString())),
+                  DataCell(
+                    status == 'Delayed' && flight['time_delay'] != null
+                      ? buildFormatTimestamp(flight['time_delay']?.toString(), customColor: const Color(0xFFea580c))
+                      : buildFormatTimestamp(flight['date']?.toString())
+                  ),
                   DataCell(Text('$cantBreak / $cantNoBreak')),
                   DataCell(Text('${cantBreak + cantNoBreak}', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                   DataCell(buildFormatTimestamp(flight['start_break']?.toString())),
@@ -371,6 +376,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                           }
                         });
                       },
+                      activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)),
                     ),
                   ),
                 ],
@@ -516,7 +522,10 @@ if (_selectedFlightIds.isNotEmpty)
         );
       },
     ).then((_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        logic.fetchFlights(silent: true);
+        setState(() {});
+      }
     });
   }
 
@@ -537,6 +546,9 @@ if (_selectedFlightIds.isNotEmpty)
         bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac); break;
       case 'delayed':
         bg = const Color(0xFFc2410c).withAlpha(51); fg = const Color(0xFFfdba74); break;
+      case 'canceled':
+      case 'closed':
+        bg = const Color(0xFF991b1b).withAlpha(51); fg = const Color(0xFFfca5a5); break;
       default: break;
     }
 

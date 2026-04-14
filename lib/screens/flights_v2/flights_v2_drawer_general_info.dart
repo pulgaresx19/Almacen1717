@@ -36,6 +36,8 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
   late TextEditingController _firstTruckCtrl;
   late TextEditingController _lastTruckCtrl;
   late TextEditingController _remarksCtrl;
+  late TextEditingController _timeDelayedCtrl;
+  bool _timeDelayError = false;
 
   @override
   void initState() {
@@ -51,9 +53,16 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
     _firstTruckCtrl = TextEditingController(text: widget.flight['first_truck']?.toString());
     _lastTruckCtrl = TextEditingController(text: widget.flight['last_truck']?.toString());
     _remarksCtrl = TextEditingController(text: widget.flight['remarks']?.toString());
+    _timeDelayedCtrl = TextEditingController(text: widget.flight['time_delay']?.toString());
   }
 
   Future<void> _saveChanges() async {
+    if (_statusCtrl.text == 'Delayed' && (_timeDelayedCtrl.text.isEmpty || _timeDelayedCtrl.text == '-' || _timeDelayedCtrl.text == 'null')) {
+      setState(() => _timeDelayError = true);
+      return;
+    }
+    setState(() => _timeDelayError = false);
+
     setState(() => _isLoading = true);
     try {
       final updates = {
@@ -65,8 +74,9 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
         'cant_nobreak': int.tryParse(_cantNoBreakCtrl.text) ?? 0,
         'start_break': _startBreakCtrl.text.isEmpty || _startBreakCtrl.text == '-' ? null : _startBreakCtrl.text,
         'end_break': _endBreakCtrl.text.isEmpty || _endBreakCtrl.text == '-' ? null : _endBreakCtrl.text,
-        'first_truck': _firstTruckCtrl.text.isEmpty || _firstTruckCtrl.text == '-' ? null : _firstTruckCtrl.text,
-        'last_truck': _lastTruckCtrl.text.isEmpty || _lastTruckCtrl.text == '-' ? null : _lastTruckCtrl.text,
+        'first_truck': _firstTruckCtrl.text.isEmpty || _firstTruckCtrl.text == '-' || _firstTruckCtrl.text == 'null' ? null : _firstTruckCtrl.text,
+        'last_truck': _lastTruckCtrl.text.isEmpty || _lastTruckCtrl.text == '-' || _lastTruckCtrl.text == 'null' ? null : _lastTruckCtrl.text,
+        'time_delay': _statusCtrl.text != 'Delayed' ? null : (_timeDelayedCtrl.text.isEmpty || _timeDelayedCtrl.text == '-' || _timeDelayedCtrl.text == 'null' ? null : _timeDelayedCtrl.text),
         'remarks': _remarksCtrl.text,
       };
 
@@ -85,18 +95,27 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
       widget.flight['end_break'] = updates['end_break'];
       widget.flight['first_truck'] = updates['first_truck'];
       widget.flight['last_truck'] = updates['last_truck'];
+      widget.flight['time_delay'] = updates['time_delay'];
       widget.flight['remarks'] = updates['remarks'];
 
       setState(() => _isEditing = false);
     } catch (e) {
       debugPrint('Error updating: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error saving changes: $e', style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.redAccent,
+        ));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Widget _formatTimestamp(String? val, Color textP, Color textS) {
-    if (val == null || val.isEmpty || val == '-') return Text('-', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600));
+    if (val == null || val.isEmpty || val == '-') return Text('--:--', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600));
     try {
       final dt = DateTime.parse(val).toLocal();
       final timeStr = DateFormat('hh:mm a').format(dt);
@@ -118,9 +137,9 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
     }
   }
 
-  Widget _buildEditor(String label, TextEditingController ctrl, FieldType type, Color textP) {
-    final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-    final fillC = widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5);
+  Widget _buildEditor(String label, TextEditingController ctrl, FieldType type, Color textP, {bool isError = false}) {
+    final borderC = isError ? Colors.redAccent.withAlpha(150) : (widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB));
+    final fillC = isError ? Colors.redAccent.withAlpha(20) : (widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5));
 
     if (type == FieldType.status) {
       return Container(
@@ -168,8 +187,11 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
               initialTime: TimeOfDay.fromDateTime(initialDate),
             );
             if (pickedTime != null) {
-              final newDt = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
-              setState(() => ctrl.text = newDt.toUtc().toIso8601String());
+               final newDt = DateTime(pickedDate.year, pickedDate.month, pickedDate.day, pickedTime.hour, pickedTime.minute);
+               setState(() {
+                 ctrl.text = newDt.toUtc().toIso8601String();
+                 _timeDelayError = false;
+               });
             }
           }
         },
@@ -203,33 +225,27 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
     }
   }
 
-  Widget _buildModernDetail(String label, dynamic value, IconData icon, Color textP, Color textS, {TextEditingController? controller, FieldType type = FieldType.text}) {
-    return Row(
+  Widget _buildModernDetail(String label, dynamic value, IconData icon, Color textP, Color textS, {TextEditingController? controller, FieldType type = FieldType.text, bool isError = false}) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(icon, size: 14, color: widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: TextStyle(color: textS, fontSize: 11)),
-              const SizedBox(height: 4),
-              _isEditing && controller != null
-                  ? _buildEditor(label, controller, type, textP)
-                  : value is Widget 
-                      ? value 
-                      : Text(value.toString().isNotEmpty ? value.toString() : '-', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600)),
+        Row(
+          children: [
+            Icon(icon, size: 14, color: isError ? Colors.redAccent : (widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280))),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(color: isError ? Colors.redAccent : textS, fontSize: 11)),
+            if (isError) ...[
+              const Spacer(),
+              Text(appLanguage.value == 'es' ? '* Requerido' : '* Required', style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
             ],
-          ),
-        )
+          ],
+        ),
+        const SizedBox(height: 4),
+        _isEditing && controller != null
+            ? _buildEditor(label, controller, type, textP, isError: isError)
+            : (value is Widget 
+                ? value 
+                : Text(value.toString().isNotEmpty ? value.toString() : '-', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600))),
       ],
     );
   }
@@ -279,6 +295,7 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
           Row(
             children: [
               Expanded(child: _buildModernDetail('Carrier', widget.flight['carrier']?.toString() ?? '-', Icons.business, textP, textS, controller: _carrierCtrl)),
+              const SizedBox(width: 12),
               Expanded(child: _buildModernDetail('Number', widget.flight['number']?.toString() ?? '-', Icons.tag, textP, textS, controller: _numberCtrl)),
             ],
           ),
@@ -286,9 +303,14 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
           Row(
             children: [
               Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Llegada' : 'Arrive Time', _formatTimestamp(widget.flight['date']?.toString(), textP, textS), Icons.schedule, textP, textS, controller: _dateCtrl, type: FieldType.date)),
+              const SizedBox(width: 12),
               Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Estado' : 'Status', widget.flight['status']?.toString() ?? 'Waiting', Icons.info_outline, textP, textS, controller: _statusCtrl, type: FieldType.status)),
             ],
           ),
+          if (_statusCtrl.text == 'Delayed' || (widget.flight['status'] == 'Delayed')) ...[
+            const SizedBox(height: 20),
+            _buildModernDetail(appLanguage.value == 'es' ? 'Hora programada Delay' : 'Delayed Rescheduled Time', _formatTimestamp(widget.flight['time_delay']?.toString(), const Color(0xFFf97316), const Color(0xFFea580c)), Icons.history_toggle_off_rounded, const Color(0xFFf97316), const Color(0xFFea580c), controller: _timeDelayedCtrl, type: FieldType.date, isError: _timeDelayError),
+          ],
           if (_expanded || _isEditing) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -297,6 +319,7 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
             Row(
               children: [
                 Expanded(child: _buildModernDetail('Break ULD', widget.flight['cant_break']?.toString() ?? '0', Icons.inventory_2_outlined, textP, textS, controller: _cantBreakCtrl, type: FieldType.number)),
+                const SizedBox(width: 12),
                 Expanded(child: _buildModernDetail('No-Break ULD', widget.flight['cant_nobreak']?.toString() ?? '0', Icons.all_inbox, textP, textS, controller: _cantNoBreakCtrl, type: FieldType.number)),
               ],
             ),
@@ -304,6 +327,7 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
             Row(
               children: [
                 Expanded(child: _buildModernDetail('Start Break', _formatTimestamp(widget.flight['start_break']?.toString(), textP, textS), Icons.play_circle_outline, textP, textS, controller: _startBreakCtrl, type: FieldType.date)),
+                const SizedBox(width: 12),
                 Expanded(child: _buildModernDetail('End Break', _formatTimestamp(widget.flight['end_break']?.toString(), textP, textS), Icons.stop_circle_outlined, textP, textS, controller: _endBreakCtrl, type: FieldType.date)),
               ],
             ),
@@ -311,6 +335,7 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
             Row(
               children: [
                 Expanded(child: _buildModernDetail('First Truck', _formatTimestamp(widget.flight['first_truck']?.toString(), textP, textS), Icons.local_shipping_outlined, textP, textS, controller: _firstTruckCtrl, type: FieldType.date)),
+                const SizedBox(width: 12),
                 Expanded(child: _buildModernDetail('Last Truck', _formatTimestamp(widget.flight['last_truck']?.toString(), textP, textS), Icons.local_shipping, textP, textS, controller: _lastTruckCtrl, type: FieldType.date)),
               ],
             ),

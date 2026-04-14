@@ -13,6 +13,8 @@ import 'screens/other_modules.dart';
 import 'screens/system_bf_module.dart';
 import 'screens/area_nobreak_module.dart';
 import 'screens/flights_v2/flights_v2_screen.dart';
+import 'screens/ulds_v2/ulds_v2_screen.dart';
+// import 'screens/add_uld_v2/add_uld_v2_screen.dart';
 
 
 
@@ -745,6 +747,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'ULD',
                                   2,
                                 ),
+                              if (can('ulds'))
+                                _buildNavItem(
+                                  Icons.inventory_2_outlined,
+                                  'ULDs V2',
+                                  13,
+                                ),
                               if (can('awbs'))
                                 _buildNavItem(
                                   Icons.description_rounded,
@@ -1125,6 +1133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SystemBfModule(),
         const AreaNobreakModule(),
         FlightsV2Screen(isActive: _selectedIndex == 12),
+        UldsV2Screen(isActive: _selectedIndex == 13),
 
       ],
     );

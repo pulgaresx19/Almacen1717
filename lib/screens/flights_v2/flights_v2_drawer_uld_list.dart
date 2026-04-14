@@ -224,14 +224,24 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
     };
     
     final splitPieces = split['pieces']?.toString() ?? split['pieces_split']?.toString() ?? '0';
-    final masterPieces = master['pieces']?.toString() ?? master['pieces_total']?.toString() ?? '0';
+    final masterPieces = master['total_pieces']?.toString() ?? master['pieces']?.toString() ?? '0';
     final splitWeight = split['weight']?.toString() ?? split['weight_split']?.toString() ?? '0';
+
+    String houseNum = '-';
+    if (combined['house_number'] != null) {
+      if (combined['house_number'] is List) {
+        houseNum = (combined['house_number'] as List).join(', ').trim();
+        if (houseNum.isEmpty) houseNum = '-';
+      } else {
+        houseNum = combined['house_number'].toString();
+      }
+    }
 
     final gridItems = [
       {'label': 'Pieces', 'value': splitPieces, 'icon': Icons.extension, 'color': widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)},
       {'label': 'Total', 'value': masterPieces, 'icon': Icons.layers, 'color': widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)},
       {'label': 'Weight', 'value': '$splitWeight kg', 'icon': Icons.scale, 'color': widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)},
-      {'label': 'House Num', 'value': combined['house_number']?.toString() ?? '-', 'icon': Icons.home_work, 'color': widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)},
+      {'label': 'House Num', 'value': houseNum, 'icon': Icons.home_work, 'color': widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)},
       {'label': 'Remarks', 'value': combined['remarks']?.toString() ?? '-', 'icon': Icons.notes, 'color': widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)},
     ];
 

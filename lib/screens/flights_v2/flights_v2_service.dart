@@ -10,7 +10,22 @@ class FlightsV2Service {
           .neq('status', 'Closed')
           .order('date', ascending: false)
           .limit(50);
-      return List<Map<String, dynamic>>.from(response);
+      List<Map<String, dynamic>> list = List<Map<String, dynamic>>.from(response);
+      // Sort dynamically: use time_delay if present, otherwise use date
+      list.sort((a, b) {
+        final aDelayed = a['status']?.toString().trim().toLowerCase() == 'delayed';
+        final bDelayed = b['status']?.toString().trim().toLowerCase() == 'delayed';
+        final aDateStr = (aDelayed && a['time_delay'] != null && a['time_delay'].toString().isNotEmpty && a['time_delay'].toString() != '-') 
+            ? a['time_delay'].toString() 
+            : a['date']?.toString();
+        final bDateStr = (bDelayed && b['time_delay'] != null && b['time_delay'].toString().isNotEmpty && b['time_delay'].toString() != '-') 
+            ? b['time_delay'].toString() 
+            : b['date']?.toString();
+        final aDate = DateTime.tryParse(aDateStr ?? '') ?? DateTime(2000);
+        final bDate = DateTime.tryParse(bDateStr ?? '') ?? DateTime(2000);
+        return bDate.compareTo(aDate); // descending chronological order
+      });
+      return list;
     } catch (e) {
       debugPrint('Error fetching flights: $e');
       return [];

@@ -1249,7 +1249,7 @@ class _FlightDrawerDetailsState extends State<FlightDrawerDetails> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  IconButton(icon: Icon(Icons.print_rounded, color: textP), onPressed: () => showFlightPrintPreviewDialog(context, f, _ulds), tooltip: 'Print Flight Manifest'),
+                  IconButton(icon: Icon(Icons.print_rounded, color: textP), onPressed: () => showFlightPrintPreviewDialog(context, f, _ulds, widget.dark), tooltip: 'Print Flight Manifest'),
                   const SizedBox(width: 8),
                   IconButton(icon: Icon(Icons.close_rounded, color: textP), onPressed: () => Navigator.pop(context)),
                 ],
