@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../main.dart' show currentUserData;
 
 class CoordinatorV2Logic extends ChangeNotifier {
   final supabase = Supabase.instance.client;
@@ -73,8 +74,12 @@ class CoordinatorV2Logic extends ChangeNotifier {
   }
 
   Future<void> fetchAwbsForUld(String uldId) async {
-    isLoadingUldAwbs = true;
-    notifyListeners();
+    final bool isRefetchingSame = selectedUldId == uldId && uldAwbs.isNotEmpty;
+    if (!isRefetchingSame) {
+      isLoadingUldAwbs = true;
+      notifyListeners();
+    }
+    
     try {
       final res = await supabase
           .from('awb_splits')
@@ -82,10 +87,40 @@ class CoordinatorV2Logic extends ChangeNotifier {
           .eq('uld_id', uldId)
           .order('created_at', ascending: false);
       uldAwbs = List<Map<String, dynamic>>.from(res);
+      
+      // Auto-evaluate if all AWBs are checked
+      bool allChecked = true;
+      if (uldAwbs.isEmpty) allChecked = false;
+      for (var awbSplit in uldAwbs) {
+        final d = awbSplit['data_coordinator'];
+        bool hasData = false;
+        if (d is Map) {
+          hasData = d.isNotEmpty;
+        } else if (d is String) {
+          hasData = d.trim().isNotEmpty && d != 'null' && d != '{}';
+        }
+        if (!hasData) {
+          allChecked = false;
+          break;
+        }
+      }
+
+      final idx = ulds.indexWhere((u) => u['id_uld'].toString() == uldId);
+      if (idx != -1) {
+        final wasChecked = ulds[idx]['all_checked'] == true;
+        ulds[idx]['all_checked'] = allChecked;
+        
+        // Auto-collapse if it just became fully checked AFTER being opened explicitly.
+        if (allChecked && !wasChecked && isRefetchingSame && selectedUldId == uldId) {
+          selectedUldId = null;
+          uldAwbs = [];
+        }
+      }
     } catch (e) {
       debugPrint('Error fetching AWBs for ULD: $e');
       uldAwbs = [];
     }
+    
     isLoadingUldAwbs = false;
     notifyListeners();
   }
@@ -145,8 +180,12 @@ class CoordinatorV2Logic extends ChangeNotifier {
   }
 
   Future<void> fetchUldsForFlight(String idFlight) async {
-    isLoadingUlds = true;
-    notifyListeners();
+    final bool isRefetchingSame = selectedFlightId == idFlight && ulds.isNotEmpty;
+    if (!isRefetchingSame) {
+      isLoadingUlds = true;
+      notifyListeners();
+    }
+    
     try {
       final res = await supabase.from('ulds').select().eq('id_flight', idFlight).order('created_at', ascending: true);
       ulds = List<Map<String, dynamic>>.from(res);
@@ -154,13 +193,17 @@ class CoordinatorV2Logic extends ChangeNotifier {
       debugPrint('Error fetching ULDs: $e');
       ulds = [];
     }
+    
     isLoadingUlds = false;
     notifyListeners();
   }
 
   Future<void> fetchFlights(DateTime dt) async {
-    isLoadingFlights = true;
-    notifyListeners();
+    final bool isRefetchingSame = selectedDate == dt && flights.isNotEmpty;
+    if (!isRefetchingSame) {
+      isLoadingFlights = true;
+      notifyListeners();
+    }
 
     final dateStr = DateFormat('yyyy-MM-dd').format(dt);
     final validDates = <String>[];
@@ -203,5 +246,25 @@ class CoordinatorV2Logic extends ChangeNotifier {
 
     isLoadingFlights = false;
     notifyListeners();
+  }
+
+  Future<void> markUldReady(String uldId) async {
+    try {
+      final String userFullName = currentUserData.value?['full-name'] ?? 'Unknown User';
+      final String nowIso = DateTime.now().toUtc().toIso8601String();
+      await supabase.from('ulds').update({
+        'time_checked': nowIso,
+        'user_checked': userFullName,
+      }).eq('id_uld', uldId);
+      
+      final idx = ulds.indexWhere((u) => u['id_uld'] == uldId);
+      if (idx != -1) {
+        ulds[idx]['time_checked'] = nowIso;
+        ulds[idx]['user_checked'] = userFullName;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error marking ULD as ready: $e');
+    }
   }
 }

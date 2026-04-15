@@ -131,7 +131,6 @@ class AddUldV2Service {
         // Insert into awb_splits
         final splitPayload = {
           'awb_id': currentAwbId,
-          'awb_number': awbNum,
           'pieces': awb['pieces'],
           'weight': awb['weight'],
           'status': 'Pending',

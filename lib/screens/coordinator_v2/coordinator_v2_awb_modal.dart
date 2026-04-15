@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'coordinator_v2_awb_dialog.dart';
 
-void showCoordinatorV2AwbModal(BuildContext context, Map<String, dynamic> combined, Map<String, dynamic> awbSplit, bool dark) {
+void showCoordinatorV2AwbModal(BuildContext context, Map<String, dynamic> combined, Map<String, dynamic> awbSplit, bool dark, [bool isReadOnly = false]) {
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -10,6 +10,7 @@ void showCoordinatorV2AwbModal(BuildContext context, Map<String, dynamic> combin
         combined: combined,
         awbSplit: awbSplit,
         dark: dark,
+        isReadOnly: isReadOnly,
       );
     },
   );

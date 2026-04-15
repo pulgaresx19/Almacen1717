@@ -176,7 +176,6 @@ class AddFlightV2Service {
           // Create the many-to-many split relationship using both UUID and natural key (for readability)
           final splitPayload = {
             'awb_id': currentAwbId,
-            'awb_number': awbNum,
             'pieces': awb['pieces'],
             'weight': awb['weight'],
             'status': 'Pending',

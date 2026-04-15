@@ -56,8 +56,10 @@ Widget buildDetailItem(String label, String value, Color textP, Color textS, Col
   );
 }
 
-Widget buildTextFieldBlock(String label, Color textP, Color textS, Color bgCard, bool dark, TextEditingController ctrl, VoidCallback onAdd) {
-  return Row(
+Widget buildTextFieldBlock(String label, Color textP, Color textS, Color bgCard, bool dark, TextEditingController ctrl, VoidCallback onAdd, bool isReadOnly) {
+  return Opacity(
+    opacity: isReadOnly ? 0.6 : 1.0,
+    child: Row(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
       SizedBox(
@@ -77,11 +79,12 @@ Widget buildTextFieldBlock(String label, Color textP, Color textS, Color bgCard,
           color: Colors.transparent,
           child: TextField(
             controller: ctrl,
+            readOnly: isReadOnly,
             style: TextStyle(color: textP, fontSize: 13),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             maxLength: 5,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               counterText: '',
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
@@ -95,15 +98,15 @@ Widget buildTextFieldBlock(String label, Color textP, Color textS, Color bgCard,
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: onAdd,
-          child: const Padding(
-            padding: EdgeInsets.all(4.0),
-            child: Icon(Icons.add_circle, color: Color(0xFF6366f1), size: 24),
+          onTap: isReadOnly ? null : onAdd,
+          child: Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: Icon(Icons.add_circle, color: isReadOnly ? textS : const Color(0xFF6366f1), size: 24),
           ),
         ),
       ),
     ],
-  );
+  ));
 }
 
 Widget buildSelectorIcon(int index, int selectedIndex, IconData icon, Color actColor, Color textS, VoidCallback onTap) {
@@ -133,29 +136,32 @@ Widget buildLocationSection(
   String? selectedLocation,
   TextEditingController locationOtherCtrl,
   Function(String) onSelectLocation,
+  bool isReadOnly,
 ) {
   return Expanded(
     flex: 2,
-    child: Container(
-      height: 240,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(appLanguage.value == 'es' ? 'Locación Requerida:' : 'Location Required:', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 16),
+    child: Opacity(
+      opacity: isReadOnly ? 0.6 : 1.0,
+      child: Container(
+        height: 240,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(appLanguage.value == 'es' ? 'Locación Requerida:' : 'Location Required:', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: ['2-8C*', 'CRT', 'PSV', 'DG', 'Oversize', 'Small rack', 'Animal live', 'Other'].map((loc) {
               final isSelected = selectedLocation == loc;
               return InkWell(
-                onTap: () => onSelectLocation(loc),
+                onTap: isReadOnly ? null : () => onSelectLocation(loc),
                 borderRadius: BorderRadius.circular(20),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -192,6 +198,7 @@ Widget buildLocationSection(
                 color: Colors.transparent,
                 child: TextField(
                   controller: locationOtherCtrl,
+                  readOnly: isReadOnly,
                   style: TextStyle(color: textP, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: appLanguage.value == 'es' ? 'Especifique locación...' : 'Specify location...',
@@ -207,7 +214,7 @@ Widget buildLocationSection(
         ],
       ),
     ),
-  );
+  ));
 }
 
 Widget buildDamageSection(
@@ -222,19 +229,22 @@ Widget buildDamageSection(
   VoidCallback onPickGallery,
   VoidCallback onPickCamera,
   Function(int) onRemovePhoto,
+  bool isReadOnly,
 ) {
   final damagesList = ['Torn', 'Crushed', 'Wet', 'Broken', 'Open', 'Missing', 'Cracked', 'Leaking', 'Other'];
 
   return Expanded(
     flex: 2,
-    child: Container(
-      height: 240,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-      ),
+    child: Opacity(
+      opacity: isReadOnly ? 0.6 : 1.0,
+      child: Container(
+        height: 240,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -244,31 +254,33 @@ Widget buildDamageSection(
               const Text('DAMAGE REPORT', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13)),
               Row(
                 children: [
-                  InkWell(
-                    onTap: onPickGallery,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: dark ? Colors.white.withAlpha(10) : Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                  if (!isReadOnly) ...[
+                    InkWell(
+                      onTap: onPickGallery,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                        ),
+                        child: const Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF3B82F6)),
                       ),
-                      child: const Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF3B82F6)),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: onPickCamera,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: dark ? Colors.white.withAlpha(10) : Colors.white,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: onPickCamera,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                        ),
+                        child: const Icon(Icons.camera_alt_outlined, size: 16, color: Color(0xFF10B981)),
                       ),
-                      child: const Icon(Icons.camera_alt_outlined, size: 16, color: Color(0xFF10B981)),
                     ),
-                  ),
+                  ],
                 ],
               )
             ],
@@ -311,21 +323,22 @@ Widget buildDamageSection(
                                   ),
                             ),
                           ),
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: InkWell(
-                              onTap: () => onRemovePhoto(index),
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
+                          if (!isReadOnly)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: InkWell(
+                                onTap: () => onRemovePhoto(index),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
                                 ),
-                                child: const Icon(Icons.close, size: 14, color: Colors.white),
                               ),
                             ),
-                          ),
                         ],
                       );
                     },
@@ -342,7 +355,7 @@ Widget buildDamageSection(
                 children: damagesList.map((dmg) {
                   final isSelected = selectedDamages.contains(dmg);
                   return InkWell(
-                    onTap: () {
+                    onTap: isReadOnly ? null : () {
                       final newList = List<String>.from(selectedDamages);
                       if (isSelected) {
                         newList.remove(dmg);
@@ -379,7 +392,7 @@ Widget buildDamageSection(
         ],
       ),
     ),
-  );
+  ));
 }
 
 Widget buildNotesSection(
@@ -388,17 +401,20 @@ Widget buildNotesSection(
   Color textP,
   Color textS,
   TextEditingController notesCtrl,
+  bool isReadOnly,
 ) {
   return Expanded(
     flex: 2,
-    child: Container(
-      height: 240,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-      ),
+    child: Opacity(
+      opacity: isReadOnly ? 0.6 : 1.0,
+      child: Container(
+        height: 240,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -424,6 +440,7 @@ Widget buildNotesSection(
               child: SingleChildScrollView(
                 child: TextField(
                   controller: notesCtrl,
+                  readOnly: isReadOnly,
                   maxLines: null,
                   style: TextStyle(color: textP, fontSize: 13),
                   decoration: InputDecoration(
@@ -439,5 +456,5 @@ Widget buildNotesSection(
         ],
       ),
     ),
-  );
+  ));
 }

@@ -69,9 +69,9 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
 
     try {
       final resList = await Supabase.instance.client
-          .from('ULD')
-          .select()
-          .ilike('ULD-number', '%$query%')
+          .from('ulds')
+          .select('*, flights(*)')
+          .ilike('uld_number', '%$query%')
           .limit(10);
 
       if (mounted) {
@@ -338,13 +338,13 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                                       separatorBuilder: (_, _) => Divider(color: dark ? Colors.white24 : Colors.black12),
                                       itemBuilder: (context, idx) {
                                         final uItem = (_globalSearchResult!['list'] as List)[idx];
-                                        bool isReceived = uItem['data-received'] != null && (uItem['data-received'] as Map).isNotEmpty;
+                                        bool isReceived = uItem['time_received'] != null;
                                         final txtColor = dark ? Colors.white : const Color(0xFF111827);
                                         final subColor = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
                                         return ListTile(
                                           contentPadding: EdgeInsets.zero,
                                           title: Text(
-                                            'ULD: ${uItem['ULD-number'] ?? 'Unknown'}',
+                                            'ULD: ${uItem['uld_number'] ?? 'Unknown'}',
                                             style: TextStyle(color: txtColor, fontWeight: FontWeight.bold),
                                           ),
                                           subtitle: Column(
@@ -353,11 +353,11 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                                             children: [
                                               const SizedBox(height: 4),
                                               Text(
-                                                'Flight: ${uItem['refCarrier'] ?? ''} ${uItem['refNumber'] ?? ''} | Date: ${uItem['refDate'] ?? '-'}',
+                                                'Flight: ${uItem['flights']?['carrier'] ?? ''} ${uItem['flights']?['number'] ?? ''} | Date: ${uItem['flights']?['date'] ?? uItem['flights']?['date_arrived'] ?? '-'}',
                                                 style: TextStyle(color: subColor, fontSize: 12),
                                               ),
                                               Text(
-                                                'PCs: ${uItem['pieces'] ?? '-'} | Weight: ${uItem['weight'] ?? '-'} kg',
+                                                'PCs: ${uItem['pieces_total'] ?? '-'} | Weight: ${uItem['weight_total'] ?? '-'} kg',
                                                 style: TextStyle(color: subColor, fontSize: 12),
                                               ),
                                             ],
@@ -379,32 +379,38 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                                                 final truckTime = DateTime.now().toUtc().toIso8601String();
                                                 setState(() {
                                                   if (isChecked) {
-                                                    uItem['data-received'] = {'user': authorName, 'time': truckTime, 'status': true};
+                                                    uItem['time_received'] = truckTime;
+                                                    uItem['user_received'] = authorName;
                                                     uItem['status'] = 'Received';
                                                   } else {
-                                                    uItem['data-received'] = {};
+                                                    uItem['time_received'] = null;
+                                                    uItem['user_received'] = null;
                                                     uItem['status'] = 'Waiting';
                                                   }
                                                 });
                                                 if (isChecked) {
-                                                  final payload = {'user': authorName, 'time': truckTime, 'status': true};
-                                                  await Supabase.instance.client.from('ULD').update({'data-received': payload, 'status': 'Received'}).eq('id', uItem['id']);
-                                                  if (uItem['refCarrier'] != null && uItem['refNumber'] != null && uItem['refDate'] != null) {
-                                                    final fl = await Supabase.instance.client.from('Flight')
-                                                        .select('first-truck')
-                                                        .eq('carrier', uItem['refCarrier'])
-                                                        .eq('number', uItem['refNumber'])
-                                                        .eq('date-arrived', uItem['refDate'])
+                                                  await Supabase.instance.client.from('ulds').update({
+                                                    'time_received': truckTime,
+                                                    'user_received': authorName,
+                                                    'status': 'Received'
+                                                  }).eq('id_uld', uItem['id_uld']);
+
+                                                  if (uItem['id_flight'] != null) {
+                                                    final fl = await Supabase.instance.client.from('flights')
+                                                        .select('first_truck')
+                                                        .eq('id_flight', uItem['id_flight'])
                                                         .maybeSingle();
-                                                    if (fl != null && fl['first-truck'] == null) {
-                                                      await Supabase.instance.client.from('Flight').update({'first-truck': truckTime})
-                                                          .eq('carrier', uItem['refCarrier'])
-                                                          .eq('number', uItem['refNumber'])
-                                                          .eq('date-arrived', uItem['refDate']);
+                                                    if (fl != null && fl['first_truck'] == null) {
+                                                      await Supabase.instance.client.from('flights').update({'first_truck': truckTime})
+                                                          .eq('id_flight', uItem['id_flight']);
                                                     }
                                                   }
                                                 } else {
-                                                  await Supabase.instance.client.from('ULD').update({'data-received': {}, 'status': 'Waiting'}).eq('id', uItem['id']);
+                                                  await Supabase.instance.client.from('ulds').update({
+                                                    'time_received': null,
+                                                    'user_received': null,
+                                                    'status': 'Waiting'
+                                                  }).eq('id_uld', uItem['id_uld']);
                                                 }
                                               },
                                             ),

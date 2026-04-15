@@ -297,6 +297,43 @@ class CoordinatorV2Panel extends StatelessWidget {
                                     ],
                                   ),
                                 ),
+                                if (logic.selectedUldId != uld['id_uld']?.toString()) ...[
+                                  const SizedBox(width: 12),
+                                  Builder(
+                                    builder: (context) {
+                                      final bool isAllChecked = uld['all_checked'] == true;
+                                      final bool isReady = uld['time_checked'] != null;
+                                      return ElevatedButton(
+                                        onPressed: (isAllChecked && !isReady) ? () {
+                                          logic.markUldReady(uld['id_uld']?.toString() ?? '');
+                                        } : null,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: isReady ? const Color(0xFF10b981) : const Color(0xFF6366f1),
+                                          disabledBackgroundColor: isReady ? const Color(0xFF10b981).withAlpha(150) : (dark ? Colors.white.withAlpha(20) : Colors.grey.shade300),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          minimumSize: const Size(0, 32),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (isReady) ...[
+                                              const Icon(Icons.check, color: Colors.white, size: 14),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            Text(
+                                              'Ready',
+                                              style: TextStyle(
+                                                color: (isAllChecked || isReady) ? Colors.white : (dark ? Colors.white30 : Colors.black26),
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  ),
+                                ],
                                 const SizedBox(width: 12),
                                 Icon(
                                   logic.selectedUldId == uld['id_uld']?.toString() ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,

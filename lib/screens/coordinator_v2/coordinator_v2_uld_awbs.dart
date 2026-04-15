@@ -66,6 +66,9 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
             final Map<String, dynamic> master = (awbSplit['awbs'] as Map<String, dynamic>?) ?? {};
             final Map<String, dynamic> combined = {...master, ...awbSplit};
 
+            final thisUld = logic.ulds.firstWhere((u) => u['id_uld'].toString() == logic.selectedUldId, orElse: () => <String, dynamic>{});
+            final bool isUldReady = thisUld['time_checked'] != null;
+
             final awbNumber = combined['awb_number']?.toString() ?? '-';
             final pieces = awbSplit['pieces']?.toString() ?? awbSplit['pieces_split']?.toString() ?? '0';
             final weight = awbSplit['weight']?.toString() ?? awbSplit['weight_split']?.toString() ?? '0';
@@ -73,6 +76,14 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
 
             final rowBg = dark ? Colors.white.withAlpha(10) : Colors.white;
             final rowBorder = dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB);
+
+            final dynamic d = awbSplit['data_coordinator'];
+            bool hasData = false;
+            if (d is Map) {
+              hasData = d.isNotEmpty;
+            } else if (d is String) {
+              hasData = d.trim().isNotEmpty && d != 'null' && d != '{}';
+            }
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -85,7 +96,7 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(8),
-                  onTap: () => showCoordinatorV2AwbModal(context, combined, awbSplit, dark),
+                  onTap: () => showCoordinatorV2AwbModal(context, combined, awbSplit, dark, isUldReady),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
@@ -157,6 +168,10 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+                  if (hasData) ...[
+                    const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 20),
+                    const SizedBox(width: 8),
+                  ],
                 ],
               ),
             ),

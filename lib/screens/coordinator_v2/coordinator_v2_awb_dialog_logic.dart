@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../main.dart' show appLanguage;
+import '../../main.dart' show appLanguage, currentUserData;
 
 class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
   final Map<String, dynamic> combined;
@@ -241,6 +241,16 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         dataCoordinator['Remarks'] = remarksText;
       }
 
+      String userFullName = 'Unknown User';
+      try {
+        if (currentUserData.value != null && currentUserData.value!['full-name'] != null) {
+          userFullName = currentUserData.value!['full-name'];
+        }
+      } catch (_) {}
+      
+      dataCoordinator['processed_by'] = userFullName;
+      dataCoordinator['processed_at'] = DateTime.now().toUtc().toIso8601String();
+
       final awbSplitId = awbSplit['id'];
       if (awbSplitId != null) {
         await supabase.from('awb_splits').update({
@@ -250,11 +260,75 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
 
       if (context.mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(appLanguage.value == 'es' ? 'Reporte guardado con éxito' : 'Report saved successfully'),
-            backgroundColor: Colors.green,
-          ),
+        showDialog(
+          barrierColor: Colors.black45,
+          barrierDismissible: false,
+          context: context,
+          builder: (ctx) {
+            Future.delayed(const Duration(milliseconds: 1800), () {
+              if (ctx.mounted) Navigator.pop(ctx);
+            });
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Center(
+                child: Container(
+                  width: 280,
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(40),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10b981).withAlpha(30),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF10b981),
+                          size: 56,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        appLanguage.value == 'es' ? '¡Guardado!' : 'Saved!',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : const Color(0xFF111827),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        appLanguage.value == 'es'
+                            ? 'El reporte se procesó correctamente.'
+                            : 'The report was processed successfully.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         );
       }
     } catch (e) {

@@ -8,12 +8,14 @@ class CoordinatorV2AwbDialog extends StatefulWidget {
   final Map<String, dynamic> combined;
   final Map<String, dynamic> awbSplit;
   final bool dark;
+  final bool isReadOnly;
 
   const CoordinatorV2AwbDialog({
     super.key,
     required this.combined,
     required this.awbSplit,
     required this.dark,
+    this.isReadOnly = false,
   });
 
   @override
@@ -129,7 +131,7 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                       ],
                     ),
                     InkWell(
-                      onTap: () => logic.toggleNotFound(),
+                      onTap: widget.isReadOnly ? null : () => logic.toggleNotFound(),
                       borderRadius: BorderRadius.circular(8),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -158,29 +160,29 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                     if (logic.selectedType == 2)
                       buildLocationSection(widget.dark, bgCard, bgModal, textP, textS, logic.selectedLocation, logic.locationOtherCtrl, (loc) {
                         logic.setLocation(loc);
-                      })
+                      }, widget.isReadOnly)
                     else if (logic.selectedType == 1)
                       buildDamageSection(widget.dark, bgCard, bgModal, textP, textS, logic.selectedDamages, (damages) {
                         logic.setDamages(damages);
                       }, logic.localPhotos, () => logic.pickImageLocally(ImageSource.gallery), () => logic.pickImageLocally(ImageSource.camera), (idx) {
                         logic.removePhoto(idx);
-                      })
+                      }, widget.isReadOnly)
                     else if (logic.selectedType == 3)
-                      buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl)
+                      buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl, widget.isReadOnly)
                     else ...[
                       Expanded(
                         flex: 1,
                         child: Column(
                           children: [
-                            buildTextFieldBlock('AGI skid', textP, textS, bgCard, widget.dark, logic.agiSkidCtrl, () => logic.addItem('AGI skid', logic.agiSkidCtrl)),
+                            buildTextFieldBlock('AGI skid', textP, textS, bgCard, widget.dark, logic.agiSkidCtrl, () => logic.addItem('AGI skid', logic.agiSkidCtrl), widget.isReadOnly),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Pre skid', textP, textS, bgCard, widget.dark, logic.preSkidCtrl, () => logic.addItem('Pre skid', logic.preSkidCtrl)),
+                            buildTextFieldBlock('Pre skid', textP, textS, bgCard, widget.dark, logic.preSkidCtrl, () => logic.addItem('Pre skid', logic.preSkidCtrl), widget.isReadOnly),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Crate', textP, textS, bgCard, widget.dark, logic.crateCtrl, () => logic.addItem('Crate', logic.crateCtrl)),
+                            buildTextFieldBlock('Crate', textP, textS, bgCard, widget.dark, logic.crateCtrl, () => logic.addItem('Crate', logic.crateCtrl), widget.isReadOnly),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Box', textP, textS, bgCard, widget.dark, logic.boxCtrl, () => logic.addItem('Box', logic.boxCtrl)),
+                            buildTextFieldBlock('Box', textP, textS, bgCard, widget.dark, logic.boxCtrl, () => logic.addItem('Box', logic.boxCtrl), widget.isReadOnly),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Other', textP, textS, bgCard, widget.dark, logic.otherCtrl, () => logic.addItem('Other', logic.otherCtrl)),
+                            buildTextFieldBlock('Other', textP, textS, bgCard, widget.dark, logic.otherCtrl, () => logic.addItem('Other', logic.otherCtrl), widget.isReadOnly),
                           ],
                         ),
                       ),
@@ -227,10 +229,11 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                                               Text(item['value'].toString(), style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
                                             ],
                                           ),
-                                          InkWell(
-                                            onTap: () => logic.removeItem(item),
-                                            child: const Icon(Icons.close, color: Color(0xFFEF4444), size: 16),
-                                          )
+                                          if (!widget.isReadOnly)
+                                            InkWell(
+                                              onTap: () => logic.removeItem(item),
+                                              child: const Icon(Icons.close, color: Color(0xFFEF4444), size: 16),
+                                            )
                                         ],
                                       ),
                                     );
@@ -299,10 +302,11 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: logic.isSaving ? null : () => logic.handleSave(context),
+                    onPressed: (logic.isSaving || widget.isReadOnly) ? null : () => logic.handleSave(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: logic.hasExistingData ? const Color(0xFF3B82F6) : const Color(0xFF6366f1),
-                      foregroundColor: Colors.white,
+                      backgroundColor: widget.isReadOnly ? const Color(0xFFbfdbfe) : (logic.hasExistingData ? const Color(0xFF3B82F6) : const Color(0xFF6366f1)),
+                      foregroundColor: widget.isReadOnly ? const Color(0xFF1d4ed8) : Colors.white,
+                      disabledBackgroundColor: widget.isReadOnly ? const Color(0xFFbfdbfe) : null,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -316,10 +320,16 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                       : Text(
-                          logic.hasExistingData
+                          widget.isReadOnly 
+                            ? (appLanguage.value == 'es' ? 'Chequeado' : 'Checked')
+                            : (logic.hasExistingData
                               ? (appLanguage.value == 'es' ? 'Editar' : 'Edit')
-                              : (appLanguage.value == 'es' ? 'Guardar' : 'Save'),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                              : (appLanguage.value == 'es' ? 'Guardar' : 'Save')),
+                          style: TextStyle(
+                            fontSize: 14, 
+                            fontWeight: FontWeight.bold,
+                            color: widget.isReadOnly ? const Color(0xFF1d4ed8) : Colors.white,
+                          ),
                         ),
                   ),
                 ),
