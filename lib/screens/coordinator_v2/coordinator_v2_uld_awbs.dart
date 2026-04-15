@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import '../../main.dart' show appLanguage;
 import 'coordinator_v2_logic.dart';
+import 'coordinator_v2_add_awb_dialog.dart';
 import 'coordinator_v2_awb_modal.dart';
 
 class CoordinatorV2UldAwbs extends StatelessWidget {
   final CoordinatorV2Logic logic;
   final bool dark;
+  final String flightId;
+  final String uldId;
 
   const CoordinatorV2UldAwbs({
     super.key,
     required this.logic,
     required this.dark,
+    required this.flightId,
+    required this.uldId,
   });
 
   @override
@@ -50,14 +55,51 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 12, left: 4),
-            child: Text(
-              appLanguage.value == 'es' ? 'Air Waybills' : 'Air Waybills',
-              style: TextStyle(
-                color: textS,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+            padding: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  appLanguage.value == 'es' ? 'Air Waybills' : 'Air Waybills',
+                  style: TextStyle(
+                    color: textS,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (_) => CoordinatorV2AddAwbDialog(
+                        logic: logic,
+                        flightId: flightId,
+                        uldId: uldId,
+                        dark: dark,
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366f1).withAlpha(20),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.add, color: Color(0xFF6366f1), size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          appLanguage.value == 'es' ? 'Añadir' : 'Add',
+                          style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           ...logic.uldAwbs.asMap().entries.map((entry) {
@@ -79,11 +121,22 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
 
             final dynamic d = awbSplit['data_coordinator'];
             bool hasData = false;
+            bool hasDiscrepancy = false;
+            String? discAmount;
+            String? discType;
+            
             if (d is Map) {
               hasData = d.isNotEmpty;
+              if (d['discrepancy_amount'] != null) {
+                hasDiscrepancy = true;
+                discAmount = d['discrepancy_amount'].toString();
+                discType = d['discrepancy_type']?.toString();
+              }
             } else if (d is String) {
               hasData = d.trim().isNotEmpty && d != 'null' && d != '{}';
             }
+
+            final bool isNew = awbSplit['is_new'] == true;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -167,6 +220,50 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (hasDiscrepancy && discAmount != null && discType != null) ...[
+                    const SizedBox(width: 24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withAlpha(15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFEF4444).withAlpha(40)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$discAmount $discType',
+                            style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (isNew) ...[
+                    const SizedBox(width: 24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3B82F6).withAlpha(15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF3B82F6).withAlpha(40)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.fiber_new_rounded, color: Color(0xFF3B82F6), size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'NEW',
+                            style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   if (hasData) ...[
                     const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 20),
@@ -178,7 +275,7 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
           ),
         ),
       );
-          }),
+    }),
         ],
       ),
     );

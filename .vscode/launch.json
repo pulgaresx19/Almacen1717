@@ -2,11 +2,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Flutter (Chrome)",
+            "name": "Flutter (Web Server)",
             "request": "launch",
             "type": "dart",
             "program": "lib/main.dart",
-            "deviceId": "chrome"
+            "deviceId": "web-server"
+        },
+        {
+            "name": "Flutter (Edge)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "deviceId": "edge"
         },
         {
             "name": "Flutter (macOS)",

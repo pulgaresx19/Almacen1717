@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show currentUserData;
-
 class CoordinatorV2Logic extends ChangeNotifier {
   final supabase = Supabase.instance.client;
 
@@ -144,6 +144,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
           .from('ulds')
           .select()
           .ilike('uld_number', '%$query%')
+          .eq('is_break', true)
           .limit(10);
       
       if (resList.isNotEmpty) {
@@ -187,7 +188,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
     }
     
     try {
-      final res = await supabase.from('ulds').select().eq('id_flight', idFlight).order('created_at', ascending: true);
+      final res = await supabase.from('ulds').select().eq('id_flight', idFlight).eq('is_break', true).order('created_at', ascending: true);
       ulds = List<Map<String, dynamic>>.from(res);
     } catch (e) {
       debugPrint('Error fetching ULDs: $e');
@@ -250,21 +251,150 @@ class CoordinatorV2Logic extends ChangeNotifier {
 
   Future<void> markUldReady(String uldId) async {
     try {
+      List<Map<String, dynamic>> finalDiscrepancies = [];
+      
+      // Fetch the latest AWBs for this ULD directly to ensure accurate discrepancy counting,
+      // because the user might click "Ready" when the ULD is collapsed and uldAwbs is empty.
+      final res = await supabase
+          .from('awb_splits')
+          .select('*, awbs(*)')
+          .eq('uld_id', uldId);
+      final List<Map<String, dynamic>> currentAwbs = List<Map<String, dynamic>>.from(res);
+
+      for (var awbSplit in currentAwbs) {
+        final dynamic d = awbSplit['data_coordinator'];
+        Map? dataCoord;
+        
+        if (d is Map) {
+          dataCoord = d;
+        } else if (d is String && d.trim().isNotEmpty && d != 'null') {
+          try {
+            dataCoord = jsonDecode(d); 
+          } catch (_) {}
+        }
+        
+        if (dataCoord != null && dataCoord['discrepancy_amount'] != null) {
+          final String awbNum = awbSplit['awbs']?['awb_number']?.toString() ?? 'Unknown AWB';
+          finalDiscrepancies.add({
+            'awb': awbNum,
+            'amount': dataCoord['discrepancy_amount'],
+            'type': dataCoord['discrepancy_type'],
+          });
+        }
+      }
+
       final String userFullName = currentUserData.value?['full-name'] ?? 'Unknown User';
       final String nowIso = DateTime.now().toUtc().toIso8601String();
+      
       await supabase.from('ulds').update({
         'time_checked': nowIso,
         'user_checked': userFullName,
+        'discrepancies_summary': finalDiscrepancies,
       }).eq('id_uld', uldId);
-      
-      final idx = ulds.indexWhere((u) => u['id_uld'] == uldId);
+
+      final idx = ulds.indexWhere((u) => u['id_uld'].toString() == uldId);
       if (idx != -1) {
         ulds[idx]['time_checked'] = nowIso;
         ulds[idx]['user_checked'] = userFullName;
+        ulds[idx]['discrepancies_summary'] = finalDiscrepancies;
         notifyListeners();
       }
     } catch (e) {
       debugPrint('Error marking ULD as ready: $e');
     }
+  }
+
+  Future<void> addNewAwb(String awbNumber, int pieces, int total, double weight, String uldId, String flightId, String remarks, List<String> houseNumbers) async {
+    bool isNewAwb = false;
+    dynamic masterAwbId;
+    num originalExpected = 0;
+    num originalWeight = 0.0;
+
+    try {
+      final existingAwb = await supabase
+          .from('awbs')
+          .select('id, total_espected, total_weight')
+          .eq('awb_number', awbNumber)
+          .limit(1);
+      
+      if (existingAwb.isNotEmpty) {
+        masterAwbId = existingAwb.first['id'];
+        originalExpected = existingAwb.first['total_espected'] ?? 0;
+        originalWeight = existingAwb.first['total_weight'] ?? 0.0;
+        
+        await supabase.from('awbs').update({
+          'total_espected': originalExpected + pieces,
+          'total_weight': originalWeight + weight,
+        }).eq('id', masterAwbId);
+        
+      } else {
+        isNewAwb = true;
+        final insertedAwb = await supabase.from('awbs').insert({
+          'awb_number': awbNumber,
+          'total_pieces': total,
+          'total_espected': pieces,
+          'total_weight': weight,
+        }).select('id').single();
+        masterAwbId = insertedAwb['id'];
+      }
+      
+      await supabase.from('awb_splits').insert({
+        'uld_id': int.tryParse(uldId) ?? uldId,
+        'awb_id': masterAwbId,
+        'pieces': pieces,
+        'weight': weight,
+        'status': 'Pending',
+        'flight_id': int.tryParse(flightId) ?? flightId,
+        'house_number': houseNumbers,
+        'remarks': remarks,
+        'is_new': true,
+      });
+    } catch (e) {
+      debugPrint('Error adding new AWB, attempting rollback: $e');
+      // Compensation (Rollback) layer
+      if (masterAwbId != null) {
+        try {
+          if (isNewAwb) {
+            await supabase.from('awbs').delete().eq('id', masterAwbId);
+          } else {
+            await supabase.from('awbs').update({
+              'total_espected': originalExpected,
+              'total_weight': originalWeight,
+            }).eq('id', masterAwbId);
+          }
+        } catch (rollbackError) {
+          debugPrint('Fatal: Rollback failed: $rollbackError');
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchAwbTotalAsync(String awbNumber) async {
+    try {
+      final res = await supabase
+          .from('awbs')
+          .select('id, total_pieces, total_weight, total_espected')
+          .eq('awb_number', awbNumber)
+          .limit(1);
+      if (res.isNotEmpty) return res.first;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  int getLocalUsedPieces(String awbNumber) {
+    int used = 0;
+    for (var u in ulds) {
+      final splits = (u['awb_splits'] is List) ? u['awb_splits'] as List : [];
+      for (var s in splits) {
+        final master = s['awbs'] ?? {};
+        if (master['awb_number'] == awbNumber || s['awb_number'] == awbNumber) {
+          used += (s['pieces'] as num?)?.toInt() ?? (s['pieces_split'] as num?)?.toInt() ?? 0;
+        }
+      }
+    }
+    return used;
   }
 }

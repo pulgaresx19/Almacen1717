@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../main.dart' show appLanguage;
@@ -61,6 +62,31 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
     
     final remarks = widget.combined['remarks']?.toString() ?? '';
 
+    final dynamic d = widget.awbSplit['data_coordinator'];
+    bool hasDiscrepancy = false;
+    String? discAmount;
+    String? discType;
+    bool isNotFound = false;
+    
+    if (d is Map) {
+      if (d['not_found'] == true) isNotFound = true;
+      if (d['discrepancy_amount'] != null) {
+        hasDiscrepancy = true;
+        discAmount = d['discrepancy_amount'].toString();
+        discType = d['discrepancy_type']?.toString();
+      }
+    } else if (d is String && d.trim().isNotEmpty && d != 'null') {
+      try {
+        final parsed = jsonDecode(d);
+        if (parsed['not_found'] == true) isNotFound = true;
+        if (parsed['discrepancy_amount'] != null) {
+          hasDiscrepancy = true;
+          discAmount = parsed['discrepancy_amount'].toString();
+          discType = parsed['discrepancy_type']?.toString();
+        }
+      } catch (_) {}
+    }
+
     return Dialog(
       backgroundColor: Colors.transparent,
       child: AnimatedBuilder(
@@ -95,9 +121,55 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: textS),
-                      onPressed: () => Navigator.pop(context),
+                    Row(
+                      children: [
+                        if (isNotFound)
+                          Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withAlpha(15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFEF4444).withAlpha(40)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  appLanguage.value == 'es' ? 'NO ENCONTRADO' : 'NOT FOUND',
+                                  style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (hasDiscrepancy && discAmount != null && discType != null)
+                          Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withAlpha(15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFEF4444).withAlpha(40)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$discAmount $discType',
+                                  style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: textS),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -160,29 +232,29 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                     if (logic.selectedType == 2)
                       buildLocationSection(widget.dark, bgCard, bgModal, textP, textS, logic.selectedLocation, logic.locationOtherCtrl, (loc) {
                         logic.setLocation(loc);
-                      }, widget.isReadOnly)
+                      }, widget.isReadOnly || logic.notFoundSelected)
                     else if (logic.selectedType == 1)
                       buildDamageSection(widget.dark, bgCard, bgModal, textP, textS, logic.selectedDamages, (damages) {
                         logic.setDamages(damages);
                       }, logic.localPhotos, () => logic.pickImageLocally(ImageSource.gallery), () => logic.pickImageLocally(ImageSource.camera), (idx) {
                         logic.removePhoto(idx);
-                      }, widget.isReadOnly)
+                      }, widget.isReadOnly || logic.notFoundSelected)
                     else if (logic.selectedType == 3)
-                      buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl, widget.isReadOnly)
+                      buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl, widget.isReadOnly || logic.notFoundSelected)
                     else ...[
                       Expanded(
                         flex: 1,
                         child: Column(
                           children: [
-                            buildTextFieldBlock('AGI skid', textP, textS, bgCard, widget.dark, logic.agiSkidCtrl, () => logic.addItem('AGI skid', logic.agiSkidCtrl), widget.isReadOnly),
+                            buildTextFieldBlock('AGI skid', textP, textS, bgCard, widget.dark, logic.agiSkidCtrl, () => logic.addItem('AGI skid', logic.agiSkidCtrl), widget.isReadOnly || logic.notFoundSelected),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Pre skid', textP, textS, bgCard, widget.dark, logic.preSkidCtrl, () => logic.addItem('Pre skid', logic.preSkidCtrl), widget.isReadOnly),
+                            buildTextFieldBlock('Pre skid', textP, textS, bgCard, widget.dark, logic.preSkidCtrl, () => logic.addItem('Pre skid', logic.preSkidCtrl), widget.isReadOnly || logic.notFoundSelected),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Crate', textP, textS, bgCard, widget.dark, logic.crateCtrl, () => logic.addItem('Crate', logic.crateCtrl), widget.isReadOnly),
+                            buildTextFieldBlock('Crate', textP, textS, bgCard, widget.dark, logic.crateCtrl, () => logic.addItem('Crate', logic.crateCtrl), widget.isReadOnly || logic.notFoundSelected),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Box', textP, textS, bgCard, widget.dark, logic.boxCtrl, () => logic.addItem('Box', logic.boxCtrl), widget.isReadOnly),
+                            buildTextFieldBlock('Box', textP, textS, bgCard, widget.dark, logic.boxCtrl, () => logic.addItem('Box', logic.boxCtrl), widget.isReadOnly || logic.notFoundSelected),
                             const SizedBox(height: 12),
-                            buildTextFieldBlock('Other', textP, textS, bgCard, widget.dark, logic.otherCtrl, () => logic.addItem('Other', logic.otherCtrl), widget.isReadOnly),
+                            buildTextFieldBlock('Other', textP, textS, bgCard, widget.dark, logic.otherCtrl, () => logic.addItem('Other', logic.otherCtrl), widget.isReadOnly || logic.notFoundSelected),
                           ],
                         ),
                       ),
@@ -229,7 +301,7 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                                               Text(item['value'].toString(), style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
                                             ],
                                           ),
-                                          if (!widget.isReadOnly)
+                                          if (!widget.isReadOnly && !logic.notFoundSelected)
                                             InkWell(
                                               onTap: () => logic.removeItem(item),
                                               child: const Icon(Icons.close, color: Color(0xFFEF4444), size: 16),
@@ -299,39 +371,66 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: (logic.isSaving || widget.isReadOnly) ? null : () => logic.handleSave(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: widget.isReadOnly ? const Color(0xFFbfdbfe) : (logic.hasExistingData ? const Color(0xFF3B82F6) : const Color(0xFF6366f1)),
-                      foregroundColor: widget.isReadOnly ? const Color(0xFF1d4ed8) : Colors.white,
-                      disabledBackgroundColor: widget.isReadOnly ? const Color(0xFFbfdbfe) : null,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: logic.isSaving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(
-                          widget.isReadOnly 
-                            ? (appLanguage.value == 'es' ? 'Chequeado' : 'Checked')
-                            : (logic.hasExistingData
-                              ? (appLanguage.value == 'es' ? 'Editar' : 'Edit')
-                              : (appLanguage.value == 'es' ? 'Guardar' : 'Save')),
-                          style: TextStyle(
-                            fontSize: 14, 
-                            fontWeight: FontWeight.bold,
-                            color: widget.isReadOnly ? const Color(0xFF1d4ed8) : Colors.white,
+                Builder(
+                  builder: (context) {
+                    String checkedText = appLanguage.value == 'es' ? 'Chequeado' : 'Checked';
+                    if (widget.isReadOnly && widget.awbSplit['data_coordinator'] is Map) {
+                      final data = widget.awbSplit['data_coordinator'] as Map;
+                      final pb = data['processed_by'];
+                      final pa = data['processed_at'];
+                      if (pb != null && pa != null) {
+                        try {
+                          final dt = DateTime.parse(pa.toString()).toLocal();
+                          int hr = dt.hour;
+                          String ampm = hr >= 12 ? 'PM' : 'AM';
+                          if (hr > 12) hr -= 12;
+                          if (hr == 0) hr = 12;
+                          final timeStr = "${hr.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $ampm";
+                          if (appLanguage.value == 'es') {
+                            checkedText = 'Chequeado por $pb a las $timeStr';
+                          } else {
+                            checkedText = 'Checked by $pb at $timeStr';
+                          }
+                        } catch (_) {}
+                      }
+                    }
+
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: (logic.isSaving || widget.isReadOnly) ? null : () => logic.handleSave(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: widget.isReadOnly ? const Color(0xFF10b981).withAlpha(20) : (logic.hasExistingData ? const Color(0xFF3B82F6) : const Color(0xFF6366f1)),
+                          foregroundColor: widget.isReadOnly ? const Color(0xFF059669) : Colors.white,
+                          disabledBackgroundColor: widget.isReadOnly ? const Color(0xFF10b981).withAlpha(20) : null,
+                          disabledForegroundColor: widget.isReadOnly ? const Color(0xFF059669) : null,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
+                          elevation: 0,
                         ),
-                  ),
+                        child: logic.isSaving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              widget.isReadOnly 
+                                ? checkedText
+                                : (logic.hasExistingData
+                                    ? (appLanguage.value == 'es' ? 'Editar' : 'Edit')
+                                    : (appLanguage.value == 'es' ? 'Guardar' : 'Save')),
+                              style: TextStyle(
+                                fontSize: 13, 
+                                fontWeight: FontWeight.bold,
+                                color: widget.isReadOnly ? const Color(0xFF059669) : Colors.white,
+                              ),
+                            ),
+                      ),
+                    );
+                  }
                 ),
               ],
             ),

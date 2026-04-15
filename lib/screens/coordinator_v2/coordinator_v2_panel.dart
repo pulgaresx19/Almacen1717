@@ -303,33 +303,108 @@ class CoordinatorV2Panel extends StatelessWidget {
                                     builder: (context) {
                                       final bool isAllChecked = uld['all_checked'] == true;
                                       final bool isReady = uld['time_checked'] != null;
-                                      return ElevatedButton(
-                                        onPressed: (isAllChecked && !isReady) ? () {
-                                          logic.markUldReady(uld['id_uld']?.toString() ?? '');
-                                        } : null,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: isReady ? const Color(0xFF10b981) : const Color(0xFF6366f1),
-                                          disabledBackgroundColor: isReady ? const Color(0xFF10b981).withAlpha(150) : (dark ? Colors.white.withAlpha(20) : Colors.grey.shade300),
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          minimumSize: const Size(0, 32),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            if (isReady) ...[
-                                              const Icon(Icons.check, color: Colors.white, size: 14),
-                                              const SizedBox(width: 4),
-                                            ],
-                                            Text(
-                                              'Ready',
-                                              style: TextStyle(
-                                                color: (isAllChecked || isReady) ? Colors.white : (dark ? Colors.white30 : Colors.black26),
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
+                                      
+                                      final List<dynamic> discrepancies = (uld['discrepancies_summary'] is List) ? uld['discrepancies_summary'] as List : [];
+                                      final bool hasDiscrepancy = isReady && discrepancies.isNotEmpty;
+
+                                      return Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (hasDiscrepancy) ...[
+                                            InkWell(
+                                              borderRadius: BorderRadius.circular(20),
+                                              onTap: () {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (ctx) => AlertDialog(
+                                                    backgroundColor: dark ? const Color(0xFF1E293B) : Colors.white,
+                                                    title: Row(
+                                                      children: [
+                                                        const Icon(Icons.warning_rounded, color: Color(0xFFEF4444)),
+                                                        const SizedBox(width: 8),
+                                                        Text(
+                                                          appLanguage.value == 'es' ? 'Resumen de Discrepancias' : 'Discrepancy Summary',
+                                                          style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    content: SizedBox(
+                                                      width: 300,
+                                                      child: ListView.builder(
+                                                        shrinkWrap: true,
+                                                        itemCount: discrepancies.length,
+                                                        itemBuilder: (ctx, i) {
+                                                          final d = discrepancies[i];
+                                                          return Padding(
+                                                            padding: const EdgeInsets.symmetric(vertical: 4),
+                                                            child: DefaultTextStyle(
+                                                              style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 14),
+                                                              child: Row(
+                                                                children: [
+                                                                  const Text('AWB: '),
+                                                                  Text('${d['awb']} ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                                  const Spacer(),
+                                                                  Container(
+                                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                                    decoration: BoxDecoration(color: const Color(0xFFEF4444).withAlpha(15), borderRadius: BorderRadius.circular(4)),
+                                                                    child: Text('${d['amount']} ${d['type']}', style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 12)),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () => Navigator.pop(ctx),
+                                                        child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: const TextStyle(color: Color(0xFF6366f1))),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEF4444).withAlpha(15),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(Icons.warning_rounded, color: Color(0xFFEF4444), size: 18),
                                               ),
                                             ),
+                                            const SizedBox(width: 12),
                                           ],
-                                        ),
+                                          ElevatedButton(
+                                            onPressed: (isAllChecked && !isReady) ? () {
+                                              logic.markUldReady(uld['id_uld']?.toString() ?? '');
+                                            } : null,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: isReady ? const Color(0xFF10b981) : const Color(0xFF6366f1),
+                                              disabledBackgroundColor: isReady ? const Color(0xFF10b981).withAlpha(150) : (dark ? Colors.white.withAlpha(20) : Colors.grey.shade300),
+                                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                                              minimumSize: const Size(0, 32),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isReady) ...[
+                                                  const Icon(Icons.check, color: Colors.white, size: 14),
+                                                  const SizedBox(width: 4),
+                                                ],
+                                                Text(
+                                                  'Ready',
+                                                  style: TextStyle(
+                                                    color: (isAllChecked || isReady) ? Colors.white : (dark ? Colors.white30 : Colors.black26),
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       );
                                     }
                                   ),
@@ -344,7 +419,12 @@ class CoordinatorV2Panel extends StatelessWidget {
                             ),
                           ),
                           if (logic.selectedUldId == uld['id_uld']?.toString())
-                            CoordinatorV2UldAwbs(logic: logic, dark: dark),
+                            CoordinatorV2UldAwbs(
+                              logic: logic, 
+                              dark: dark,
+                              flightId: logic.selectedFlightId ?? '',
+                              uldId: uld['id_uld']?.toString() ?? '',
+                            ),
                         ],
                       ),
                     );

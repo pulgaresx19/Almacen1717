@@ -28,6 +28,9 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
   CoordinatorV2AwbDialogLogic(this.combined, this.awbSplit) {
     if (awbSplit['data_coordinator'] != null && awbSplit['data_coordinator'] is Map) {
       final Map<String, dynamic> data = awbSplit['data_coordinator'];
+      if (data['not_found'] == true) {
+        notFoundSelected = true;
+      }
       
       data.forEach((key, value) {
         if (key == 'Location requerida') {
@@ -41,7 +44,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
           }
         } else if (key == 'Remarks') {
           // Handled below
-        } else {
+        } else if (!key.startsWith('discrepancy_') && key != 'processed_by' && key != 'processed_at') {
           int val = value is int ? value : (int.tryParse(value.toString()) ?? 0);
           if (val > 0) {
             String cat = key;
@@ -87,6 +90,14 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
 
   void toggleNotFound() {
     notFoundSelected = !notFoundSelected;
+    if (notFoundSelected) {
+      addedItems.clear();
+      selectedLocation = null;
+      locationOtherCtrl.clear();
+      notesCtrl.clear();
+      selectedDamages.clear();
+      localPhotos.clear();
+    }
     notifyListeners();
   }
 
@@ -177,6 +188,77 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
   }
 
   Future<void> handleSave(BuildContext context) async {
+    final piecesStr = awbSplit['pieces']?.toString() ?? awbSplit['pieces_split']?.toString() ?? '0';
+    final targetPieces = int.tryParse(piecesStr) ?? 0;
+    final int checkedPieces = notFoundSelected ? 0 : getTotalChecked();
+    
+    if (checkedPieces != targetPieces) {
+      if (!context.mounted) return;
+      int diff = checkedPieces - targetPieces;
+      String type = diff > 0 ? "OVER" : "SHORT";
+      int absDiff = diff.abs();
+      
+      final bool isDark = Theme.of(context).brightness == Brightness.dark;
+      
+      bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          title: Row(
+            children: [
+              const Icon(Icons.warning_rounded, color: Color(0xFFEF4444)),
+              const SizedBox(width: 8),
+              Text(
+                appLanguage.value == 'es' ? 'Discrepancia de Piezas' : 'Pieces Discrepancy',
+                style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)
+              ),
+            ],
+          ),
+          content: RichText(
+            text: TextSpan(
+              style: TextStyle(color: isDark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 15, height: 1.5),
+              children: [
+                TextSpan(
+                  text: appLanguage.value == 'es'
+                    ? 'El total chequeado ($checkedPieces) no coincide con las declaradas ($targetPieces).\n\n'
+                    : 'Total checked ($checkedPieces) does not match declared pieces ($targetPieces).\n\n'
+                ),
+                TextSpan(
+                  text: appLanguage.value == 'es'
+                    ? 'Hay una diferencia de '
+                    : 'There is a discrepancy of ',
+                ),
+                TextSpan(
+                  text: '[$absDiff $type]',
+                  style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)
+                ),
+                TextSpan(
+                  text: appLanguage.value == 'es'
+                    ? ' piezas.\n¿Deseas guardar de todos modos?'
+                    : ' pieces.\nDo you want to save anyway?'
+                ),
+              ]
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false), 
+              child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8)))
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              onPressed: () => Navigator.pop(ctx, true), 
+              child: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) {
+        return;
+      }
+    }
+
     isSaving = true;
     notifyListeners();
     try {
@@ -232,6 +314,14 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         dataCoordinator[label] = item['value'];
       }
       
+      if (checkedPieces != targetPieces) {
+        int diff = checkedPieces - targetPieces;
+        dataCoordinator['discrepancy_expected'] = targetPieces;
+        dataCoordinator['discrepancy_checked'] = checkedPieces;
+        dataCoordinator['discrepancy_amount'] = diff.abs();
+        dataCoordinator['discrepancy_type'] = diff > 0 ? 'OVER' : 'SHORT';
+      }
+      
       if (finLocation.isNotEmpty) {
         dataCoordinator['Location requerida'] = finLocation;
       }
@@ -248,6 +338,10 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         }
       } catch (_) {}
       
+      if (notFoundSelected) {
+        dataCoordinator['not_found'] = true;
+      }
+
       dataCoordinator['processed_by'] = userFullName;
       dataCoordinator['processed_at'] = DateTime.now().toUtc().toIso8601String();
 

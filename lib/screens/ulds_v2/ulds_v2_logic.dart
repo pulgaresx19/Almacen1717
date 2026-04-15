@@ -41,6 +41,18 @@ class UldsV2Logic extends ChangeNotifier {
     try {
       final res = await supabase.from('ulds').select().order('created_at', ascending: false);
       uldsList = List<Map<String, dynamic>>.from(res);
+
+      // Sort: Breaks first, then No Breaks. Within the same group, sort by ULD number.
+      uldsList.sort((a, b) {
+        final aBreak = a['is_break'] == true;
+        final bBreak = b['is_break'] == true;
+        if (aBreak != bBreak) {
+          return aBreak ? -1 : 1;
+        }
+        final aNum = (a['uld_number'] ?? '').toString().toLowerCase();
+        final bNum = (b['uld_number'] ?? '').toString().toLowerCase();
+        return aNum.compareTo(bNum);
+      });
       
       // Fetch flights to match flight_id
       Set<String> flightIds = {};
