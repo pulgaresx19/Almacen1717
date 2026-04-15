@@ -14,13 +14,52 @@ class CoordinatorV2Logic extends ChangeNotifier {
   bool isLoadingUlds = false;
   List<Map<String, dynamic>> ulds = [];
 
-  // Search logic if needed could be stored here
   Map<String, dynamic>? globalSearchResult;
   bool isGlobalSearching = false;
 
   String? selectedUldId;
   bool isLoadingUldAwbs = false;
   List<Map<String, dynamic>> uldAwbs = [];
+
+  RealtimeChannel? _realtimeChannel;
+
+  CoordinatorV2Logic() {
+    _setupRealtime();
+  }
+
+  void _setupRealtime() {
+    _realtimeChannel = supabase.channel('coordinator_v2_changes');
+    
+    _realtimeChannel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'flights',
+      callback: (payload) {
+        if (selectedDate != null) fetchFlights(selectedDate!);
+      }
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'ulds',
+      callback: (payload) {
+        if (selectedFlightId != null) fetchUldsForFlight(selectedFlightId!);
+      }
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'awb_splits',
+      callback: (payload) {
+        if (selectedUldId != null) fetchAwbsForUld(selectedUldId!);
+      }
+    ).onPostgresChanges( // We can listen to damage_reports too if needed
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'damage_reports',
+      callback: (payload) {
+        if (selectedUldId != null) fetchAwbsForUld(selectedUldId!);
+      }
+    ).subscribe();
+  }
 
   void selectUld(String uldId) {
     if (selectedUldId == uldId) {
@@ -52,7 +91,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
   }
 
   void disposeLogic() {
-    // any subscriptions
+    _realtimeChannel?.unsubscribe();
   }
 
   @override
