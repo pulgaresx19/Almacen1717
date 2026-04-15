@@ -319,7 +319,16 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         dataCoordinator['discrepancy_expected'] = targetPieces;
         dataCoordinator['discrepancy_checked'] = checkedPieces;
         dataCoordinator['discrepancy_amount'] = diff.abs();
-        dataCoordinator['discrepancy_type'] = diff > 0 ? 'OVER' : 'SHORT';
+        if (notFoundSelected) {
+          dataCoordinator['not_found'] = true;
+        } else {
+          dataCoordinator['discrepancy_type'] = diff > 0 ? 'OVER' : 'SHORT';
+        }
+      } else {
+        if (notFoundSelected) {
+          dataCoordinator['not_found'] = true;
+          dataCoordinator['discrepancy_amount'] = targetPieces;
+        }
       }
       
       if (finLocation.isNotEmpty) {
@@ -338,12 +347,12 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         }
       } catch (_) {}
       
-      if (notFoundSelected) {
-        dataCoordinator['not_found'] = true;
-      }
-
       dataCoordinator['processed_by'] = userFullName;
       dataCoordinator['processed_at'] = DateTime.now().toUtc().toIso8601String();
+      if (awbSplit['is_new'] == true) {
+        dataCoordinator['is_new'] = true;
+        dataCoordinator['new_amount'] = targetPieces;
+      }
 
       final awbSplitId = awbSplit['id'];
       if (awbSplitId != null) {

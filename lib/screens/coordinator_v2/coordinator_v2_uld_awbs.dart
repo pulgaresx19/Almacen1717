@@ -122,15 +122,25 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
             final dynamic d = awbSplit['data_coordinator'];
             bool hasData = false;
             bool hasDiscrepancy = false;
+            bool isNotFound = false;
             String? discAmount;
             String? discType;
+            String? newAmount;
+            String? notFoundAmount;
             
             if (d is Map) {
               hasData = d.isNotEmpty;
-              if (d['discrepancy_amount'] != null) {
+              if (d['discrepancy_amount'] != null && d['discrepancy_type'] != null && d['not_found'] != true) {
                 hasDiscrepancy = true;
                 discAmount = d['discrepancy_amount'].toString();
                 discType = d['discrepancy_type']?.toString();
+              }
+              if (d['not_found'] == true) {
+                isNotFound = true;
+                notFoundAmount = d['discrepancy_amount']?.toString() ?? master['total_pieces']?.toString() ?? '0';
+              }
+              if (d['is_new'] == true) {
+                newAmount = d['new_amount']?.toString() ?? awbSplit['pieces']?.toString() ?? '0';
               }
             } else if (d is String) {
               hasData = d.trim().isNotEmpty && d != 'null' && d != '{}';
@@ -242,6 +252,28 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (isNotFound && notFoundAmount != null) ...[
+                    const SizedBox(width: 24),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF97316).withAlpha(15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFF97316).withAlpha(40)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.search_off_rounded, color: Color(0xFFF97316), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$notFoundAmount NOT FOUND',
+                            style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (isNew) ...[
                     const SizedBox(width: 24),
                     Container(
@@ -251,14 +283,14 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFF3B82F6).withAlpha(40)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.fiber_new_rounded, color: Color(0xFF3B82F6), size: 16),
-                          SizedBox(width: 4),
+                          const Icon(Icons.fiber_new_rounded, color: Color(0xFF3B82F6), size: 16),
+                          const SizedBox(width: 4),
                           Text(
-                            'NEW',
-                            style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 11),
+                            '${newAmount ?? "0"} NEW',
+                            style: const TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold, fontSize: 11),
                           ),
                         ],
                       ),

@@ -273,13 +273,32 @@ class CoordinatorV2Logic extends ChangeNotifier {
           } catch (_) {}
         }
         
-        if (dataCoord != null && dataCoord['discrepancy_amount'] != null) {
+        if (dataCoord != null) {
           final String awbNum = awbSplit['awbs']?['awb_number']?.toString() ?? 'Unknown AWB';
-          finalDiscrepancies.add({
-            'awb': awbNum,
-            'amount': dataCoord['discrepancy_amount'],
-            'type': dataCoord['discrepancy_type'],
-          });
+          
+          if (dataCoord['discrepancy_type'] != null && dataCoord['discrepancy_amount'] != null) {
+            finalDiscrepancies.add({
+              'awb': awbNum,
+              'amount': dataCoord['discrepancy_amount'],
+              'type': dataCoord['discrepancy_type'],
+            });
+          }
+          
+          if (dataCoord['is_new'] == true) {
+            finalDiscrepancies.add({
+              'awb': awbNum,
+              'amount': dataCoord['new_amount'] ?? dataCoord['discrepancy_expected'] ?? 0,
+              'type': 'NEW',
+            });
+          }
+          
+          if (dataCoord['not_found'] == true) {
+            finalDiscrepancies.add({
+              'awb': awbNum,
+              'amount': dataCoord['discrepancy_amount'] ?? 0,
+              'type': 'NOT FOUND',
+            });
+          }
         }
       }
 

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import 'coordinator_v2_logic.dart';
 import 'coordinator_v2_uld_awbs.dart';
+import 'coordinator_v2_footer.dart';
 
 class CoordinatorV2Panel extends StatelessWidget {
   final CoordinatorV2Logic logic;
@@ -297,7 +298,6 @@ class CoordinatorV2Panel extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                if (logic.selectedUldId != uld['id_uld']?.toString()) ...[
                                   const SizedBox(width: 12),
                                   Builder(
                                     builder: (context) {
@@ -408,7 +408,6 @@ class CoordinatorV2Panel extends StatelessWidget {
                                       );
                                     }
                                   ),
-                                ],
                                 const SizedBox(width: 12),
                                 Icon(
                                   logic.selectedUldId == uld['id_uld']?.toString() ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
@@ -428,9 +427,10 @@ class CoordinatorV2Panel extends StatelessWidget {
                         ],
                       ),
                     );
-                        },
-                      ),
-                    ),
+                  },
+                ),
+              ),
+              CoordinatorV2Footer(dark: dark, logic: logic),
                 ]
               ],
             ],
