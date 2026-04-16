@@ -316,8 +316,23 @@ class CoordinatorV2Logic extends ChangeNotifier {
         ulds[idx]['time_checked'] = nowIso;
         ulds[idx]['user_checked'] = userFullName;
         ulds[idx]['discrepancies_summary'] = finalDiscrepancies;
-        notifyListeners();
       }
+
+      if (selectedFlightId != null) {
+        final fIdx = flights.indexWhere((f) => f['id_flight']?.toString() == selectedFlightId);
+        if (fIdx != -1 && flights[fIdx]['start_break'] == null) {
+          try {
+            await supabase.from('flights').update({
+              'start_break': nowIso,
+            }).eq('id_flight', selectedFlightId!);
+            flights[fIdx]['start_break'] = nowIso;
+          } catch (ef) {
+            debugPrint('Error updating start_break for flight: $ef');
+          }
+        }
+      }
+
+      notifyListeners();
     } catch (e) {
       debugPrint('Error marking ULD as ready: $e');
     }

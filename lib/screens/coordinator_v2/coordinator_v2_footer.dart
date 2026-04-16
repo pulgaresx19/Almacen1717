@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'coordinator_v2_logic.dart';
 
 class CoordinatorV2Footer extends StatelessWidget {
@@ -30,6 +31,29 @@ class CoordinatorV2Footer extends StatelessWidget {
     
     int totalItems = logic.ulds.length;
     int checkedItems = logic.ulds.where((u) => u['time_checked'] != null && u['time_checked'].toString().isNotEmpty).length;
+
+    Map<String, dynamic>? selectedFlight;
+    if (logic.selectedFlightId != null) {
+      try {
+        selectedFlight = logic.flights.firstWhere((f) => f['id_flight']?.toString() == logic.selectedFlightId);
+      } catch (_) {}
+    }
+
+    String startBreakStr = 'Start Break: -';
+    if (selectedFlight != null && selectedFlight['start_break'] != null) {
+      final dt = DateTime.tryParse(selectedFlight['start_break'].toString())?.toLocal();
+      if (dt != null) {
+        startBreakStr = 'Start Break: ${dt.day}/${dt.month} ${DateFormat('h:mm a').format(dt).toLowerCase()}';
+      }
+    }
+
+    String endBreakStr = 'End Break: -';
+    if (selectedFlight != null && selectedFlight['end_break'] != null) {
+      final dt = DateTime.tryParse(selectedFlight['end_break'].toString())?.toLocal();
+      if (dt != null) {
+        endBreakStr = 'End Break: ${dt.day}/${dt.month} ${DateFormat('h:mm a').format(dt).toLowerCase()}';
+      }
+    }
     
     return Column(
       children: [
@@ -43,7 +67,7 @@ class CoordinatorV2Footer extends StatelessWidget {
                 children: [
                   const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
                   const SizedBox(width: 6),
-                  const Text('Start Break: 15/4 6:59 am', style: TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                  Text(startBreakStr, style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
                 ],
               ),
               Row(
@@ -51,7 +75,7 @@ class CoordinatorV2Footer extends StatelessWidget {
                 children: [
                   const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
                   const SizedBox(width: 6),
-                  const Text('End Break: 15/4 7:05 am', style: TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                  Text(endBreakStr, style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -82,12 +106,14 @@ class CoordinatorV2Footer extends StatelessWidget {
               ),
               Container(width: 1, height: 40, margin: const EdgeInsets.symmetric(horizontal: 16), color: borderC),
               ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: (totalItems > 0 && checkedItems == totalItems) ? () {} : null,
                 icon: const Icon(Icons.check_circle_outline, size: 20),
-                label: const Text('Mark Flight as Received', style: TextStyle(fontWeight: FontWeight.bold)),
+                label: const Text('Mark Flight as Checked', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10b981),
                   foregroundColor: Colors.white,
+                  disabledBackgroundColor: dark ? Colors.white.withAlpha(20) : Colors.grey.shade300,
+                  disabledForegroundColor: dark ? Colors.white30 : Colors.black26,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
