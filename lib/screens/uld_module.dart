@@ -65,8 +65,8 @@ class _UldModuleState extends State<UldModule> {
     setState(() {
       _uldsStream = Supabase.instance.client
           .from('ULD')
-          .stream(primaryKey: ['id'])
-          .order('ULD-number', ascending: true);
+          .select()
+          .order('ULD-number', ascending: true).asStream();
     });
   }
 

@@ -17,8 +17,8 @@ class _SystemBfModuleState extends State<SystemBfModule> {
   @override
   void initState() {
     super.initState();
-    _system1Stream = Supabase.instance.client.from('System1').stream(primaryKey: ['id']).eq('id', 1).limit(1);
-    _system2Stream = Supabase.instance.client.from('System2').stream(primaryKey: ['id']).eq('id', 1).limit(1);
+    _system1Stream = Supabase.instance.client.from('System1').select().eq('id', 1).limit(1).asStream();
+    _system2Stream = Supabase.instance.client.from('System2').select().eq('id', 1).limit(1).asStream();
   }
 
   @override

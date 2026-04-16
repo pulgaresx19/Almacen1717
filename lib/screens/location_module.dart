@@ -132,9 +132,9 @@ class _LocationModuleState extends State<LocationModule> {
       setState(() => _isLoadingUldsLeft = true);
       _uldSubLeft = Supabase.instance.client
           .from('ULD')
-          .stream(primaryKey: ['id'])
+          .select()
           .eq('refDate', flight['date-arrived'])
-          .listen((data) {
+          .asStream().listen((data) {
         if (!mounted) return;
         
         final allBreak = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number'] && u['isBreak'] == true).toList();
@@ -154,9 +154,9 @@ class _LocationModuleState extends State<LocationModule> {
       setState(() => _isLoadingUldsRight = true);
       _uldSubRight = Supabase.instance.client
           .from('ULD')
-          .stream(primaryKey: ['id'])
+          .select()
           .eq('refDate', flight['date-arrived'])
-          .listen((data) {
+          .asStream().listen((data) {
         if (!mounted) return;
         
         final allBreak = data.where((u) => u['refCarrier'] == flight['carrier'] && u['refNumber'] == flight['number'] && u['isBreak'] == true).toList();
@@ -238,9 +238,9 @@ class _LocationModuleState extends State<LocationModule> {
     if (isLeft) {
       _flightSubLeft = Supabase.instance.client
           .from('Flight')
-          .stream(primaryKey: ['id'])
+          .select()
           .inFilter('date-arrived', validDates)
-          .listen((data) {
+          .asStream().listen((data) {
         if (!mounted) return;
         
         final validList = <Map<String, dynamic>>[];
@@ -271,9 +271,9 @@ class _LocationModuleState extends State<LocationModule> {
     } else {
       _flightSubRight = Supabase.instance.client
           .from('Flight')
-          .stream(primaryKey: ['id'])
+          .select()
           .inFilter('date-arrived', validDates)
-          .listen((data) {
+          .asStream().listen((data) {
         if (!mounted) return;
         
         final validList = <Map<String, dynamic>>[];

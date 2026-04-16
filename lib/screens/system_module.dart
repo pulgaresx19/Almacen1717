@@ -140,9 +140,9 @@ class _SystemModuleState extends State<SystemModule> {
       setState(() => _isLoadingUldsLeft = true);
       _uldSubLeft = Supabase.instance.client
           .from('ULD')
-          .stream(primaryKey: ['id'])
+          .select()
           .eq('refDate', flight['date-arrived'])
-          .listen(
+          .asStream().listen(
             (data) {
               if (!mounted) return;
               final filtered = data
@@ -164,9 +164,9 @@ class _SystemModuleState extends State<SystemModule> {
       setState(() => _isLoadingUldsRight = true);
       _uldSubRight = Supabase.instance.client
           .from('ULD')
-          .stream(primaryKey: ['id'])
+          .select()
           .eq('refDate', flight['date-arrived'])
-          .listen(
+          .asStream().listen(
             (data) {
               if (!mounted) return;
               final filtered = data
@@ -258,9 +258,9 @@ class _SystemModuleState extends State<SystemModule> {
     if (isLeft) {
       _flightSubLeft = Supabase.instance.client
           .from('Flight')
-          .stream(primaryKey: ['id'])
+          .select()
           .inFilter('date-arrived', validDates)
-          .listen(
+          .asStream().listen(
             (data) {
               if (!mounted) return;
 
@@ -305,9 +305,9 @@ class _SystemModuleState extends State<SystemModule> {
     } else {
       _flightSubRight = Supabase.instance.client
           .from('Flight')
-          .stream(primaryKey: ['id'])
+          .select()
           .inFilter('date-arrived', validDates)
-          .listen(
+          .asStream().listen(
             (data) {
               if (!mounted) return;
 

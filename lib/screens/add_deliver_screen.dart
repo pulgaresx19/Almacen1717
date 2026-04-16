@@ -64,9 +64,9 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
     
     _awbSub = Supabase.instance.client
         .from('AWB')
-        .stream(primaryKey: ['id'])
+        .select()
         .order('AWB-number', ascending: true)
-        .listen((data) {
+        .asStream().listen((data) {
       if (mounted) {
         setState(() {
           _allAwbs = List<Map<String, dynamic>>.from(data);
@@ -77,8 +77,8 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
 
     _deliversSub = Supabase.instance.client
         .from('Delivers')
-        .stream(primaryKey: ['id'])
-        .listen((data) {
+        .select()
+        .asStream().listen((data) {
       if (mounted) {
         setState(() {
           _allDelivers = List<Map<String, dynamic>>.from(data);
@@ -88,9 +88,9 @@ class AddDeliverScreenState extends State<AddDeliverScreen> {
 
     _uldSub = Supabase.instance.client
         .from('ULD')
-        .stream(primaryKey: ['id'])
+        .select()
         .order('id', ascending: false)
-        .listen((data) {
+        .asStream().listen((data) {
       if (mounted) {
         setState(() {
           _allUlds = List<Map<String, dynamic>>.from(data);

@@ -38,7 +38,7 @@ class _FlightModuleState extends State<FlightModule> {
   @override
   void initState() {
     super.initState();
-    _flightStream = Supabase.instance.client.from('Flight').stream(primaryKey: ['id']).order('date-arrived', ascending: false).order('time-arrived', ascending: true);
+    _flightStream = Supabase.instance.client.from('Flight').select().order('date-arrived', ascending: false).order('time-arrived', ascending: true).asStream();
   }
 
   @override

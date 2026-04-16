@@ -39,8 +39,8 @@ class _DriverModuleState extends State<DriverModule> {
     super.initState();
     _deliversStream = Supabase.instance.client
         .from('Delivers')
-        .stream(primaryKey: ['id'])
-        .order('time-deliver', ascending: true);
+        .select()
+        .order('time-deliver', ascending: true).asStream();
         
     _awbChannel = Supabase.instance.client
         .channel('public:AWB')

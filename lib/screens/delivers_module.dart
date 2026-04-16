@@ -26,7 +26,7 @@ class _DeliversModuleState extends State<DeliversModule> {
   @override
   void initState() {
     super.initState();
-    _deliversStream = Supabase.instance.client.from('Delivers').stream(primaryKey: ['id']).order('time-deliver', ascending: true);
+    _deliversStream = Supabase.instance.client.from('Delivers').select().order('time-deliver', ascending: true).asStream();
   }
 
   @override

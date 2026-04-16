@@ -22,7 +22,7 @@ class _UsersModuleState extends State<UsersModule> {
   @override
   void initState() {
     super.initState();
-    _usersStream = Supabase.instance.client.from('users').stream(primaryKey: ['id']).order('full-name', ascending: true);
+    _usersStream = Supabase.instance.client.from('users').select().order('full-name', ascending: true).asStream();
   }
 
   @override

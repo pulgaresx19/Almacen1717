@@ -26,7 +26,7 @@ class _AwbModuleState extends State<AwbModule> {
   @override
   void initState() {
     super.initState();
-    _awbStream = Supabase.instance.client.from('AWB').stream(primaryKey: ['id']).order('AWB-number', ascending: true);
+    _awbStream = Supabase.instance.client.from('AWB').select().order('AWB-number', ascending: true).asStream();
   }
 
   @override

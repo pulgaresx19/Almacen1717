@@ -23,7 +23,7 @@ class _AreaNobreakModuleState extends State<AreaNobreakModule> {
   @override
   void initState() {
     super.initState();
-    _uldStream = Supabase.instance.client.from('ULD').stream(primaryKey: ['id']);
+    _uldStream = Supabase.instance.client.from('ULD').select().asStream();
   }
 
   Widget _buildDeliveryTextField(
