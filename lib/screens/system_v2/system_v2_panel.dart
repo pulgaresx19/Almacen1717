@@ -38,6 +38,14 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
   }
 
   @override
+  void didUpdateWidget(covariant SystemV2Panel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.authorName != widget.authorName) {
+      _logic.authorName = widget.authorName;
+    }
+  }
+
+  @override
   void dispose() {
     _logic.dispose();
     super.dispose();
@@ -103,83 +111,87 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (widget.isSplitView || _logic.date != null)
-                              Text(
-                                (widget.isSplitView ? '[System ${widget.panelId}]' : '') +
-                                    (widget.isSplitView && _logic.date != null ? ' ' : '') +
-                                    (_logic.date != null ? (appLanguage.value == 'es' ? 'Vuelos en esta fecha' : 'Flights on this date') : ''),
-                                style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold),
-                              ),
-                            if (!isFlightReceived && _logic.lastReceivedUld != null) ...[
-                              if (widget.isSplitView || _logic.date != null) const SizedBox(width: 16),
-                              Builder(
-                                builder: (context) {
-                                  final uld = _logic.lastReceivedUld!;
-                                  final bool isBreak = uld['is_break'] == true;
-                                  final String uldNum = uld['uld_number']?.toString() ?? '-';
-                                  final Color statusColor = isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444);
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: statusColor.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: statusColor.withAlpha(80)),
-                                    ),
-                                    child: Text(
-                                      uldNum,
-                                      style: TextStyle(color: statusColor, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                                    ),
-                                  );
-                                },
-                              ),
+                    SizedBox(
+                      height: 48,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.isSplitView || _logic.date != null)
+                                Text(
+                                  (widget.isSplitView ? '[System ${widget.panelId}]' : '') +
+                                      (widget.isSplitView && _logic.date != null ? ' ' : '') +
+                                      (_logic.date != null ? (appLanguage.value == 'es' ? 'Vuelos en esta fecha' : 'Flights on this date') : ''),
+                                  style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                              if (!isFlightReceived && _logic.lastReceivedUld != null) ...[
+                                if (widget.isSplitView || _logic.date != null) const SizedBox(width: 16),
+                                Builder(
+                                  builder: (context) {
+                                    final uld = _logic.lastReceivedUld!;
+                                    final bool isBreak = uld['is_break'] == true;
+                                    final String uldNum = uld['uld_number']?.toString() ?? '-';
+                                    final Color statusColor = isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444);
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: statusColor.withAlpha(20),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: statusColor.withAlpha(80)),
+                                      ),
+                                      child: Text(
+                                        uldNum,
+                                        style: TextStyle(color: statusColor, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: () => _pickDate(context),
-                              icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                              label: Text(
-                                _logic.date == null
-                                    ? (appLanguage.value == 'es' ? 'Seleccionar Fecha' : 'Select Date')
-                                    : DateFormat('MM/dd/yyyy').format(_logic.date!),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _pickDate(context),
+                                icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                                label: Text(
+                                  _logic.date == null
+                                      ? (appLanguage.value == 'es' ? 'Seleccionar Fecha' : 'Select Date')
+                                      : DateFormat('MM/dd/yyyy').format(_logic.date!),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366f1),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6366f1),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                            if (!widget.isSplitView && widget.panelId == 1 && MediaQuery.of(context).size.width >= 1100) ...[
-                              const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: widget.onToggleSplit,
-                                icon: const Icon(Icons.add_circle_outline_rounded, size: 28),
-                                color: const Color(0xFF6366f1),
-                                tooltip: appLanguage.value == 'es' ? 'Dividir vista' : 'Split view',
-                              ),
+                              if (!widget.isSplitView && widget.panelId == 1 && MediaQuery.of(context).size.width >= 1100) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: widget.onToggleSplit,
+                                  icon: const Icon(Icons.add_circle_outline_rounded, size: 28),
+                                  color: const Color(0xFF6366f1),
+                                  tooltip: appLanguage.value == 'es' ? 'Dividir vista' : 'Split view',
+                                ),
+                              ],
+                              if (widget.isSplitView && widget.panelId == 2) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: widget.onCloseSplit,
+                                  icon: const Icon(Icons.close_rounded, size: 28),
+                                  color: Colors.redAccent,
+                                  tooltip: appLanguage.value == 'es' ? 'Cerrar panel' : 'Close panel',
+                                ),
+                              ],
                             ],
-                            if (widget.isSplitView && widget.panelId == 2) ...[
-                              const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: widget.onCloseSplit,
-                                icon: const Icon(Icons.close_rounded, size: 28),
-                                color: Colors.redAccent,
-                                tooltip: appLanguage.value == 'es' ? 'Cerrar panel' : 'Close panel',
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     if (_logic.isLoading)

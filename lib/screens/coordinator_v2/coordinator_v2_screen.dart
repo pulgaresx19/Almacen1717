@@ -60,8 +60,8 @@ class _CoordinatorV2ScreenState extends State<CoordinatorV2Screen> {
                         const SizedBox(height: 4),
                         Text(
                           appLanguage.value == 'es'
-                              ? 'Módulo para verificación y check-in de vuelos y AWBs.'
-                              : 'Module for verification and check-in of flights and AWBs.',
+                              ? 'Módulo para chequear AWBs de vuelos.'
+                              : 'Module to check flight AWBs.',
                           style: TextStyle(
                             color: dark
                                 ? const Color(0xFF94a3b8)

@@ -22,6 +22,8 @@ class CoordinatorV2Logic extends ChangeNotifier {
   bool isLoadingUldAwbs = false;
   List<Map<String, dynamic>> uldAwbs = [];
 
+  List<Map<String, dynamic>> locationRequiredAwbs = [];
+
   RealtimeChannel? _realtimeChannel;
 
   CoordinatorV2Logic() {
@@ -51,6 +53,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
       table: 'awb_splits',
       callback: (payload) {
         if (selectedUldId != null) fetchAwbsForUld(selectedUldId!);
+        if (selectedFlightId != null) fetchLocationRequiredAwbs(selectedFlightId!);
       }
     ).onPostgresChanges( // We can listen to damage_reports too if needed
       event: PostgresChangeEvent.all,
@@ -173,11 +176,27 @@ class CoordinatorV2Logic extends ChangeNotifier {
     if (selectedFlightId == idFlight) {
       selectedFlightId = null; // deselect
       ulds = [];
+      locationRequiredAwbs = [];
     } else {
       selectedFlightId = idFlight;
       fetchUldsForFlight(idFlight);
+      fetchLocationRequiredAwbs(idFlight);
     }
     notifyListeners();
+  }
+
+  Future<void> fetchLocationRequiredAwbs(String idFlight) async {
+    try {
+      final awbRes = await supabase
+          .from('awb_splits')
+          .select('*, awbs(awb_number, total_pieces)')
+          .eq('flight_id', idFlight)
+          .not('required_location', 'is', null);
+      locationRequiredAwbs = List<Map<String, dynamic>>.from(awbRes);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error fetching required_location AWBs: $e');
+    }
   }
 
   Future<void> fetchUldsForFlight(String idFlight) async {
@@ -415,6 +434,155 @@ class CoordinatorV2Logic extends ChangeNotifier {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  int verificationState = 0; // 0=Info, 1=Loading, 2=Success, 3=Report
+  List<Map<String, dynamic>> finalDiscrepancies = [];
+
+  bool get allReportsFilled {
+    if (finalDiscrepancies.isEmpty) return false;
+    for (var d in finalDiscrepancies) {
+      final ctrl = d['reportCtrl'] as TextEditingController?;
+      if (ctrl == null || ctrl.text.trim().isEmpty) return false;
+    }
+    return true;
+  }
+
+  void resetVerificationState() {
+    verificationState = 0;
+    for (var d in finalDiscrepancies) {
+      if (d['reportCtrl'] != null && d['reportCtrl'] is TextEditingController) {
+        (d['reportCtrl'] as TextEditingController).dispose();
+      }
+    }
+    finalDiscrepancies.clear();
+    notifyListeners();
+  }
+
+  Future<void> verifyFlightDiscrepancies() async {
+    if (selectedFlightId == null) return;
+    verificationState = 1;
+    notifyListeners();
+
+    try {
+      final response = await supabase
+          .from('awb_splits')
+          .select('*, awbs!inner(awb_number, total_pieces)')
+          .eq('flight_id', selectedFlightId!);
+
+      final List<dynamic> splits = response;
+      
+      Map<String, Map<String, dynamic>> sums = {};
+      
+      for (var split in splits) {
+        String awbNum = split['awbs']['awb_number']?.toString() ?? 'Unknown';
+        int expected = int.tryParse(split['awbs']['total_pieces']?.toString() ?? '0') ?? 0;
+        int checked = split['total_checked'] ?? 0;
+        
+        if (!sums.containsKey(awbNum)) {
+          sums[awbNum] = {
+            'expected': expected,
+            'checked': 0,
+            'awb_id': split['awb_id'],
+            'awb_number': awbNum,
+          };
+        }
+        sums[awbNum]!['checked'] = (sums[awbNum]!['checked'] as int) + checked;
+      }
+      
+      for (var d in finalDiscrepancies) {
+        if (d['reportCtrl'] is TextEditingController) {
+          (d['reportCtrl'] as TextEditingController).dispose();
+        }
+      }
+      finalDiscrepancies.clear();
+      
+      for (var entry in sums.entries) {
+        int exp = entry.value['expected'];
+        int chk = entry.value['checked'];
+        if (chk != exp) {
+          int diff = chk - exp;
+          final ctrl = TextEditingController();
+          ctrl.addListener(() {
+            notifyListeners();
+          });
+          finalDiscrepancies.add({
+            'awb_number': entry.key,
+            'awb_id': entry.value['awb_id'],
+            'expected': exp,
+            'checked': chk,
+            'diff': diff.abs(),
+            'type': diff > 0 ? 'OVER' : 'SHORT',
+            'reportCtrl': ctrl,
+          });
+        }
+      }
+      
+      if (finalDiscrepancies.isEmpty) {
+        verificationState = 2; // Success
+      } else {
+        verificationState = 3; // Requires Report
+      }
+    } catch (e) {
+      debugPrint('Error verifying flight: $e');
+      verificationState = 0;
+    }
+    notifyListeners();
+  }
+
+  Future<void> submitFinalReport() async {
+    if (selectedFlightId == null) return;
+    verificationState = 1;
+    notifyListeners();
+    
+    try {
+      List<Map<String, dynamic>> reportItems = [];
+      final String reporter = currentUserData.value?['full-name']?.toString() ?? 'Unknown';
+      final String reportTime = DateTime.now().toLocal().toString();
+      
+      for (var d in finalDiscrepancies) {
+         reportItems.add({
+          'awb_number': d['awb_number'],
+          'expected': d['expected'],
+          'checked': d['checked'],
+          'type': d['type'],
+          'amount': d['diff'],
+          'comment': (d['reportCtrl'] as TextEditingController?)?.text.trim() ?? '',
+          'reported_by': reporter,
+          'reported_at': reportTime,
+        });
+      }
+      
+      await supabase.from('flights').update({
+        'final_discrepancy_report': reportItems,
+      }).eq('id_flight', selectedFlightId!);
+      
+      verificationState = 2; 
+    } catch (e) {
+      debugPrint('Error submitting report: $e');
+      verificationState = 3;
+    }
+    notifyListeners();
+  }
+
+  Future<void> markFlightAsChecked() async {
+    if (selectedFlightId == null) return;
+    try {
+      final String nowIso = DateTime.now().toUtc().toIso8601String();
+      await supabase.from('flights').update({
+        'is_checked': true,
+        'end_break': nowIso
+      }).eq('id_flight', selectedFlightId!);
+      
+      int fIdx = flights.indexWhere((f) => f['id_flight']?.toString() == selectedFlightId);
+      if (fIdx != -1) {
+        flights[fIdx]['is_checked'] = true;
+        flights[fIdx]['end_break'] = nowIso;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error marking flight as checked: $e');
     }
   }
 

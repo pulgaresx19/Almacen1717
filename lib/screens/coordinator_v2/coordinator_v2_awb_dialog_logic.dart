@@ -356,9 +356,17 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
 
       final awbSplitId = awbSplit['id'];
       if (awbSplitId != null) {
-        await supabase.from('awb_splits').update({
+        final updateData = <String, dynamic>{
           'data_coordinator': dataCoordinator,
-        }).eq('id', awbSplitId);
+          'total_checked': checkedPieces,
+        };
+        if (finLocation.isNotEmpty) {
+          updateData['required_location'] = finLocation;
+        } else {
+          updateData['required_location'] = null;
+        }
+
+        await supabase.from('awb_splits').update(updateData).eq('id', awbSplitId);
       }
 
       if (context.mounted) {

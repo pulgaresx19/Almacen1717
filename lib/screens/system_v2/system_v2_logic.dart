@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SystemPanelLogic extends ChangeNotifier {
   final int panelId;
-  final String authorName;
+  String authorName;
 
   DateTime? date;
   List<Map<String, dynamic>> flights = [];
@@ -181,7 +181,7 @@ class SystemPanelLogic extends ChangeNotifier {
         final response = await Supabase.instance.client
             .from('awb_splits')
             .select('*, awbs(*)')
-            .eq('id_uld', uld['id_uld']);
+            .eq('uld_id', uld['id_uld']);
 
         List<Map<String, dynamic>> parsedAwbs = [];
         for (var split in response) {

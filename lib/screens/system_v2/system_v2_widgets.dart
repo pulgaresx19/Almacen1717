@@ -157,7 +157,7 @@ class SystemV2UldItem extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(
-                color: Color(0xFFef4444),
+                color: Color(0xFFF59E0B),
                 shape: BoxShape.circle,
                 boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
               ),
@@ -217,23 +217,18 @@ class SystemV2StatsFooter extends StatelessWidget {
         List<String> times = truckMap.values.map((v) => v.toString()).toList();
         times.sort((a, b) => a.compareTo(b));
         fTruck ??= times.first;
-        lTruck ??= times.last;
       } else if (currentFlight['local_first_truck'] != null) {
         fTruck ??= currentFlight['local_first_truck'].toString();
       }
     }
 
     String toAmPm(String? t) {
-      if (t == null) return '-';
+      if (t == null || t.isEmpty || t == 'null') return '-';
       try {
-        if (t.contains('T')) {
-          final dt = DateTime.parse(t).toLocal();
-          int h = dt.hour;
-          int m = dt.minute;
-          bool pm = h >= 12;
-          int h12 = h > 12 ? h - 12 : (h == 0 ? 12 : h);
-          return '${dt.day}/${dt.month} $h12:${m.toString().padLeft(2, '0')} ${pm ? 'pm' : 'am'}';
-        }
+        DateTime dt = DateTime.parse(t).toLocal();
+        return DateFormat('h:mm a').format(dt).toLowerCase();
+      } catch (_) {}
+      try {
         final pts = t.split(':');
         if (pts.length >= 2) {
           int h = int.parse(pts[0]);
@@ -250,32 +245,30 @@ class SystemV2StatsFooter extends StatelessWidget {
 
     return Column(
       children: [
-        if (fTruck != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12.0, left: 4, right: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
-                    const SizedBox(width: 6),
-                    Text('First Truck: ${toAmPm(fTruck)}', style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                if (isFlightReceived)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.done_all, size: 14, color: Color(0xFF10b981)),
-                      const SizedBox(width: 6),
-                      Text('Last Truck: ${toAmPm(lTruck ?? fTruck)}', style: const TextStyle(fontSize: 13, color: Color(0xFF10b981), fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12.0, left: 4, right: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
+                  const SizedBox(width: 6),
+                  Text('First Truck: ${toAmPm(fTruck)}', style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.access_time, size: 14, color: Color(0xFF94a3b8)),
+                  const SizedBox(width: 6),
+                  Text('Last Truck: ${toAmPm(lTruck)}', style: const TextStyle(fontSize: 13, color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ],
           ),
+        ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -326,7 +319,21 @@ class SystemV2StatsFooter extends StatelessWidget {
                           }
                         : null,
                 icon: Icon(isFlightReceived ? Icons.verified : Icons.check_circle_outline, size: 20),
-                label: Text(isFlightReceived ? 'Received' : 'Mark Flight as Received', style: const TextStyle(fontWeight: FontWeight.bold)),
+                label: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Text(
+                      appLanguage.value == 'es' ? 'Marcar como Recibido' : 'Mark Flight as Received',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.transparent),
+                    ),
+                    Text(
+                      isFlightReceived 
+                          ? (appLanguage.value == 'es' ? 'Vuelo Recibido' : 'Flight Received') 
+                          : (appLanguage.value == 'es' ? 'Marcar como Recibido' : 'Mark Flight as Received'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isFlightReceived ? Colors.lightBlue.shade100 : const Color(0xFF10b981),
                   disabledBackgroundColor: isFlightReceived ? Colors.lightBlue.withAlpha(dark ? 40 : 100) : const Color(0xFF10b981).withAlpha(60),

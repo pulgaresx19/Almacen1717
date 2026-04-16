@@ -40,6 +40,92 @@ class CoordinatorV2Panel extends StatelessWidget {
     }
   }
 
+  void _showUldInfoDialog(BuildContext context, Map<String, dynamic> uld, bool dark, Color textP, Color textS, Color borderC) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: dark ? const Color(0xFF1e293b) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(appLanguage.value == 'es' ? 'Info de la Paleta' : 'ULD Info', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  if (uld['time_received'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.download_done, size: 16, color: Color(0xFF6366f1)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(appLanguage.value == 'es' ? 'Recibido Por' : 'Received By', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text('${uld['user_received'] ?? 'Unknown'}', style: TextStyle(color: textP, fontSize: 14)),
+                                Text(DateFormat('MMM dd, hh:mm a').format(DateTime.parse(uld['time_received']).toLocal()), style: TextStyle(color: textS, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (uld['time_checked'] != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.done_all, size: 16, color: Color(0xFF10b981)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(appLanguage.value == 'es' ? 'Chequeado Por' : 'Checked By', style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text('${uld['user_checked'] ?? 'Unknown'}', style: TextStyle(color: textP, fontSize: 14)),
+                                Text(DateFormat('MMM dd, hh:mm a').format(DateTime.parse(uld['time_checked']).toLocal()), style: TextStyle(color: textS, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (uld['time_received'] == null && uld['time_checked'] == null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(appLanguage.value == 'es' ? 'Aún no se ha recibido ni chequeado.' : 'Not received or checked yet.', style: TextStyle(color: textS)),
+                    ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -129,7 +215,7 @@ class CoordinatorV2Panel extends StatelessWidget {
                   children: logic.flights.map((f) {
                     final chipId = f['id_flight']?.toString() ?? '';
                     final isSel = logic.selectedFlightId == chipId && chipId.isNotEmpty;
-                    final isChecked = f['isChecked'] == true;
+                    final isChecked = f['is_checked'] == true;
 
                     Color textColor = isSel
                         ? Colors.white
@@ -188,17 +274,20 @@ class CoordinatorV2Panel extends StatelessWidget {
                           final num weight = uld['weight_total'] ?? 0;
                           final String remarks = uld['remarks']?.toString() ?? '';
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(10) : bgCard,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(50) : borderC
-                              ),
-                            ),
-                            child: Column(
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(10) : bgCard,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(50) : borderC
+                                  ),
+                                ),
+                                child: Column(
                               children: [
                                 GestureDetector(
                                   behavior: HitTestBehavior.opaque,
@@ -212,20 +301,25 @@ class CoordinatorV2Panel extends StatelessWidget {
                                       Expanded(
                                   child: Row(
                                     children: [
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF6366f1).withAlpha(30),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Text(
-                                          '${index + 1}',
-                                          style: const TextStyle(
-                                            color: Color(0xFF6366f1),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
+                                      GestureDetector(
+                                        onTap: () {
+                                          _showUldInfoDialog(context, uld, dark, textP, textS, borderC);
+                                        },
+                                        child: Container(
+                                          width: 28,
+                                          height: 28,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF6366f1).withAlpha(30),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Text(
+                                            '${index + 1}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF6366f1),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -426,7 +520,23 @@ class CoordinatorV2Panel extends StatelessWidget {
                             ),
                         ],
                       ),
-                    );
+                    ),
+                    if (uld['is_priority'] == true)
+                      Positioned(
+                        top: -4,
+                        left: -4,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF59E0B), // Orange
+                            shape: BoxShape.circle,
+                            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
+                          ),
+                          child: const Icon(Icons.flash_on, color: Colors.white, size: 14),
+                        ),
+                      ),
+                  ],
+                );
                   },
                 ),
               ),
