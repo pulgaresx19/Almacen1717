@@ -306,10 +306,12 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                         columns: [
                           const DataColumn(label: Text('#')),
                           const DataColumn(label: Text('AWB Number')),
-                          const DataColumn(label: Text('Pieces Expected')),
-                          const DataColumn(label: Text('Total Pieces')),
-                          const DataColumn(label: Text('Total Weight')),
-                          const DataColumn(label: Text('Remarks')),
+                          const DataColumn(label: Text('Expected')),
+                          const DataColumn(label: Text('Received')),
+                          const DataColumn(label: Text('Delivered')),
+                          const DataColumn(label: Text('Remaining')),
+                          const DataColumn(label: Text('Total')),
+                          const DataColumn(label: Text('Weight')),
                           const DataColumn(label: Text('Status')),
                           DataColumn(
                             label: Checkbox(
@@ -332,9 +334,11 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           final u = awbs[index];
                           
                           int expectedPieces = int.tryParse(u['total_espected']?.toString() ?? '0') ?? 0;
+                          int receivedPieces = int.tryParse(u['pieces_received']?.toString() ?? '0') ?? 0;
+                          int deliveredPieces = int.tryParse(u['pieces_delivered']?.toString() ?? '0') ?? 0;
+                          int remainingPieces = u['pieces_remaining'] != null ? (int.tryParse(u['pieces_remaining'].toString()) ?? 0) : (expectedPieces - deliveredPieces);
                           int totalPieces = int.tryParse(u['total_pieces']?.toString() ?? '0') ?? 0;
                           double totalWeight = double.tryParse(u['total_weight']?.toString() ?? '0') ?? 0.0;
-                          String remarks = u['remarks']?.toString() ?? '-';
 
                           String status = 'Waiting';
 
@@ -344,9 +348,11 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                               DataCell(Text('${index + 1}')),
                               DataCell(Text(u['awb_number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                               DataCell(Text(expectedPieces.toString())),
-                              DataCell(Text(totalPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
+                              DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFf59e0b)))), // Pieces Received (Amber)
+                              DataCell(Text(deliveredPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))), // Delivered Pieces (Green)
+                              DataCell(Text(remainingPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))), // Pieces Remaining (Purple)
+                              DataCell(Text(totalPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3b82f6)))), // Total Pieces (Blue)
                               DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
-                              DataCell(SizedBox(width: 150, child: Text(remarks, overflow: TextOverflow.ellipsis))),
                               DataCell(_buildStatusBadge(status)),
                                 DataCell(
                                   Checkbox(

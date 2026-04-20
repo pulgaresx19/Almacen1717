@@ -55,11 +55,23 @@ Widget buildUldFlightDropdown(AddUldV2Logic logic, String? selectedFlight, Value
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String?>(
             value: selectedFlight,
-            hint: const Text('Standalone ULD', style: TextStyle(color: Colors.white, fontSize: 12)),
+            hint: Text('Select Flight', style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12)),
             dropdownColor: const Color(0xFF1e293b), isExpanded: true, style: const TextStyle(color: Colors.white, fontSize: 12), icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFcbd5e1), size: 20),
             items: [
-              const DropdownMenuItem<String?>(value: null, child: Text('Standalone ULD')),
-              ...logic.flights.map((f) => DropdownMenuItem<String?>(value: f['id'].toString(), child: Text('${f['carrier']} ${f['number']} (${f['date-arrived']})')))
+              DropdownMenuItem<String?>(value: null, child: Text('Select Flight', style: TextStyle(color: Colors.white.withAlpha(120)))),
+              ...logic.flights.map((f) {
+                String dateStr = f['date-arrived']?.toString() ?? '';
+                if (dateStr.length >= 10 && dateStr.contains('-')) {
+                  final parts = dateStr.split('-');
+                  if (parts.length >= 3) {
+                    dateStr = '${parts[1]}/${parts[2].substring(0, 2)}';
+                  }
+                }
+                return DropdownMenuItem<String?>(
+                  value: f['id'].toString(),
+                  child: Text('${f['carrier']} ${f['number']} ($dateStr)')
+                );
+              })
             ],
             onChanged: onChanged,
           ),

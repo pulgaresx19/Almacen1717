@@ -17,6 +17,7 @@ import 'screens/ulds_v2/ulds_v2_screen.dart';
 import 'screens/system_v2/system_v2_screen.dart';
 import 'screens/coordinator_v2/coordinator_v2_screen.dart';
 import 'screens/awbs_v2/awbs_v2_screen.dart';
+import 'screens/delivers_v2/delivers_v2_screen.dart';
 
 // import 'screens/add_uld_v2/add_uld_v2_screen.dart';
 
@@ -776,6 +777,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Delivers',
                                   4,
                                 ),
+                              if (can('delivers'))
+                                _buildNavItem(
+                                  Icons.local_shipping_outlined,
+                                  'Delivers V2',
+                                  17,
+                                ),
                               if (can('users'))
                                 _buildNavItem(
                                   Icons.people_alt_rounded,
@@ -1161,6 +1168,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SystemV2Screen(),
         const CoordinatorV2Screen(),
         AwbsV2Screen(isActive: _selectedIndex == 16),
+        DeliversV2Screen(isActive: _selectedIndex == 17),
       ],
     );
   }

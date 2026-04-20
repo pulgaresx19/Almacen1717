@@ -139,17 +139,58 @@ Future<void> showCoordinatorDataDialog({
                 child: Text('Cancel', style: TextStyle(color: textS)),
               ),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
+                  if (enteredPieces > expectedPieces) {
+                    bool? confirm = await showDialog<bool>(
+                      context: ctx,
+                      builder: (c) => AlertDialog(
+                        backgroundColor: dark ? const Color(0xFF1E293B) : Colors.white,
+                        title: Row(
+                          children: [
+                            const Icon(Icons.warning_rounded, color: Color(0xFFEF4444)),
+                            const SizedBox(width: 8),
+                            Text('Pieces Discrepancy', style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        content: RichText(
+                          text: TextSpan(
+                            style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 15, height: 1.5),
+                            children: [
+                              TextSpan(text: 'Total checked ($enteredPieces) is greater than declared pieces ($expectedPieces).\n\n'),
+                              const TextSpan(text: 'There is a difference of '),
+                              TextSpan(
+                                text: '[${enteredPieces - expectedPieces} OVER]',
+                                style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)
+                              ),
+                              const TextSpan(text: ' pieces.\nDo you want to save the report anyway?'),
+                            ]
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(c, false), 
+                            child: const Text('Cancel', style: TextStyle(color: Color(0xFF94a3b8)))
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                            onPressed: () => Navigator.pop(c, true), 
+                            child: const Text('Confirm', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    );
+                    
+                    if (confirm != true) return;
+                  }
+
                   coordinatorCounts.clear();
                   ctrls.forEach((k, v) {
                     if (v.text.trim().isNotEmpty) {
                       coordinatorCounts[k] = v.text.trim();
-                    } else {
-                      coordinatorCounts[k] = '0';
                     }
                   });
                   onSave();
-                  Navigator.pop(ctx);
+                  if (ctx.mounted) Navigator.pop(ctx);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white),
                 child: const Text('Save'),
@@ -470,7 +511,7 @@ Future<void> showItemLocationEntryDialog({
           ],
         ),
         content: SizedBox(
-          width: 320,
+          width: 300,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -575,4 +616,210 @@ Future<void> showItemLocationEntryDialog({
       );
     }
   );
+}
+
+void showCustomListDialog(BuildContext context, String title, List<String> items) {
+  showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: const Color(0xFF1e293b),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(20))),
+      child: Container(
+        width: 320,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              items.length > 1 ? '$title (${items.length})' : title,
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: items.asMap().entries.map((entry) {
+                    int idx = entry.key;
+                    String val = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 20, height: 20,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle),
+                            child: Text('${idx + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 10, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(val, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14))),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close', style: TextStyle(color: Color(0xFF6366f1))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void showMissingFieldAlert(BuildContext context, String fieldName, {String? customMessage}) {
+  showDialog(
+    context: context,
+    builder: (alertCtx) => AlertDialog(
+      backgroundColor: const Color(0xFF1e293b),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.redAccent.withAlpha(50)),
+      ),
+      contentPadding: const EdgeInsets.all(24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Colors.redAccent,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Action Required',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            customMessage ?? 'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFcbd5e1),
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFef4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: () => Navigator.pop(alertCtx),
+              child: const Text(
+                'UNDERSTOOD',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Future<void> showSuccessSaveDialog(BuildContext context, {required bool dark, required String lang}) async {
+  bool dialogOpen = true;
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 350),
+    pageBuilder: (context, anim1, anim2) {
+      return Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 320,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF1e293b) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10b981).withAlpha(40),
+                  blurRadius: 40,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+              border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10b981).withAlpha(20),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  lang == 'es' ? '¡AWB Guardada!' : 'AWB Saved!',
+                  style: TextStyle(
+                    color: dark ? Colors.white : const Color(0xFF111827),
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  lang == 'es' ? 'Las Guías Aéreas se guardaron exitosamente.' : 'Air Waybills saved successfully.',
+                  style: TextStyle(
+                    color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (context, anim1, anim2, child) {
+      return Transform.scale(
+        scale: Curves.easeOutBack.transform(anim1.value),
+        child: FadeTransition(
+          opacity: anim1,
+          child: child,
+        ),
+      );
+    },
+  ).then((_) => dialogOpen = false);
+
+  await Future.delayed(const Duration(milliseconds: 2000));
+  if (!context.mounted) return;
+  if (dialogOpen && Navigator.canPop(context)) {
+    Navigator.of(context).pop();
+  }
 }

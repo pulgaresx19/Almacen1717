@@ -35,7 +35,7 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
 
               LayoutBuilder(
                 builder: (context, constraints) {
-                  double baseWidth = 1187;
+                  double baseWidth = 1275;
                   double rWidth = constraints.maxWidth - baseWidth - 1;
                   if (rWidth < 70) rWidth = 70;
                   return Wrap(
@@ -45,7 +45,12 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
                     children: [
                       SizedBox(
                         width: 135,
-                        child: buildAwbTextField('AWB Number', _awbNumberCtrl, '123-1234 5678', dark: dark, textP: textP, maxLen: 13, inputFormatters: [AwbNumberFormatter()]),
+                        child: buildAwbTextField('AWB Number', _awbNumberCtrl, '123-1234 5678', dark: dark, textP: textP, maxLen: 13, inputFormatters: [AwbNumberFormatter()],
+                          errorText: _awbNumberError,
+                          onChanged: (_) {
+                            if (_awbNumberError != null) updateUI(() => _awbNumberError = null);
+                          }
+                        ),
                       ),
                       SizedBox(width: 170, child: buildFlightDropdownWidget(
                         dark, textP, borderC,
@@ -63,30 +68,47 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
                         flights: _flights,
                         onChanged: (v) {
                           updateUI(() => _selectedFlight = v);
+                          _fetchUldsForFlight(v);
                           _checkUldBreakStatus();
                         },
                       )),
                       SizedBox(
-                        width: 135,
-                        child: buildAwbTextField(
-                          'Ref ULD', _refUldCtrl, 'AKE12345AA',
-                          dark: dark, textP: textP, maxLen: 10,
-                          inputFormatters: [UpperCaseTextFormatter()],
-                          textCapitalization: TextCapitalization.characters,
+                        width: 155,
+                        child: buildUldDropdownWidget(
+                          dark, textP, borderC,
+                          selectedUld: _refUld,
+                          ulds: _uldsForFlight,
+                          isLoading: _isLoadingUlds,
                           onChanged: (v) {
-                             updateUI(() => _refUld = v);
-                             _checkUldBreakStatus();
+                             updateUI(() {
+                               _refUld = v ?? '';
+                               _refUldCtrl.text = v ?? '';
+                               if (v != null && v.isNotEmpty && v != 'MANUAL') {
+                                 _refUldCheck = true;
+                                 final uldData = _uldsForFlight.firstWhere(
+                                   (u) => u['uld_number'].toString() == v, 
+                                   orElse: () => <String, dynamic>{}
+                                 );
+                                 if (uldData.isNotEmpty) {
+                                   _isBreak = uldData['is_break'] == true;
+                                 } else {
+                                   _isBreak = false;
+                                 }
+                               } else {
+                                 _isBreak = false;
+                               }
+                             });
                           },
-                          titleTrailing: _refUld.trim().isNotEmpty ? SizedBox(
+                          titleTrailing: SizedBox(
                             width: 20, height: 20,
                             child: Checkbox(
                               value: _refUldCheck,
                               activeColor: const Color(0xFF6366f1),
                               side: const BorderSide(color: Color(0xFF94a3b8)),
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              onChanged: (v) => updateUI(() => _refUldCheck = v ?? false),
+                              onChanged: (val) => updateUI(() => _refUldCheck = val ?? false),
                             )
-                          ) : null,
+                          ),
                         ),
                       ),
                       SizedBox(
@@ -108,17 +130,21 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Icon(Icons.broken_image_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
-                                  Switch(
-                                    value: _isBreak,
-                                    onChanged: (v) => updateUI(() => _isBreak = v),
-                                    activeThumbColor: Colors.white,
-                                    activeTrackColor: const Color(0xFF22c55e),
-                                    inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF),
-                                    inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
-                                    trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                                      if (states.contains(WidgetState.selected)) return Colors.transparent;
-                                      return const Color(0xFFef4444).withAlpha(180);
-                                    }),
+                                  IgnorePointer(
+                                    child: Switch(
+                                      value: _isBreak,
+                                      onChanged: (v) {},
+                                      activeThumbColor: Colors.white,
+                                      activeTrackColor: const Color(0xFF22c55e),
+                                      inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF),
+                                      inactiveTrackColor: (_refUldCheck && _refUld.trim().isNotEmpty && _refUld.trim().toUpperCase() != 'MANUAL') ? const Color(0xFFef4444).withAlpha(30) : (dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
+                                      trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                        if (states.contains(WidgetState.selected)) return Colors.transparent;
+                                        bool hasUld = _refUldCheck && _refUld.trim().isNotEmpty && _refUld.trim().toUpperCase() != 'MANUAL';
+                                        if (!hasUld) return Colors.transparent;
+                                        return const Color(0xFFef4444).withAlpha(180);
+                                      }),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -137,11 +163,16 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
                             if (_totalCtrl.text.isNotEmpty && t > 0 && p > t) return oldValue;
                             return newValue;
                           })
-                        ], onChanged: (_) => updateUI(() {})),
+                        ],
+                        errorText: _piecesError,
+                        onChanged: (_) => updateUI(() { _piecesError = null; })),
                       ),
                       SizedBox(
                         width: 75,
-                        child: buildAwbTextField('Total', _totalCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly], readOnly: _totalLocked),
+                        child: buildAwbTextField('Total', _totalCtrl, '0', isNum: true, dark: dark, textP: textP, inputFormatters: [FilteringTextInputFormatter.digitsOnly], readOnly: _totalLocked,
+                          errorText: _totalError,
+                          onChanged: (_) => updateUI(() { _totalError = null; })
+                        ),
                       ),
                       SizedBox(
                         width: 75,
@@ -152,8 +183,15 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
                         child: buildAwbTextField('Remarks', _remarksCtrl, 'Additional remarks...', dark: dark, textP: textP, textCapitalization: TextCapitalization.sentences, inputFormatters: [SentenceCaseTextFormatter()]),
                       ),
                       SizedBox(
-                        width: 140,
-                        child: buildAwbTextField('House Number', _houseCtrl, 'HAWB', dark: dark, textP: textP, maxLines: 3, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters),
+                        width: 200,
+                        child: buildAwbTextField('House Number', _houseCtrl, 'HAWB', dark: dark, textP: textP, maxLines: 3, inputFormatters: [UpperCaseTextFormatter()], textCapitalization: TextCapitalization.characters,
+                          onChanged: (_) => updateUI(() {}),
+                          titleTrailing: _houseCtrl.text.trim().isNotEmpty ? Container(
+                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                             decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), borderRadius: BorderRadius.circular(8)),
+                             child: Text('${_houseCtrl.text.split(RegExp(r'\n+')).where((e) => e.trim().isNotEmpty).length}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.bold)),
+                          ) : null,
+                        ),
                       ),
                       Container(
                         height: 48,
@@ -318,7 +356,7 @@ extension AddAwbV2FormUI on AddAwbV2ScreenState {
                                   onRemoveAwb: (index) {
                                     updateUI(() => _localAwbs.removeAt(index));
                                   },
-                                  onShowListDialog: _showCustomListDialog,
+                                  onShowListDialog: (title, items) => showCustomListDialog(context, title, items),
                                   onShowCoordinatorPreview: (awb) => showCoordinatorDataPreviewDialog(context, awb),
                                   onShowLocationPreview: (awb) => showItemLocationPreviewDialog(context, awb),
                                 )

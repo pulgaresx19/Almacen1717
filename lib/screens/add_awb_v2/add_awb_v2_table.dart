@@ -156,22 +156,24 @@ class LocalAwbsTable extends StatelessWidget {
                                       Icon(Icons.inventory_2_outlined, size: 12, color: textS),
                                       const SizedBox(width: 4),
                                       Text(a['refUld'], style: TextStyle(color: textS, fontSize: 12)),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: (a['isBreak'] == true) ? const Color(0xFF22c55e).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          (a['isBreak'] == true) ? 'BREAK' : 'NO BREAK',
-                                          style: TextStyle(
-                                            color: (a['isBreak'] == true) ? const Color(0xFF22c55e) : const Color(0xFFef4444),
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
+                                      if (a['isBreak'] != null) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: (a['isBreak'] == true) ? const Color(0xFF22c55e).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            (a['isBreak'] == true) ? 'BREAK' : 'NO BREAK',
+                                            style: TextStyle(
+                                              color: (a['isBreak'] == true) ? const Color(0xFF22c55e) : const Color(0xFFef4444),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -247,11 +249,49 @@ class LocalAwbsTable extends StatelessWidget {
                             builder: (context) {
                               bool hasCoordinatorData = (a['coordinator'] != null && (a['coordinator'] is List ? (a['coordinator'] as List).isNotEmpty : a['coordinator'].toString().isNotEmpty)) || (a['coordinatorCounts'] != null && (a['coordinatorCounts'] as Map).isNotEmpty);
                               bool hasLocationData = (a['location'] != null && (a['location'] is List ? (a['location'] as List).isNotEmpty : a['location'].toString().isNotEmpty)) || (a['itemLocations'] != null && (a['itemLocations'] as Map).isNotEmpty);
-                              if (!hasCoordinatorData && !hasLocationData) return const SizedBox.shrink();
+                              
+                              int discrepancy = 0;
+                              String discType = '';
+                              if (a['coordinatorCounts'] != null && (a['coordinatorCounts'] as Map).isNotEmpty) {
+                                int totalChecked = 0;
+                                Map counts = a['coordinatorCounts'];
+                                if (counts['AGI Skid'] != null) {
+                                  final parts = counts['AGI Skid'].toString().split(RegExp(r'[,\s-]+'));
+                                  for (var p in parts) { totalChecked += int.tryParse(p) ?? 0; }
+                                }
+                                for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
+                                  totalChecked += int.tryParse(counts[k]?.toString() ?? '') ?? 0;
+                                }
+                                int expected = int.tryParse(a['pieces']?.toString() ?? '0') ?? 0;
+                                if (totalChecked != expected && totalChecked > 0) {
+                                  discrepancy = (totalChecked - expected).abs();
+                                  discType = totalChecked > expected ? 'OVER' : 'SHORT';
+                                }
+                              }
+                              
+                              if (!hasCoordinatorData && !hasLocationData && discrepancy == 0) return const SizedBox.shrink();
                               
                               return Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  if (discrepancy > 0)
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444).withAlpha(30),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFEF4444).withAlpha(100)),
+                                      ),
+                                      child: Text(
+                                        '$discrepancy $discType',
+                                        style: const TextStyle(
+                                          color: Color(0xFFEF4444),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                   if (hasCoordinatorData)
                                     InkWell(
                                       onTap: () {

@@ -16,6 +16,7 @@ Widget buildAwbTextField(
   int? minLines = 1,
   Widget? titleTrailing,
   ValueChanged<String>? onChanged,
+  String? errorText,
 }) {
   Widget field = TextField(
     controller: ctrl,
@@ -38,7 +39,7 @@ Widget buildAwbTextField(
         fontSize: 13,
       ),
       filled: true,
-      fillColor: readOnly ? (dark ? const Color(0xFF0f172a).withAlpha(150) : const Color(0xFFF3F4F6)) : (dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5)),
+      fillColor: errorText != null ? const Color(0xFFef4444).withAlpha(10) : (readOnly ? (dark ? const Color(0xFF0f172a).withAlpha(150) : const Color(0xFFF3F4F6)) : (dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5))),
       counterText: '',
       contentPadding: const EdgeInsets.symmetric(
         horizontal: 16,
@@ -46,12 +47,12 @@ Widget buildAwbTextField(
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+        borderSide: BorderSide(color: errorText != null ? const Color(0xFFef4444) : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Color(0xFF6366f1),
+        borderSide: BorderSide(
+          color: errorText != null ? const Color(0xFFef4444) : const Color(0xFF6366f1),
           width: 1.5,
         ),
       ),
@@ -68,7 +69,7 @@ Widget buildAwbTextField(
             Text(
               label,
               style: TextStyle(
-                color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563),
+                color: errorText != null ? const Color(0xFFef4444) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -80,13 +81,18 @@ Widget buildAwbTextField(
         Text(
           label,
           style: TextStyle(
-            color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563),
+            color: errorText != null ? const Color(0xFFef4444) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)),
             fontSize: 13,
             fontWeight: FontWeight.w500,
           ),
         ),
       const SizedBox(height: 8),
       field,
+      if (errorText != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 6, left: 4),
+          child: Text(errorText, style: const TextStyle(color: Color(0xFFef4444), fontSize: 12, fontWeight: FontWeight.bold)),
+        )
     ],
   );
 }
@@ -149,17 +155,20 @@ Widget buildFlightDropdownWidget(
           child: DropdownButton<String?>(
             value: selectedFlight,
             hint: Text(
-              'No Flight (Standalone)',
-              style: TextStyle(color: textP.withAlpha(150)),
+              'Select Flight',
+              style: TextStyle(color: textP.withAlpha(76)),
             ),
             dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
             isExpanded: true,
             style: TextStyle(color: textP, fontSize: 13),
             menuMaxHeight: 300,
             items: [
-              const DropdownMenuItem<String?>(
-                value: null,
-                child: Text('No Flight (Standalone)'),
+              DropdownMenuItem<String?>(
+                value: 'NONE',
+                child: Text(
+                  'No Flight (Standalone)',
+                  style: TextStyle(color: textP.withAlpha(150)),
+                ),
               ),
               ...flights.map(
                 (f) => DropdownMenuItem<String?>(
@@ -174,6 +183,96 @@ Widget buildFlightDropdownWidget(
             onChanged: onChanged,
           ),
         ),
+      ),
+    ],
+  );
+}
+
+Widget buildUldDropdownWidget(
+  bool dark, 
+  Color textP, 
+  Color borderC, 
+  {
+    Widget? titleTrailing,
+    required String? selectedUld,
+    required List<dynamic> ulds,
+    required ValueChanged<String?> onChanged,
+    bool isLoading = false,
+  }
+) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (titleTrailing != null)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Ref ULD',
+              style: TextStyle(
+                color: Color(0xFFcbd5e1),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            titleTrailing,
+          ],
+        )
+      else
+        const Text(
+          'Ref ULD',
+          style: TextStyle(
+            color: Color(0xFFcbd5e1),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      const SizedBox(height: 8),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: 48,
+        decoration: BoxDecoration(
+          color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderC),
+        ),
+        child: isLoading
+          ? const Center(
+              child: SizedBox(
+                width: 20, 
+                height: 20, 
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366f1))
+              )
+            )
+          : DropdownButtonHideUnderline(
+              child: DropdownButton<String?>(
+                value: selectedUld != null && selectedUld.isNotEmpty && (selectedUld == 'MANUAL' || ulds.any((u) => u['uld_number'].toString() == selectedUld)) ? selectedUld : null,
+                hint: Text(
+                  'Select ULD',
+                  style: TextStyle(color: textP.withAlpha(76)),
+                ),
+                dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                isExpanded: true,
+                style: TextStyle(color: textP, fontSize: 13),
+                menuMaxHeight: 300,
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: 'MANUAL',
+                    child: Text('MANUAL (Standalone)'),
+                  ),
+                  ...ulds.map(
+                    (u) => DropdownMenuItem<String?>(
+                      value: u['uld_number'].toString(),
+                      child: Text(
+                        u['uld_number'].toString(),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: onChanged,
+              ),
+            ),
       ),
     ],
   );

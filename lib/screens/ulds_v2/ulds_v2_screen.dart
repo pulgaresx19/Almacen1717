@@ -23,7 +23,7 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
   
   late UldsV2Logic logic;
   List<String> _selectedUldIds = [];
-  final Set<String> _collapsedFlights = {};
+  final Set<String> _expandedFlights = {};
 
   @override
   void initState() {
@@ -92,11 +92,11 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                                 tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                               ),
                               const SizedBox(width: 8),
-                              Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                              Text(appLanguage.value == 'es' ? 'Añadir New ULD' : 'Add New ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                             ],
                           )
                         else
-                          Text('Unit Load Devices', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                          Text('Unit Load Devices (ULD)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
                         if (_showAddForm)
                           Text(appLanguage.value == 'es' ? 'Registra un ULD en la nueva base de datos.' : 'Register a ULD in the new database.', style: TextStyle(color: textS, fontSize: 13))
@@ -245,8 +245,20 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
       }
       int cmp = fa.compareTo(fb);
       if (cmp != 0) return cmp;
-      final nA = (a['uld_number'] ?? '').toString();
-      final nB = (b['uld_number'] ?? '').toString();
+      
+      bool breakA = a['is_break'] == true;
+      bool breakB = b['is_break'] == true;
+      if (breakA && !breakB) return -1;
+      if (!breakA && breakB) return 1;
+
+      final nA = (a['uld_number'] ?? '').toString().toUpperCase();
+      final nB = (b['uld_number'] ?? '').toString().toUpperCase();
+      
+      bool isBulkA = nA == 'BULK' || nA.startsWith('BULK');
+      bool isBulkB = nB == 'BULK' || nB.startsWith('BULK');
+      if (isBulkA && !isBulkB) return -1;
+      if (!isBulkA && isBulkB) return 1;
+
       return nA.compareTo(nB);
     });
 
@@ -292,7 +304,7 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
          lastFlightHeader = flightDisplay;
       }
       
-      if (!_collapsedFlights.contains(flightDisplay)) {
+      if (_expandedFlights.contains(flightDisplay)) {
         groupedList.add(u);
       }
     }
@@ -349,6 +361,15 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                           if (item is String) {
                             return DataRow(
                               color: WidgetStateProperty.all(dark ? const Color(0xFF334155).withAlpha(150) : const Color(0xFFE5E7EB)),
+                              onSelectChanged: (_) {
+                                setState(() {
+                                  if (_expandedFlights.contains(item)) {
+                                    _expandedFlights.remove(item);
+                                  } else {
+                                    _expandedFlights.add(item);
+                                  }
+                                });
+                              },
                               cells: List.generate(10, (cellIdx) {
                                 if (cellIdx == 0) {
                                   final count = flightCounts[item] ?? 0;
@@ -382,26 +403,14 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                                     )
                                   );
                                 } else if (cellIdx == 9) {
-                                  final isCollapsed = _collapsedFlights.contains(item);
+                                  final isExpanded = _expandedFlights.contains(item);
                                   return DataCell(
                                     Align(
                                       alignment: Alignment.centerLeft,
-                                      child: IconButton(
-                                        icon: Icon(
-                                          isCollapsed ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
-                                          size: 18, 
-                                          color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            if (isCollapsed) {
-                                              _collapsedFlights.remove(item);
-                                            } else {
-                                              _collapsedFlights.add(item);
-                                            }
-                                          });
-                                        },
-                                        tooltip: isCollapsed ? (appLanguage.value == 'es' ? 'Mostrar ULDs' : 'Show ULDs') : (appLanguage.value == 'es' ? 'Ocultar ULDs' : 'Hide ULDs'),
+                                      child: Icon(
+                                        isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded, 
+                                        size: 20, 
+                                        color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)
                                       ),
                                     )
                                   );
