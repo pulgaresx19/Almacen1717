@@ -45,7 +45,7 @@ class AddFlightV2Logic extends ChangeNotifier {
   final uldWeightCtrl = TextEditingController(text: 'Auto');
   final uldRemarksCtrl = TextEditingController();
   bool uldPriority = false;
-  bool uldBreak = false;
+  bool uldBreak = true;
   bool isUldPiecesAuto = true;
   bool isUldWeightAuto = true;
 
@@ -232,7 +232,7 @@ class AddFlightV2Logic extends ChangeNotifier {
     uldWeightCtrl.text = isUldWeightAuto ? 'Auto' : '';
     uldRemarksCtrl.clear();
     uldPriority = false;
-    uldBreak = false;
+    uldBreak = true;
     
     notifyListeners();
   }

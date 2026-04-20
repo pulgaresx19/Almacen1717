@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
 import '../../main.dart' show isDarkMode, appLanguage;
 import 'add_uld_v2_logic.dart';
 import 'add_uld_v2_service.dart';
@@ -54,7 +54,6 @@ Future<void> showAddAwbDialog(BuildContext context, AddUldV2Logic logic, int uld
   final totalLocked = ValueNotifier<bool>(false);
   final dbExpected = ValueNotifier<int>(0);
   final awbErrors = ValueNotifier<Map<String, String>>({});
-  final houseNumbers = ValueNotifier<List<String>>([]);
 
   awbNumCtrl.addListener(() async {
     final text = awbNumCtrl.text.toUpperCase();
@@ -98,13 +97,6 @@ Future<void> showAddAwbDialog(BuildContext context, AddUldV2Logic logic, int uld
     }
   });
 
-  void addHouseNumber(String text) {
-    final val = text.trim().toUpperCase();
-    if (val.isNotEmpty && !houseNumbers.value.contains(val)) {
-      houseNumbers.value = [...houseNumbers.value, val];
-    }
-    houseCtrl.clear();
-  }
 
   await showDialog(
     context: context,
@@ -143,66 +135,33 @@ Future<void> showAddAwbDialog(BuildContext context, AddUldV2Logic logic, int uld
                     buildUldTextField('Remarks', remCtrl, 'Additional remarks...'),
                     const SizedBox(height: 12),
                     
-                    // Chips based House Number Field
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('House Number (Press Enter)', style: TextStyle(color: Color(0xFF94a3b8), fontSize: 13, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0f172a),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withAlpha(20)),
-                          ),
-                          child: KeyboardListener(
-                            focusNode: FocusNode(),
-                            onKeyEvent: (event) {
-                              if (event is KeyDownEvent) {
-                                if (event.logicalKey == LogicalKeyboardKey.enter) {
-                                  addHouseNumber(houseCtrl.text);
-                                }
-                              }
-                            },
-                            child: TextField(
-                              controller: houseCtrl,
-                              style: const TextStyle(color: Colors.white, fontSize: 15),
-                              textInputAction: TextInputAction.done,
-                              textCapitalization: TextCapitalization.characters,
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                hintText: 'HAWB...',
-                                hintStyle: TextStyle(color: Color(0xFF64748b)),
-                              ),
-                              onSubmitted: addHouseNumber,
+                    // Multiline House Number Field
+                    buildUldTextField(
+                      'House Number (One per line)',
+                      houseCtrl,
+                      'HAWB...\nHAWB...',
+                      isUpperCase: true,
+                      maxLines: 3,
+                      minLines: 1,
+                      titleTrailing: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: houseCtrl,
+                        builder: (context, value, child) {
+                          final count = value.text.split('\n').where((e) => e.trim().isNotEmpty).length;
+                          if (count == 0) return const SizedBox.shrink();
+                          return Container(
+                            width: 22, height: 22,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3b82f6),
+                              shape: BoxShape.circle,
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ValueListenableBuilder<List<String>>(
-                          valueListenable: houseNumbers,
-                          builder: (context, hwbs, _) {
-                            if (hwbs.isEmpty) return const SizedBox.shrink();
-                            return Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: hwbs.map((hwb) {
-                                return InputChip(
-                                  label: Text(hwb, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                                  backgroundColor: const Color(0xFF6366f1).withAlpha(40),
-                                  deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.white70),
-                                  onDeleted: () {
-                                    houseNumbers.value = houseNumbers.value.where((e) => e != hwb).toList();
-                                  },
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFF6366f1))),
-                                );
-                              }).toList(),
-                            );
-                          },
-                        ),
-                      ],
+                            child: Text(
+                              count.toString(),
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -270,10 +229,9 @@ Future<void> showAddAwbDialog(BuildContext context, AddUldV2Logic logic, int uld
                   return;
                 }
 
-                // Include any text left in the input field
+                List<String> parsedHouseNumbers = [];
                 if (houseCtrl.text.trim().isNotEmpty) {
-                   final val = houseCtrl.text.trim().toUpperCase();
-                   if (!houseNumbers.value.contains(val)) houseNumbers.value = [...houseNumbers.value, val];
+                   parsedHouseNumbers = houseCtrl.text.split('\n').map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toSet().toList();
                 }
 
                 logic.addAwbToUld(uldIndex, {
@@ -281,7 +239,7 @@ Future<void> showAddAwbDialog(BuildContext context, AddUldV2Logic logic, int uld
                   'pieces': int.tryParse(piecesCtrl.text) ?? 0,
                   'weight': double.tryParse(weightCtrl.text) ?? 0.0,
                   'total': int.tryParse(totalCtrl.text) ?? 1,
-                  'house_number': houseNumbers.value,
+                  'house_number': parsedHouseNumbers,
                   'remarks': remCtrl.text.trim().isEmpty ? null : remCtrl.text.trim(),
                 });
                 Navigator.pop(ctx);

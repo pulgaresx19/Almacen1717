@@ -24,7 +24,9 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
   
   String? _selectedFlight;
   bool _isPriority = false;
-  bool _isBreak = false;
+  bool _isBreak = true;
+  
+  final Map<String, String> _fieldErrors = {};
 
   bool _isFlightChk = true;
   bool _isPiecesChk = true;
@@ -49,8 +51,13 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
   }
 
   void _addLocalUld(AddUldV2Logic logic) {
+    setState(() {
+      _fieldErrors.clear();
+    });
     if (_uldNumberCtrl.text.trim().isEmpty) {
-      showRequiredFieldError(context, 'ULD Number');
+      setState(() {
+        _fieldErrors['ULD Number'] = 'Required';
+      });
       return;
     }
     
@@ -72,7 +79,7 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
       _weightCtrl.text = _isWeightChk ? 'Auto' : '';
       _remarksCtrl.clear();
       _isPriority = false;
-      _isBreak = false;
+      _isBreak = true;
       if (!_isFlightChk) {
         _selectedFlight = null;
       }
@@ -172,7 +179,7 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
               return Scaffold(
                 backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
                 appBar: AppBar(
-                  title: Text('Add New ULDs (V2 Module)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
+                  title: Text('Add New ULDs', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
                   backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
                   elevation: 0,
                   iconTheme: IconThemeData(color: textP),
@@ -209,7 +216,7 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
                         return Wrap(
                           spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
                           children: [
-                            SizedBox(width: 130, child: buildUldTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true)),
+                            SizedBox(width: 130, child: buildUldTextField('ULD Number', _uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true, hasError: _fieldErrors.containsKey('ULD Number'), errorText: _fieldErrors['ULD Number'])),
                             SizedBox(width: 200, child: buildUldFlightDropdown(
                               logic,
                               _selectedFlight,
@@ -231,7 +238,7 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
                                 child: Checkbox(value: _isWeightChk, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => setState(() { _isWeightChk = v ?? true; _weightCtrl.text = _isWeightChk ? 'Auto' : ''; }))
                               )
                             )),
-                            SizedBox(width: rWidth, child: buildUldTextField('Remarks', _remarksCtrl, 'Additional remarks...')),
+                            SizedBox(width: rWidth, child: buildUldTextField('Remarks', _remarksCtrl, 'Additional remarks...', isSentenceCase: true)),
                             SizedBox(
                               width: 125,
                               child: Column(

@@ -2,20 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'add_uld_v2_logic.dart';
 
-Widget buildUldTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines, bool expands = false, List<TextInputFormatter>? customFormatters, bool hasError = false, String? errorText}) {
+Widget buildUldTextField(String label, TextEditingController ctrl, String hint, {bool isNum = false, bool digitsOnly = false, bool allowDecimal = false, int? maxLen, bool disabled = false, Widget? suffixIcon, VoidCallback? onTap, bool readOnly = false, bool isUpperCase = false, bool isSentenceCase = false, Widget? titleTrailing, bool isAwb = false, int? maxLines = 1, int? minLines, bool expands = false, List<TextInputFormatter>? customFormatters, bool hasError = false, String? errorText}) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), titleTrailing ?? const SizedBox.shrink()]),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: TextStyle(color: hasError ? const Color(0xFFef4444) : const Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), titleTrailing ?? const SizedBox.shrink()]),
       const SizedBox(height: 6),
       TextField(
         controller: ctrl, enabled: !disabled, readOnly: readOnly, onTap: onTap,
         keyboardType: (maxLines == null || maxLines > 1) ? TextInputType.multiline : (isNum ? (allowDecimal ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.number) : TextInputType.text),
-        textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
+        textCapitalization: isUpperCase ? TextCapitalization.characters : (isSentenceCase ? TextCapitalization.sentences : TextCapitalization.none),
         inputFormatters: [
           if (isAwb) AwbTextInputFormatter(),
           if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
           if (allowDecimal) FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+          if (isSentenceCase) SentenceCaseTextInputFormatter(),
           if (isUpperCase) TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection)),
           ...?customFormatters,
         ],
@@ -83,6 +84,19 @@ class AwbTextInputFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class SentenceCaseTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    final text = newValue.text;
+    final capitalized = text[0].toUpperCase() + text.substring(1);
+    return TextEditingValue(
+      text: capitalized,
+      selection: newValue.selection,
     );
   }
 }

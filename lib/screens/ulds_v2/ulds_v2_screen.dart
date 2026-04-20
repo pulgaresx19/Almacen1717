@@ -23,6 +23,7 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
   
   late UldsV2Logic logic;
   List<String> _selectedUldIds = [];
+  final Set<String> _collapsedFlights = {};
 
   @override
   void initState() {
@@ -91,11 +92,11 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                                 tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
                               ),
                               const SizedBox(width: 8),
-                              Text(appLanguage.value == 'es' ? 'Añadir ULD V2' : 'Add ULD V2', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                              Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                             ],
                           )
                         else
-                          Text('ULD V2', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                          Text('Unit Load Devices', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
                         if (_showAddForm)
                           Text(appLanguage.value == 'es' ? 'Registra un ULD en la nueva base de datos.' : 'Register a ULD in the new database.', style: TextStyle(color: textS, fontSize: 13))
@@ -229,6 +230,73 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
       return const Center(child: Text('No ULDs found matching the search.', style: TextStyle(color: Colors.grey)));
     }
 
+    listToDisplay.sort((a, b) {
+      final fIdA = a['id_flight']?.toString();
+      final fIdB = b['id_flight']?.toString();
+      String fa = 'Standalone';
+      if (fIdA != null && logic.flightsMap.containsKey(fIdA)) {
+         final f = logic.flightsMap[fIdA]!;
+         fa = '${f['date'] ?? ''} ${f['carrier'] ?? ''} ${f['number'] ?? ''}';
+      }
+      String fb = 'Standalone';
+      if (fIdB != null && logic.flightsMap.containsKey(fIdB)) {
+         final f = logic.flightsMap[fIdB]!;
+         fb = '${f['date'] ?? ''} ${f['carrier'] ?? ''} ${f['number'] ?? ''}';
+      }
+      int cmp = fa.compareTo(fb);
+      if (cmp != 0) return cmp;
+      final nA = (a['uld_number'] ?? '').toString();
+      final nB = (b['uld_number'] ?? '').toString();
+      return nA.compareTo(nB);
+    });
+
+    Map<String, int> flightCounts = {};
+    for (var u in listToDisplay) {
+      final flightId = u['id_flight']?.toString();
+      String flightDisplay = 'Standalone';
+      if (flightId != null && logic.flightsMap.containsKey(flightId)) {
+         final f = logic.flightsMap[flightId]!;
+         flightDisplay = '${f['carrier'] ?? ''} ${f['number'] ?? ''}';
+         final stringDate = f['date']?.toString();
+         if (stringDate != null && stringDate.isNotEmpty && stringDate != '-') {
+           try {
+             final dt = DateTime.parse(stringDate).toLocal();
+             final padDate = "${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}";
+             flightDisplay += ' ($padDate)';
+           } catch (_) {}
+         }
+      }
+      flightCounts[flightDisplay] = (flightCounts[flightDisplay] ?? 0) + 1;
+    }
+
+    List<dynamic> groupedList = [];
+    String lastFlightHeader = '';
+    for (var u in listToDisplay) {
+      final flightId = u['id_flight']?.toString();
+      String flightDisplay = 'Standalone';
+      if (flightId != null && logic.flightsMap.containsKey(flightId)) {
+         final f = logic.flightsMap[flightId]!;
+         flightDisplay = '${f['carrier'] ?? ''} ${f['number'] ?? ''}';
+         final stringDate = f['date']?.toString();
+         if (stringDate != null && stringDate.isNotEmpty && stringDate != '-') {
+           try {
+             final dt = DateTime.parse(stringDate).toLocal();
+             final padDate = "${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}";
+             flightDisplay += ' ($padDate)';
+           } catch (_) {}
+         }
+      }
+
+      if (flightDisplay != lastFlightHeader) {
+         groupedList.add(flightDisplay);
+         lastFlightHeader = flightDisplay;
+      }
+      
+      if (!_collapsedFlights.contains(flightDisplay)) {
+        groupedList.add(u);
+      }
+    }
+
     return Stack(
       children: [
         Positioned.fill(
@@ -275,8 +343,84 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                             )
                           ),
                         ],
-                        rows: List.generate(listToDisplay.length, (index) {
-                          final u = listToDisplay[index];
+                        rows: List.generate(groupedList.length, (index) {
+                          final item = groupedList[index];
+
+                          if (item is String) {
+                            return DataRow(
+                              color: WidgetStateProperty.all(dark ? const Color(0xFF334155).withAlpha(150) : const Color(0xFFE5E7EB)),
+                              cells: List.generate(10, (cellIdx) {
+                                if (cellIdx == 0) {
+                                  final count = flightCounts[item] ?? 0;
+                                  return DataCell(
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      alignment: Alignment.center,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF6366f1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        '$count',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                } else if (cellIdx == 1) {
+                                  return DataCell(
+                                    Row(
+                                      children: [
+                                        Icon(Icons.flight_land_rounded, size: 16, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)),
+                                        const SizedBox(width: 8),
+                                        Text(item, style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      ]
+                                    )
+                                  );
+                                } else if (cellIdx == 9) {
+                                  final isCollapsed = _collapsedFlights.contains(item);
+                                  return DataCell(
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: IconButton(
+                                        icon: Icon(
+                                          isCollapsed ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
+                                          size: 18, 
+                                          color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            if (isCollapsed) {
+                                              _collapsedFlights.remove(item);
+                                            } else {
+                                              _collapsedFlights.add(item);
+                                            }
+                                          });
+                                        },
+                                        tooltip: isCollapsed ? (appLanguage.value == 'es' ? 'Mostrar ULDs' : 'Show ULDs') : (appLanguage.value == 'es' ? 'Ocultar ULDs' : 'Hide ULDs'),
+                                      ),
+                                    )
+                                  );
+                                }
+                                return DataCell(const SizedBox.shrink());
+                              }),
+                            );
+                          }
+
+                          final u = item as Map<String, dynamic>;
+                          
+                          int displayIndex = 1;
+                          for (int i = index - 1; i >= 0; i--) {
+                            if (groupedList[i] is String) {
+                              displayIndex = index - i;
+                              break;
+                            }
+                          }
+                          
                           final flightId = u['id_flight']?.toString();
                           String flightDisplay = 'Standalone';
                           
@@ -296,7 +440,7 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                           return DataRow(
                             onSelectChanged: (_) => _showUldDrawer(context, u, dark, flightDisplay),
                             cells: [
-                              DataCell(Text('${index + 1}')),
+                              DataCell(Text('$displayIndex', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), fontWeight: FontWeight.bold))),
                               DataCell(Text(u['uld_number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                               DataCell(Text(flightDisplay, style: const TextStyle(fontWeight: FontWeight.w600))),
                               DataCell(Text(u['pieces_total']?.toString() ?? '0')),

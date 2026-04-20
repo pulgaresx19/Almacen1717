@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../main.dart' show appLanguage;
 import 'ulds_v2_service.dart';
 import 'ulds_v2_drawer_general_info.dart';
@@ -127,6 +128,83 @@ class _UldsV2DrawerState extends State<UldsV2Drawer> {
               dark: widget.dark,
             ),
           ),
+
+          // Audit Trail
+          _UldsV2AuditTrail(uld: widget.uld, dark: widget.dark),
+        ],
+      ),
+    );
+  }
+}
+
+class _UldsV2AuditTrail extends StatelessWidget {
+  final Map<String, dynamic> uld;
+  final bool dark;
+
+  const _UldsV2AuditTrail({required this.uld, required this.dark});
+
+  Widget _buildRow(String labelES, String labelEN, String? time, String? user, Color textColor, Color subTextColor) {
+    if ((time == null || time.isEmpty) && (user == null || user.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+    DateTime? dt = DateTime.tryParse(time ?? '')?.toLocal();
+    String timeStr = dt != null ? DateFormat('dd/MM HH:mm').format(dt) : (time ?? '-');
+    String userStr = user ?? '-';
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 85, // Fixed width for labels to align the username column nicely
+            child: Text(appLanguage.value == 'es' ? labelES : labelEN, style: TextStyle(color: subTextColor, fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+          Icon(Icons.person_outline, size: 14, color: subTextColor),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(userStr, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+          ),
+          const SizedBox(width: 12),
+          Icon(Icons.access_time, size: 14, color: subTextColor),
+          const SizedBox(width: 4),
+          Text(timeStr, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+    final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+    final bgC = dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB);
+
+    bool hasAnyData = (uld['time_received'] != null && uld['time_received'].toString().isNotEmpty) || 
+                      (uld['time_checked'] != null && uld['time_checked'].toString().isNotEmpty) || 
+                      (uld['time_saved'] != null && uld['time_saved'].toString().isNotEmpty) || 
+                      (uld['time_delivered'] != null && uld['time_delivered'].toString().isNotEmpty);
+
+    if (!hasAnyData) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bgC,
+        border: Border(top: BorderSide(color: borderC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appLanguage.value == 'es' ? 'HISTORIAL DE PROCESO' : 'PROCESS HISTORY',
+            style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+          ),
+          const SizedBox(height: 12),
+          _buildRow('Recibido', 'Received', uld['time_received']?.toString(), uld['user_received']?.toString(), textP, textS),
+          _buildRow('Cotejado', 'Checked', uld['time_checked']?.toString(), uld['user_checked']?.toString(), textP, textS),
+          _buildRow('Guardado', 'Saved', uld['time_saved']?.toString(), uld['user_saved']?.toString(), textP, textS),
+          _buildRow('Entregado', 'Delivered', uld['time_delivered']?.toString(), uld['user_delivered']?.toString(), textP, textS),
         ],
       ),
     );

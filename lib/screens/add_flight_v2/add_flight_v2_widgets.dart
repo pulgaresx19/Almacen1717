@@ -15,6 +15,7 @@ Widget buildTextField(
   VoidCallback? onTap,
   bool readOnly = false,
   bool isUpperCase = false,
+  bool isSentenceCase = false,
   Widget? titleTrailing,
   bool isAwb = false,
   int? maxLines = 1,
@@ -54,11 +55,12 @@ Widget buildTextField(
                     ? const TextInputType.numberWithOptions(decimal: true)
                     : TextInputType.number)
                 : TextInputType.text),
-        textCapitalization: isUpperCase ? TextCapitalization.characters : TextCapitalization.none,
+        textCapitalization: isUpperCase ? TextCapitalization.characters : (isSentenceCase ? TextCapitalization.sentences : TextCapitalization.none),
         inputFormatters: [
           if (isAwb) AwbTextInputFormatter(),
           if (digitsOnly) FilteringTextInputFormatter.digitsOnly,
           if (allowDecimal) FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+          if (isSentenceCase) SentenceCaseTextInputFormatter(),
           if (isUpperCase)
             TextInputFormatter.withFunction(
               (oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection),
@@ -168,4 +170,17 @@ class ResizeHandlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class SentenceCaseTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    final text = newValue.text;
+    final capitalized = text[0].toUpperCase() + text.substring(1);
+    return TextEditingValue(
+      text: capitalized,
+      selection: newValue.selection,
+    );
+  }
 }

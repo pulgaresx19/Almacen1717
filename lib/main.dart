@@ -16,7 +16,7 @@ import 'screens/flights_v2/flights_v2_screen.dart';
 import 'screens/ulds_v2/ulds_v2_screen.dart';
 import 'screens/system_v2/system_v2_screen.dart';
 import 'screens/coordinator_v2/coordinator_v2_screen.dart';
-
+import 'screens/awbs_v2/awbs_v2_screen.dart';
 
 // import 'screens/add_uld_v2/add_uld_v2_screen.dart';
 
@@ -742,7 +742,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               if (can('flights'))
                                 _buildNavItem(
                                   Icons.flight_outlined,
-                                  'Flights V2',
+                                  'Flights',
                                   12,
                                 ),
                               if (can('ulds'))
@@ -754,7 +754,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               if (can('ulds'))
                                 _buildNavItem(
                                   Icons.inventory_2_outlined,
-                                  'ULDs V2',
+                                  'ULDs',
                                   13,
                                 ),
                               if (can('awbs'))
@@ -762,6 +762,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Icons.description_rounded,
                                   'AWB',
                                   3,
+                                ),
+                              if (can('awbs'))
+                                _buildNavItem(
+                                  Icons.description_outlined,
+                                  'AWBs V2',
+                                  16,
                                 ),
 
                               if (can('delivers'))
@@ -1154,7 +1160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         UldsV2Screen(isActive: _selectedIndex == 13),
         const SystemV2Screen(),
         const CoordinatorV2Screen(),
-
+        AwbsV2Screen(isActive: _selectedIndex == 16),
       ],
     );
   }

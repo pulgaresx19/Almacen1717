@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../main.dart' show isDarkMode, appLanguage;
 import 'add_flight_v2_logic.dart';
 import 'add_flight_v2_widgets.dart';
@@ -69,12 +70,41 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
     logic.saveEverything(
       context, 
       showValidationError: (msg) {
-        showDialog(context: context, builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1e293b),
-          title: const Text('Validation Error', style: TextStyle(color: Colors.white)),
-          content: Text(msg, style: const TextStyle(color: Color(0xFFcbd5e1))),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1))))]
-        ));
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1e293b),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.redAccent.withAlpha(50)),
+            ),
+            contentPadding: const EdgeInsets.all(24),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                const SizedBox(height: 16),
+                const Text('Action Required', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Text(msg, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFcbd5e1), fontSize: 14, height: 1.5)),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFef4444),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('UNDERSTOOD', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, fontSize: 14)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       }, 
       onError: (err) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $err'), backgroundColor: Colors.red));
@@ -143,7 +173,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
               return Scaffold(
                 backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
                 appBar: AppBar(
-                  title: Text('Add New Flight Process (V2)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
+                  title: Text('Add New Flight', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
                   backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
                   elevation: 0, iconTheme: IconThemeData(color: textP),
                   bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),
@@ -189,7 +219,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                 ))),
                 SizedBox(width: 130, child: buildTextField('Date Arrived', logic.dateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDate(context), suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70), hasError: logic.fieldErrors.containsKey('Date Arrived'), errorText: logic.fieldErrors['Date Arrived'])),
                 SizedBox(width: 120, child: buildTextField('Time Arrived', logic.timeCtrl, '__:__ --', readOnly: true, onTap: () => logic.selectTime(context), suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
-                SizedBox(width: rWidth, child: buildTextField('Remarks', logic.remarksCtrl, 'Additional remarks...')),
+                SizedBox(width: rWidth, child: buildTextField('Remarks', logic.remarksCtrl, 'Additional remarks...', isSentenceCase: true)),
                 SizedBox(width: 100, child: buildDropdown('Status', dark, logic)),
                 if (logic.status == 'Delayed') ...[
                    SizedBox(width: 130, child: buildTextField('Delayed Date', logic.delayedDateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDelayedDate(context), suffixIcon: const Icon(Icons.event_busy, size: 16, color: Color(0xFFfdba74)))),
@@ -215,7 +245,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                 SizedBox(width: 95, child: buildTextField('Weight', logic.uldWeightCtrl, '0.0', isNum: true, allowDecimal: true, disabled: logic.isUldWeightAuto, titleTrailing: SizedBox(
                   width: 20, height: 20, child: Checkbox(value: logic.isUldWeightAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.toggleUldWeightAuto(v ?? true))
                 ))),
-                SizedBox(width: uldRWidth, child: buildTextField('Remarks', logic.uldRemarksCtrl, 'ULD remarks...')),
+                SizedBox(width: uldRWidth, child: buildTextField('Remarks', logic.uldRemarksCtrl, 'ULD remarks...', isSentenceCase: true)),
                 SizedBox(
                   width: 125,
                   child: Column(
@@ -311,7 +341,12 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                                   Container(
                                      width: 300, height: 40, decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(20), border: Border.all(color: borderC)),
                                      child: TextField(
-                                        controller: logic.searchUldCtrl, style: TextStyle(color: textP, fontSize: 13), onChanged: (v) => logic.rebuild(), decoration: InputDecoration(hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...', hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13), prefixIcon: Icon(Icons.search_rounded, color: textP.withAlpha(76), size: 16), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12))
+                                        controller: logic.searchUldCtrl, style: TextStyle(color: textP, fontSize: 13), onChanged: (v) => logic.rebuild(), 
+                                        textCapitalization: TextCapitalization.characters,
+                                        inputFormatters: [
+                                          TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))
+                                        ],
+                                        decoration: InputDecoration(hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...', hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13), prefixIcon: Icon(Icons.search_rounded, color: textP.withAlpha(76), size: 16), border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12))
                                      ),
                                   ),
                                 ],

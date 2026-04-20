@@ -21,6 +21,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
   bool _showAddForm = false;
   final GlobalKey<AddFlightV2ScreenState> _addFlightKey = GlobalKey<AddFlightV2ScreenState>();
   final Set<String> _selectedFlightIds = {};
+  final Set<String> _collapsedDates = {};
   
   late FlightsV2Logic logic;
 
@@ -150,7 +151,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                             setState(() => _showAddForm = true);
                           },
                           icon: const Icon(Icons.add_rounded, size: 16),
-                          label: Text(appLanguage.value == 'es' ? 'Añadir Vuelo V2' : 'Add Flight V2', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          label: Text(appLanguage.value == 'es' ? 'Añadir Vuelo' : 'Add Flight', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF6366f1),
                             foregroundColor: Colors.white,
@@ -249,6 +250,74 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
       return const Center(child: Text('No flights found matching the search.', style: TextStyle(color: Colors.grey)));
     }
 
+    String getEffectiveDate(Map<String, dynamic> f) {
+      if ((f['status']?.toString() ?? '').toLowerCase() == 'delayed' && f['time_delay'] != null) {
+        return f['time_delay'].toString();
+      }
+      return f['date']?.toString() ?? '';
+    }
+
+    flightsToDisplay.sort((a, b) {
+      DateTime da = DateTime.fromMillisecondsSinceEpoch(0);
+      try { da = DateTime.parse(getEffectiveDate(a)).toLocal(); } catch (_) {}
+      DateTime db = DateTime.fromMillisecondsSinceEpoch(0);
+      try { db = DateTime.parse(getEffectiveDate(b)).toLocal(); } catch (_) {}
+      
+      final daDate = DateTime(da.year, da.month, da.day);
+      final dbDate = DateTime(db.year, db.month, db.day);
+      
+      int dateCompare = dbDate.compareTo(daDate); 
+      if (dateCompare != 0) {
+        return dateCompare; 
+      }
+      
+      return da.compareTo(db); 
+    });
+
+    final esWeekdays = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    final enWeekdays = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final esMonths = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    final enMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    Map<String, int> dateCounts = {};
+    for (var flight in flightsToDisplay) {
+      String dateStr = getEffectiveDate(flight);
+      String header = 'Unknown Date';
+      if (dateStr.isNotEmpty) {
+        try {
+           final dt = DateTime.parse(dateStr).toLocal();
+           final dayName = appLanguage.value == 'es' ? esWeekdays[dt.weekday] : enWeekdays[dt.weekday];
+           final monthName = appLanguage.value == 'es' ? esMonths[dt.month] : enMonths[dt.month];
+           header = '$dayName, ${dt.day} $monthName ${dt.year}';
+        } catch (_) {}
+      }
+      dateCounts[header] = (dateCounts[header] ?? 0) + 1;
+    }
+
+    List<dynamic> groupedList = [];
+    String lastDateHeader = '';
+    
+    for (var flight in flightsToDisplay) {
+      String dateStr = getEffectiveDate(flight);
+      String header = 'Unknown Date';
+      if (dateStr.isNotEmpty) {
+        try {
+           final dt = DateTime.parse(dateStr).toLocal();
+           final dayName = appLanguage.value == 'es' ? esWeekdays[dt.weekday] : enWeekdays[dt.weekday];
+           final monthName = appLanguage.value == 'es' ? esMonths[dt.month] : enMonths[dt.month];
+           header = '$dayName, ${dt.day} $monthName ${dt.year}';
+        } catch (_) {}
+      }
+      
+      if (header != lastDateHeader) {
+         groupedList.add(header);
+         lastDateHeader = header;
+      }
+      if (!_collapsedDates.contains(header)) {
+        groupedList.add(flight);
+      }
+    }
+
     return Stack(
       children: [
         Positioned.fill(
@@ -297,8 +366,83 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                 ),
               ),
             ],
-            rows: List.generate(flightsToDisplay.length, (index) {
-              final flight = flightsToDisplay[index];
+            rows: List.generate(groupedList.length, (index) {
+              final item = groupedList[index];
+              if (item is String) {
+                return DataRow(
+                  color: WidgetStateProperty.all(dark ? const Color(0xFF334155).withAlpha(150) : const Color(0xFFE5E7EB)),
+                  cells: List.generate(12, (cellIdx) {
+                    if (cellIdx == 0) {
+                      final count = dateCounts[item] ?? 0;
+                      return DataCell(
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF6366f1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '$count',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      );
+                    } else if (cellIdx == 1) {
+                      return DataCell(
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_month_rounded, size: 16, color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)),
+                            const SizedBox(width: 8),
+                            Text(item, style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
+                          ]
+                        )
+                      );
+                    } else if (cellIdx == 11) {
+                      final isCollapsed = _collapsedDates.contains(item);
+                      return DataCell(
+                        Align(
+                          alignment: Alignment.center,
+                          child: IconButton(
+                            icon: Icon(
+                              isCollapsed ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
+                              size: 18, 
+                              color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                if (isCollapsed) {
+                                  _collapsedDates.remove(item);
+                                } else {
+                                  _collapsedDates.add(item);
+                                }
+                              });
+                            },
+                            tooltip: isCollapsed ? (appLanguage.value == 'es' ? 'Mostrar vuelos' : 'Show flights') : (appLanguage.value == 'es' ? 'Ocultar vuelos' : 'Hide flights'),
+                          ),
+                        )
+                      );
+                    }
+                    return DataCell(const SizedBox.shrink());
+                  }),
+                );
+              }
+
+              final flight = item as Map<String, dynamic>;
+              
+              int displayIndex = 1;
+              for (int i = index - 1; i >= 0; i--) {
+                if (groupedList[i] is String) {
+                  displayIndex = index - i;
+                  break;
+                }
+              }
+              
               final carrier = flight['carrier'] ?? '';
               final number = flight['number'] ?? '';
               final cantBreak = flight['cant_break'] ?? 0;
@@ -333,7 +477,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                    _showFlightDrawer(context, flight, dark);
                 },
                 cells: [
-                  DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), fontWeight: FontWeight.bold))),
+                  DataCell(Text('$displayIndex', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), fontWeight: FontWeight.bold))),
                   DataCell(Row(
                     children: [
                       Icon(Icons.flight_land_rounded, size: 16, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)),
