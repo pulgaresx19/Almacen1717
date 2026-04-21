@@ -1,4 +1,4 @@
-﻿// ignore_for_file: invalid_use_of_protected_member
+// ignore_for_file: invalid_use_of_protected_member
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
@@ -10,11 +10,11 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
     var filteredUlds = _allUlds.where((uld) {
       final status = uld['status']?.toString() ?? '';
       if (status == 'Delivered' || status == 'Canceled') return false;
-      if (uld['isBreak'] == true) return false;
+      if (uld['is_break'] == true) return false;
       
       if (_searchAwbCtrl.text.isNotEmpty) {
         final term = _searchAwbCtrl.text.toLowerCase();
-        final uNum = (uld['ULD-number']?.toString() ?? '').toLowerCase();
+        final uNum = (uld['uld_number']?.toString() ?? uld['ULD-number']?.toString() ?? '').toLowerCase();
         if (!uNum.contains(term)) return false;
       }
       return true;
@@ -62,11 +62,13 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                     ],
                     rows: List.generate(filteredUlds.length, (index) {
                       final uld = filteredUlds[index];
-                      final String uldNum = uld['ULD-number']?.toString() ?? 'Unknown';
-                      final bool isSelected = _selectedUlds.any((item) => item['ULD-number'] == uldNum);
+                      final String uldNum = uld['uld_number']?.toString() ?? uld['ULD-number']?.toString() ?? 'Unknown';
+                      final bool isSelected = _selectedUlds.any((item) => (item['uld_number']?.toString() ?? item['ULD-number']?.toString()) == uldNum);
 
                       int totalPieces = 0;
-                      if (uld['data-ULD'] is List) {
+                      if (uld['pieces_total'] != null) {
+                        totalPieces = int.tryParse(uld['pieces_total'].toString()) ?? 0;
+                      } else if (uld['data-ULD'] is List) {
                          for (var d in (uld['data-ULD'] as List)) {
                             if (d is Map) {
                                totalPieces += int.tryParse(d['pieces']?.toString() ?? '0') ?? 0;
@@ -75,18 +77,34 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                       }
 
                       String flightStr = '-';
-                      final carrier = uld['refCarrier']?.toString() ?? '';
-                      final flightNum = uld['refNumber']?.toString() ?? '';
-                      final flightDateStr = uld['refDate']?.toString() ?? '';
-                      
-                      if (carrier.isNotEmpty || flightNum.isNotEmpty) {
-                         flightStr = '$carrier$flightNum';
-                         if (flightDateStr.isNotEmpty) {
-                             try {
-                               final d = DateTime.parse(flightDateStr);
-                               flightStr += ' ${DateFormat('MMM dd').format(d)}';
-                             } catch (_) {}
+                      if (uld['flights'] != null && uld['flights'] is Map) {
+                         final f = uld['flights'];
+                         final carrier = f['carrier']?.toString() ?? '';
+                         final flightNum = f['number']?.toString() ?? '';
+                         final flightDateStr = f['date']?.toString() ?? '';
+                         if (carrier.isNotEmpty || flightNum.isNotEmpty) {
+                            flightStr = '$carrier$flightNum';
+                            if (flightDateStr.isNotEmpty) {
+                                try {
+                                  final d = DateTime.parse(flightDateStr);
+                                  flightStr += ' ${DateFormat('MMM dd').format(d)}';
+                                } catch (_) {}
+                            }
                          }
+                      } else {
+                        final carrier = uld['refCarrier']?.toString() ?? '';
+                        final flightNum = uld['refNumber']?.toString() ?? '';
+                        final flightDateStr = uld['refDate']?.toString() ?? '';
+                        
+                        if (carrier.isNotEmpty || flightNum.isNotEmpty) {
+                           flightStr = '$carrier$flightNum';
+                           if (flightDateStr.isNotEmpty) {
+                               try {
+                                 final d = DateTime.parse(flightDateStr);
+                                 flightStr += ' ${DateFormat('MMM dd').format(d)}';
+                               } catch (_) {}
+                           }
+                        }
                       }
 
 
@@ -101,7 +119,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                                 _deliveryRemarkControllers[uldNum] = TextEditingController();
                               }
                             } else {
-                              _selectedUlds.removeWhere((item) => item['ULD-number'] == uldNum);
+                              _selectedUlds.removeWhere((item) => (item['uld_number']?.toString() ?? item['ULD-number']?.toString()) == uldNum);
                               _deliveryPcsControllers.remove(uldNum)?.dispose();
                               _deliveryRemarkControllers.remove(uldNum)?.dispose();
                             }
@@ -111,7 +129,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                           DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600))),
                           DataCell(Text(uldNum, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                           DataCell(Text('$totalPieces pcs')),
-                          DataCell(Text('${uld['weight']?.toString() ?? '0'} kg', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
+                          DataCell(Text('${uld['weight_total']?.toString() ?? uld['weight']?.toString() ?? '0'} kg', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
                           DataCell(Text(flightStr.trim() == '' ? '-' : flightStr, style: const TextStyle(fontWeight: FontWeight.w500))),
                           DataCell(_buildStatusBadge(uld['status']?.toString() ?? 'Received')),
                           DataCell(

@@ -1,4 +1,4 @@
-﻿// ignore_for_file: invalid_use_of_protected_member
+// ignore_for_file: invalid_use_of_protected_member
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
@@ -17,7 +17,9 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
     
     var filteredAwbs = _allAwbs.where((awb) {
       int deliveredPieces = 0;
-      if (awb['data-deliver'] != null) {
+      if (awb['pieces_delivered'] != null) {
+        deliveredPieces = int.tryParse(awb['pieces_delivered'].toString()) ?? 0;
+      } else if (awb['data-deliver'] != null) {
         if (awb['data-deliver'] is List) {
           for (var item in awb['data-deliver']) {
             if (item is Map && item.containsKey('found')) {
@@ -28,15 +30,16 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
           deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
         }
       }
-      final int totalValInt = int.tryParse(awb['total']?.toString() ?? '0') ?? 0;
       
-      if (deliveredPieces == totalValInt && totalValInt > 0) {
+      final int expectedPieces = int.tryParse(awb['total_espected']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
+      
+      if (deliveredPieces >= expectedPieces && expectedPieces > 0) {
         return false;
       }
       
       if (_searchAwbCtrl.text.isNotEmpty) {
         final term = _searchAwbCtrl.text.toLowerCase();
-        final awbNumber = (awb['AWB-number']?.toString() ?? '').toLowerCase();
+        final awbNumber = (awb['awb_number']?.toString() ?? awb['AWB-number']?.toString() ?? '').toLowerCase();
         if (!awbNumber.contains(term)) return false;
       }
       
@@ -82,9 +85,7 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                       const DataColumn(label: Text('Expected')),
                       const DataColumn(label: Text('Received')),
                       const DataColumn(label: Text('Delivered')),
-                      const DataColumn(label: Text('In Process')),
                       const DataColumn(label: Text('Remaining')),
-                      const DataColumn(label: Text('Reject')),
                       const DataColumn(label: Text('Total')),
                       const DataColumn(label: Text('Weight')),
                       const DataColumn(label: Text('Status')),
@@ -92,23 +93,32 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                     ],
                     rows: List.generate(filteredAwbs.length, (index) {
                       final awb = filteredAwbs[index];
-                      final String awbNumber = awb['AWB-number']?.toString() ?? 'Unknown';
-                      final bool isSelected = _selectedAwbs.any((item) => item['AWB-number'] == awbNumber);
+                      final String awbNumber = awb['awb_number']?.toString() ?? awb['AWB-number']?.toString() ?? 'Unknown';
+                      final bool isSelected = _selectedAwbs.any((item) => (item['awb_number']?.toString() ?? item['AWB-number']?.toString()) == awbNumber);
 
                       int expectedPieces = 0;
                       double totalWeight = 0.0;
-                      if (awb['data-AWB'] is List) {
-                        for (var item in awb['data-AWB']) {
-                           expectedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-                           totalWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+                      
+                      if (awb['total_espected'] != null) {
+                         expectedPieces = int.tryParse(awb['total_espected'].toString()) ?? 0;
+                         totalWeight = double.tryParse(awb['total_weight']?.toString() ?? '0') ?? 0.0;
+                      } else {
+                         // Fallback for legacy
+                        if (awb['data-AWB'] is List) {
+                          for (var item in awb['data-AWB']) {
+                             expectedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+                             totalWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+                          }
+                        } else if (awb['data-AWB'] is Map) {
+                             expectedPieces += int.tryParse(awb['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
+                             totalWeight += double.tryParse(awb['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
                         }
-                      } else if (awb['data-AWB'] is Map) {
-                           expectedPieces += int.tryParse(awb['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
-                           totalWeight += double.tryParse(awb['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
                       }
 
                       int receivedPieces = 0;
-                      if (awb['data-coordinator'] != null) {
+                      if (awb['pieces_received'] != null) {
+                        receivedPieces = int.tryParse(awb['pieces_received'].toString()) ?? 0;
+                      } else if (awb['data-coordinator'] != null) {
                         List dcList = [];
                         if (awb['data-coordinator'] is List) {
                           dcList = awb['data-coordinator'] as List;
@@ -136,7 +146,9 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                       }
 
                       int deliveredPieces = 0;
-                      if (awb['data-deliver'] != null) {
+                      if (awb['pieces_delivered'] != null) {
+                        deliveredPieces = int.tryParse(awb['pieces_delivered'].toString()) ?? 0;
+                      } else if (awb['data-deliver'] != null) {
                         if (awb['data-deliver'] is List) {
                           for (var item in awb['data-deliver']) {
                             if (item is Map && item.containsKey('found')) {
@@ -147,45 +159,24 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                           deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
                         }
                       }
-                      int inProcessPieces = getInProcessPieces(awbNumber);
-                      int remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
-                      if (remainingPieces < 0) remainingPieces = 0;
-                      
-                      List<Map<String, dynamic>> rejectDataList = [];
-                      
-                      if (awb['data-deliver'] != null) {
-                         if (awb['data-deliver'] is List) {
-                            for (var del in awb['data-deliver']) {
-                               if (del is Map && del.containsKey('rejection') && del['rejection'] != null) {
-                                  Map<String, dynamic> r = del['rejection'] as Map<String, dynamic>;
-                                  rejectDataList.add(r);
-                               }
-                            }
-                         } else if (awb['data-deliver'] is Map && awb['data-deliver']['rejection'] != null) {
-                            Map<String, dynamic> r = awb['data-deliver']['rejection'] as Map<String, dynamic>;
-                            rejectDataList.add(r);
-                         }
+
+                      int remainingPieces = 0;
+                      if (awb['pieces_remaining'] != null) {
+                        remainingPieces = int.tryParse(awb['pieces_remaining'].toString()) ?? 0;
+                      } else {
+                        remainingPieces = expectedPieces - deliveredPieces;
+                        if (remainingPieces < 0) remainingPieces = 0;
                       }
                       
-                      if (rejectDataList.isEmpty && awb['data-reject'] != null) {
-                         if (awb['data-reject'] is List) {
-                            for (var r in awb['data-reject']) {
-                               if (r is Map) {
-                                  rejectDataList.add(r as Map<String, dynamic>);
-                               }
-                            }
-                         } else if (awb['data-reject'] is Map) {
-                            Map<String, dynamic> r = awb['data-reject'] as Map<String, dynamic>;
-                            rejectDataList.add(r);
-                         }
-                      }
+                      final int totalValInt = int.tryParse(awb['total_pieces']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
                       
-                      final int totalValInt = int.tryParse(awb['total']?.toString() ?? '0') ?? 0;
                       String status = 'Waiting';
-                      if (deliveredPieces == totalValInt && totalValInt > 0) {
-                         status = 'Ready';
+                      if (deliveredPieces >= totalValInt && totalValInt > 0) {
+                         status = 'Delivered';
                       } else if (deliveredPieces > 0) {
                          status = 'In Process';
+                      } else if (receivedPieces > 0) {
+                         status = 'Received';
                       }
 
                       return DataRow(
@@ -195,7 +186,7 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                             if (val == true) {
                               _selectedAwbs.add(awb);
                             } else {
-                              _selectedAwbs.removeWhere((item) => item['AWB-number'] == awbNumber);
+                              _selectedAwbs.removeWhere((item) => (item['awb_number']?.toString() ?? item['AWB-number']?.toString()) == awbNumber);
                               _deliveryPcsControllers[awbNumber]?.dispose();
                               _deliveryPcsControllers.remove(awbNumber);
                               _deliveryRemarkControllers[awbNumber]?.dispose();
@@ -207,105 +198,27 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                           DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600))),
                           DataCell(Text(awbNumber, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                           DataCell(Text('$expectedPieces pcs')),
-                          DataCell(Text('$receivedPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600))),
-                          DataCell(Text(deliveredPieces > 0 ? '$deliveredPieces pcs' : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))),
-                          DataCell(Text(inProcessPieces > 0 ? '$inProcessPieces pcs' : '-', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3b82f6)))),
-                          DataCell(Text('$remainingPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.orange))),
-                          DataCell(
-                                rejectDataList.isNotEmpty 
-                                ? InkWell(
-                                    onTap: () {
-                                       showDialog(
-                                          context: context,
-                                          builder: (ctx) => AlertDialog(
-                                            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                            title: Text('Reject Details', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold)),
-                                            content: SizedBox(
-                                              width: 350, // standard constrained width
-                                              child: ListView.separated(
-                                                shrinkWrap: true,
-                                                itemCount: rejectDataList.length,
-                                                separatorBuilder: (ctx, i) => const SizedBox(height: 12),
-                                                itemBuilder: (ctx, i) {
-                                                  final rData = rejectDataList[i];
-                                                  final pcs = int.tryParse(rData['pieces']?.toString() ?? rData['qty']?.toString() ?? '0') ?? 0;
-                                                  return Container(
-                                                    padding: const EdgeInsets.all(12),
-                                                    decoration: BoxDecoration(
-                                                      color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
-                                                      borderRadius: BorderRadius.circular(12),
-                                                      border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB))
-                                                    ),
-                                                    child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                            Text('Rejection ${i + 1}', style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                                                            const SizedBox(height: 8),
-                                                            Row(
-                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                              children: [
-                                                                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                                                    Text('Pieces', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
-                                                                    const SizedBox(height: 2),
-                                                                    Text(pcs.toString(), style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13, fontWeight: FontWeight.bold)),
-                                                                 ]),
-                                                                 Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                                                    Text('Location', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
-                                                                    const SizedBox(height: 2),
-                                                                    Text(rData['location']?.toString() ?? 'Unknown', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13)),
-                                                                 ]),
-                                                              ],
-                                                            ),
-                                                            const SizedBox(height: 8),
-                                                            Text('Reason', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12, fontWeight: FontWeight.bold)),
-                                                            const SizedBox(height: 2),
-                                                            Text(rData['reason']?.toString() ?? 'No reason provided', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 13)),
-                                                            const SizedBox(height: 8),
-                                                            Row(
-                                                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                               children: [
-                                                                  Row(
-                                                                    children: [
-                                                                      Icon(Icons.person_outline, size: 14, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)),
-                                                                      const SizedBox(width: 4),
-                                                                      Text(rData['user']?.toString() ?? 'Unknown', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
-                                                                    ],
-                                                                  ),
-                                                                  Text(rData['time'] != null ? DateFormat('hh:mm a').format(DateTime.parse(rData['time'].toString()).toLocal()) : '', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 12)),
-                                                               ]
-                                                            ),
-                                                        ]
-                                                    )
-                                                  );
-                                                }
-                                              )
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(ctx), 
-                                                child: Text('Close', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)))
-                                              )
-                                            ],
-                                          )
-                                       );
-                                    },
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: Container(
-                                      width: 26,
-                                      height: 26,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: Colors.redAccent.withAlpha(25),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Text(rejectDataList.length.toString(), style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                                    )
-                                ) 
-                                : const Text('-', style: TextStyle(fontWeight: FontWeight.w500))
-                          ),
-                          DataCell(Text(awb['total']?.toString() ?? '0', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
-                          DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg')),
+                          DataCell(Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.amber.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                            child: Text('$receivedPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.amber)),
+                          )),
+                          DataCell(Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                            child: Text('$deliveredPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981))),
+                          )),
+                          DataCell(Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                            child: Text('$remainingPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1))),
+                          )),
+                          DataCell(Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.blue.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                            child: Text('$totalValInt pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue)),
+                          )),
+                          DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\.$|\.0$'), '')} kg')),
                           DataCell(_buildStatusBadge(status)),
                           DataCell(
                             Align(

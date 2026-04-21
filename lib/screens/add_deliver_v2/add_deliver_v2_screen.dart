@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,6 +36,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
 
   bool _isPriority = false;
   bool _isLoading = false;
+  String? _missingField;
 
   List<Map<String, dynamic>> _allAwbs = [];
   final List<Map<String, dynamic>> _selectedAwbs = [];
@@ -70,9 +71,9 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     _timeCtrl.text = 'NOW';
     
     _awbSub = Supabase.instance.client
-        .from('AWB')
+        .from('awbs')
         .select()
-        .order('AWB-number', ascending: true)
+        .order('awb_number', ascending: true)
         .asStream().listen((data) {
       if (mounted) {
         setState(() {
@@ -94,9 +95,9 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     });
 
     _uldSub = Supabase.instance.client
-        .from('ULD')
-        .select()
-        .order('id', ascending: false)
+        .from('ulds')
+        .select('*, flights:id_flight(carrier, number, date)')
+        .order('created_at', ascending: false)
         .asStream().listen((data) {
       if (mounted) {
         setState(() {
@@ -113,12 +114,12 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
       final status = del['status']?.toString() ?? '';
       if (status == 'Delivered' || status == 'Canceled') continue;
       
-      final listPickup = del['list-pickup'];
+      final listPickup = del['list_deliver'];
       if (listPickup != null) {
         if (listPickup is List) {
           for (var item in listPickup) {
-            if (item is Map && item['AWB-number'] == awbNum) {
-              count += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+            if (item is Map && (item['awb'] == awbNum || item['AWB-number'] == awbNum)) {
+              count += int.tryParse(item['found']?.toString() ?? item['pieces']?.toString() ?? '0') ?? 0;
             }
           }
         } else {
@@ -381,7 +382,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                           children: [
                             Icon(Icons.list_alt_rounded, color: textP, size: 20),
                             const SizedBox(width: 8),
-                            Text('Select Items (list-pickup)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text('Select Items (list_deliver)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
                             const Spacer(),
                             Container(
                                width: 300,

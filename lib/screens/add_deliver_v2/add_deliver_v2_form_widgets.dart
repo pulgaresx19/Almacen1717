@@ -1,4 +1,4 @@
-﻿// ignore_for_file: invalid_use_of_protected_member
+// ignore_for_file: invalid_use_of_protected_member
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
@@ -120,14 +120,19 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
       }));
     }
 
+    bool isError = _missingField == label;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+        Text(label, style: TextStyle(color: isError ? Colors.redAccent : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w500)),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
-          onChanged: onChanged,
+          onChanged: (val) {
+            if (isError && val.trim().isNotEmpty) setState(() => _missingField = null);
+            if (onChanged != null) onChanged(val);
+          },
           readOnly: readOnly,
           keyboardType: label == 'Time' 
               ? TextInputType.datetime 
@@ -142,18 +147,26 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(76) : Colors.black.withAlpha(76), fontSize: 13),
-            prefixIcon: icon != null ? Icon(icon, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18) : null,
+            prefixIcon: icon != null ? Icon(icon, color: isError ? Colors.redAccent : (dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF)), size: 18) : null,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
+            fillColor: isError ? Colors.redAccent.withAlpha(10) : (dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isError ? Colors.redAccent.withAlpha(150) : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isError ? Colors.redAccent.withAlpha(150) : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)))),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5), width: 1.5),
+              borderSide: BorderSide(color: isError ? Colors.redAccent : (dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5)), width: 1.5),
             ),
           ),
         ),
+        if (isError)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              appLanguage.value == 'es' ? 'Requerido' : 'Required',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
       ],
     );
   }
@@ -271,20 +284,25 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                 final item = combinedList[index];
                 final bool isAwb = item['type'] == 'AWB';
                 final data = item['data'];
-                final String itemNumber = isAwb ? (data['AWB-number']?.toString() ?? 'Unknown') : (data['ULD-number']?.toString() ?? 'Unknown');
+                final String itemNumber = isAwb ? (data['awb_number']?.toString() ?? data['AWB-number']?.toString() ?? 'Unknown') : (data['uld_number']?.toString() ?? data['ULD-number']?.toString() ?? 'Unknown');
                 
                 int remainingPieces = 0;
                 if (isAwb) {
                    int expectedPieces = 0;
-                   if (data['data-AWB'] is List) {
+                   if (data['total_espected'] != null) {
+                      expectedPieces = int.tryParse(data['total_espected'].toString()) ?? 0;
+                   } else if (data['data-AWB'] is List) {
                      for (var a in data['data-AWB']) {
                         expectedPieces += int.tryParse(a['pieces']?.toString() ?? '0') ?? 0;
                      }
                    } else if (data['data-AWB'] is Map) {
                         expectedPieces += int.tryParse(data['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
                    }
+
                    int deliveredPieces = 0;
-                   if (data['data-deliver'] != null) {
+                   if (data['pieces_delivered'] != null) {
+                      deliveredPieces = int.tryParse(data['pieces_delivered'].toString()) ?? 0;
+                   } else if (data['data-deliver'] != null) {
                       if (data['data-deliver'] is List) {
                          for (var d in data['data-deliver']) {
                             if (d is Map && d.containsKey('found')) {
@@ -295,11 +313,18 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                          deliveredPieces = int.tryParse(data['data-deliver']['found']?.toString() ?? '0') ?? 0;
                       }
                    }
-                   int inProcessPieces = getInProcessPieces(itemNumber);
-                   remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
-                   if (remainingPieces < 0) remainingPieces = 0;
+
+                   if (data['pieces_remaining'] != null) {
+                      remainingPieces = int.tryParse(data['pieces_remaining'].toString()) ?? 0;
+                   } else {
+                      int inProcessPieces = getInProcessPieces(itemNumber);
+                      remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
+                      if (remainingPieces < 0) remainingPieces = 0;
+                   }
                 } else {
-                   if (data['data-ULD'] is List) {
+                   if (data['pieces_total'] != null) {
+                      remainingPieces = int.tryParse(data['pieces_total'].toString()) ?? 0;
+                   } else if (data['data-ULD'] is List) {
                       for (var d in (data['data-ULD'] as List)) {
                          if (d is Map) {
                             remainingPieces += int.tryParse(d['pieces']?.toString() ?? '0') ?? 0;
@@ -420,9 +445,9 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                         onPressed: () {
                           setState(() {
                              if (isAwb) {
-                               _selectedAwbs.removeWhere((e) => e['AWB-number'] == itemNumber);
+                               _selectedAwbs.removeWhere((e) => (e['awb_number']?.toString() ?? e['AWB-number']?.toString()) == itemNumber);
                              } else {
-                               _selectedUlds.removeWhere((e) => e['ULD-number'] == itemNumber);
+                               _selectedUlds.removeWhere((e) => (e['uld_number']?.toString() ?? e['ULD-number']?.toString()) == itemNumber);
                              }
                              _deliveryPcsControllers.remove(itemNumber)?.dispose();
                              _deliveryRemarkControllers.remove(itemNumber)?.dispose();

@@ -1,4 +1,4 @@
-﻿part of 'add_deliver_v2_screen.dart';
+part of 'add_deliver_v2_screen.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
@@ -116,15 +116,15 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
 
   Future<void> _submitPayload() async {
     if (_truckCompanyCtrl.text.trim().isEmpty) {
-      _showMissingFieldAlert('Truck Company');
+      setState(() => _missingField = 'Truck Company');
       return;
     }
     if (_driverCtrl.text.trim().isEmpty) {
-      _showMissingFieldAlert('Driver');
+      setState(() => _missingField = 'Driver');
       return;
     }
     if (_idPickupCtrl.text.trim().isEmpty) {
-      _showMissingFieldAlert('ID Pickup');
+      setState(() => _missingField = 'ID Pickup');
       return;
     }
 
@@ -140,14 +140,14 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       }
       final List<Map<String, dynamic>> combinedToValidate = [..._selectedAwbs, ..._selectedUlds];
       for (var item in combinedToValidate) {
-        final awbNum = item['AWB-number']?.toString() ?? item['ULD-number']?.toString() ?? '';
+        final awbNum = item['AWB-number']?.toString() ?? item['uld_number']?.toString() ?? item['ULD-number']?.toString() ?? '';
         final pcsStr = _deliveryPcsControllers[awbNum]?.text.trim() ?? '';
         final pcs = int.tryParse(pcsStr) ?? 0;
         if (pcs <= 0) {
           _showMissingFieldAlert(
             'Pieces for $awbNum', 
             customMessage: appLanguage.value == 'es'
-                ? 'Las piezas a entregar para la guÃƒÂ­a o ULD $awbNum tienen un valor numÃƒÂ©rico no vÃƒÂ¡lido ($pcsStr).\nPor favor, introduzca un nÃƒÂºmero mayor a 0 para guardar.'
+                ? 'Las piezas a entregar para la guía o ULD $awbNum tienen un valor numérico no válido ($pcsStr).\nPor favor, introduzca un número mayor a 0 para guardar.'
                 : 'The pieces for item $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.'
           );
           return;
@@ -158,7 +158,7 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
     String finalTime = _timeCtrl.text.trim();
     if (_typeCtrl.text == 'Appointment') {
       if (finalTime.isEmpty || finalTime == 'NOW') {
-        _showMissingFieldAlert('Time');
+        setState(() => _missingField = 'Time');
         return;
       }
     } else {
@@ -168,7 +168,10 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       }
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _missingField = null;
+    });
     
     String doorText = _doorCtrl.text.trim();
     if (doorText.isEmpty) doorText = 'PENDING';
@@ -196,59 +199,69 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       }
       final timeDeliverDate = DateTime(nowForDate.year, nowForDate.month, nowForDate.day, hours, minutes);
 
-      final payload = {
-        'truck-company': _truckCompanyCtrl.text.trim(),
-        'driver': _driverCtrl.text.trim(),
-        'door': doorText,
-        'id-pickup': _idPickupCtrl.text.trim(),
-        'type': _typeCtrl.text.trim(),
-        'status': 'Waiting',
-        'time-deliver': timeDeliverDate.toUtc().toIso8601String(),
-        'remarks': _remarksCtrl.text.trim(),
-        'isPriority': _isPriority,
-        'list-pickup': _typeCtrl.text == 'Import' 
-            ? _importAwbs.map((e) => {
-                'AWB-number': e['awbNumber']?.toString() ?? '',
-                'pieces': e['pieces']?.toString() ?? '0',
-                'weight': e['weight']?.toString() ?? '0',
-                'remarks': e['remarks']?.toString() ?? ''
-              }).toList() 
-            : [
-                ..._selectedAwbs.map((e) {
-                  final awbNum = e['AWB-number']?.toString() ?? '';
-                  final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
-                  final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
-                  final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
-                  
-                  double expectedWeight = 0.0;
-                  if (e['data-AWB'] is List) {
-                    for (var item in e['data-AWB']) {
-                       expectedWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
-                    }
-                  } else if (e['data-AWB'] is Map) {
-                       expectedWeight += double.tryParse(e['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
+      final listPickup = _typeCtrl.text == 'Import' 
+          ? _importAwbs.map((e) => {
+              'awb': e['awbNumber']?.toString() ?? '',
+              'found': e['pieces']?.toString() ?? '0',
+              'weight': e['weight']?.toString() ?? '0',
+              'remarks': e['remarks']?.toString() ?? ''
+            }).toList() 
+          : [
+              ..._selectedAwbs.map((e) {
+                final awbNum = e['awb_number']?.toString() ?? e['AWB-number']?.toString() ?? '';
+                final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+                final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
+                final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
+                
+                double expectedWeight = 0.0;
+                if (e['data-AWB'] is List) {
+                  for (var item in e['data-AWB']) {
+                     expectedWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
                   }
+                } else if (e['data-AWB'] is Map) {
+                     expectedWeight += double.tryParse(e['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
+                }
 
-                  return {
-                    'AWB-number': awbNum,
-                    'pieces': pcs,
-                    'weight': expectedWeight.toStringAsFixed(2),
-                    'remarks': rem
-                  };
-                }),
-                ..._selectedUlds.map((e) {
-                   final uNum = e['ULD-number']?.toString() ?? '';
-                   final pcsCtrlText = _deliveryPcsControllers[uNum]?.text.trim() ?? '0';
-                   final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
-                   final rem = _deliveryRemarkControllers[uNum]?.text.trim() ?? '';
-                   return {
-                     'ULD-number': uNum,
-                     'pieces': pcs,
-                     'weight': e['weight']?.toString() ?? '0.00',
-                     'remarks': rem
-                   };
-                })
-              ],
+                return {
+                  'awb': awbNum,
+                  'found': pcs,
+                  'weight': expectedWeight.toStringAsFixed(2),
+                  'remarks': rem
+                };
+              }),
+              ..._selectedUlds.map((e) {
+                 final uNum = e['uld_number']?.toString() ?? e['ULD-number']?.toString() ?? '';
+                 final pcsCtrlText = _deliveryPcsControllers[uNum]?.text.trim() ?? '0';
+                 final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
+                 final rem = _deliveryRemarkControllers[uNum]?.text.trim() ?? '';
+                 return {
+                   'awb': uNum,
+                   'found': pcs,
+                   'weight': e['weight_total']?.toString() ?? e['weight']?.toString() ?? '0.00',
+                   'remarks': rem
+                 };
+              })
+            ];
+
+      int totalPieces = 0;
+      double totalWeight = 0.0;
+      for (var item in listPickup) {
+        totalPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
+        totalWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+      }
+
+      final payload = {
+        'company': _truckCompanyCtrl.text.trim(),
+        'driver_name': _driverCtrl.text.trim(),
+        'door': doorText,
+        'id_pickup': _idPickupCtrl.text.trim(),
+        'type': _typeCtrl.text.trim(),
+        'time': timeDeliverDate.toUtc().toIso8601String(),
+        'remarks': _remarksCtrl.text.trim(),
+        'is_priority': _isPriority,
+        'list_deliver': listPickup,
+        'total_pieces': totalPieces,
+        'total_weight': totalWeight,
       };
 
       await Supabase.instance.client.from('deliveries').insert(payload);
