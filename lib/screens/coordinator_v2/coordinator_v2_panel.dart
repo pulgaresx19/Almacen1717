@@ -48,9 +48,9 @@ class CoordinatorV2Panel extends StatelessWidget {
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(maxWidth: 320),
             child: Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: dark ? const Color(0xFF1e293b) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -104,17 +104,38 @@ class CoordinatorV2Panel extends StatelessWidget {
                         ],
                       ),
                     ),
-                  if (uld['time_received'] == null && uld['time_checked'] == null)
+                  if (uld['time_saved'] != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(appLanguage.value == 'es' ? 'Aún no se ha recibido ni chequeado.' : 'Not received or checked yet.', style: TextStyle(color: textS)),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.location_on, size: 16, color: Color(0xFFF59E0B)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(appLanguage.value == 'es' ? 'Localizado Por' : 'Located By', style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold)),
+                                Text('${uld['user_saved'] ?? 'Unknown'}', style: TextStyle(color: textP, fontSize: 14)),
+                                Text(DateFormat('MMM dd, hh:mm a').format(DateTime.parse(uld['time_saved']).toLocal()), style: TextStyle(color: textS, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (uld['time_received'] == null && uld['time_checked'] == null && uld['time_saved'] == null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(appLanguage.value == 'es' ? 'Aún no se ha recibido, chequeado ni localizado.' : 'Not received, checked, or located yet.', style: TextStyle(color: textS)),
                     ),
                   const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () => Navigator.pop(ctx),
-                      child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
+                      child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],

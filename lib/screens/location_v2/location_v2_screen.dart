@@ -1,7 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier;
+import 'location_v2_logic.dart';
+import 'location_v2_ulds.dart';
+import 'location_v2_scanner_modal.dart';
+
+class AwbInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    String digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length > 11) digits = digits.substring(0, 11);
+
+    String formatted = '';
+    for (int i = 0; i < digits.length; i++) {
+      if (i == 3) formatted += '-';
+      if (i == 7) formatted += ' ';
+      formatted += digits[i];
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class LocationV2Screen extends StatefulWidget {
   final bool isActive;
@@ -13,18 +37,21 @@ class LocationV2Screen extends StatefulWidget {
 
 class _LocationV2ScreenState extends State<LocationV2Screen> {
   final TextEditingController _searchController = TextEditingController();
-  DateTime? _selectedDate;
+  final FocusNode _searchFocus = FocusNode();
+  final LocationV2Logic _logic = LocationV2Logic();
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocus.dispose();
+    _logic.dispose();
     super.dispose();
   }
 
   Future<void> _pickDate(BuildContext context) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
+      initialDate: _logic.selectedDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       builder: (context, child) {
@@ -47,17 +74,88 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
       },
     );
     if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      _logic.setDate(picked);
+    }
+  }
+
+  Future<void> _handleScannerSubmit(String query) async {
+    try {
+      if (_logic.selectedFlightId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(appLanguage.value == 'es' ? 'Selecciona un vuelo primero' : 'Select a flight first')),
+        );
+        _searchFocus.requestFocus();
+        return;
+      }
+
+      if (_logic.allFlightAwbs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ DEBUG: La lista en memoria está vacía. ULDs cargados: ${_logic.ulds.length}'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        _searchFocus.requestFocus();
+        return;
+      }
+
+      final cleanQuery = query.replaceAll(RegExp(r'[^0-9A-Z]'), '');
+
+      final matches = _logic.allFlightAwbs.where((split) {
+        final uldId = split['uld_id']?.toString();
+        if (uldId != null) {
+          final uldInfo = _logic.ulds.cast<Map<String, dynamic>?>().firstWhere(
+            (u) => u != null && u['id_uld']?.toString() == uldId,
+            orElse: () => null,
+          );
+          if (uldInfo != null && uldInfo['time_saved'] != null) {
+            return false;
+          }
+        }
+
+        final master = split['awbs'];
+        Map<String, dynamic> masterMap = {};
+        if (master is Map<String, dynamic>) {
+          masterMap = master;
+        } else if (master is List && master.isNotEmpty) {
+          masterMap = master.first as Map<String, dynamic>;
+        }
+
+        final awbNumber = (masterMap['awb_number'] ?? split['awb_number'] ?? '').toString().toUpperCase();
+        final cleanAwb = awbNumber.replaceAll(RegExp(r'[^0-9A-Z]'), '');
+        
+        return cleanQuery.isNotEmpty && cleanAwb.contains(cleanQuery);
+      }).toList();
+
+      if (!mounted) return;
+      if (matches.isEmpty) {
+        await LocationV2ScannerModal.show(context, query: query, matches: matches, logic: _logic);
+      } else if (matches.length == 1) {
+        _searchController.clear();
+        await LocationV2ScannerModal.show(context, query: query, matches: matches, logic: _logic);
+      } else {
+        _searchController.clear();
+        await LocationV2ScannerModal.show(context, query: query, matches: matches, logic: _logic);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error interno en buscador: $e'), backgroundColor: Colors.red),
+      );
+    }
+    
+    // Always keep focus for next scan, but only after dialog closes
+    if (mounted) {
+      _searchFocus.requestFocus();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: isDarkMode,
-      builder: (context, dark, child) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([_logic, isDarkMode]),
+      builder: (context, child) {
+        final dark = isDarkMode.value;
         final Color textP = dark ? Colors.white : const Color(0xFF111827);
         final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
         final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
@@ -97,12 +195,15 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          textCapitalization: TextCapitalization.characters,
+                          focusNode: _searchFocus,
+                          autofocus: true,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [AwbInputFormatter()],
                           style: TextStyle(color: textP, fontSize: 13),
                           onChanged: (v) => setState(() {}),
                           onSubmitted: (v) {
                             if (v.trim().isNotEmpty) {
-                              // Perform search later
+                              _handleScannerSubmit(v.trim().toUpperCase());
                             }
                           },
                           decoration: InputDecoration(
@@ -132,7 +233,7 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                       GestureDetector(
                         onTap: () {
                           if (_searchController.text.trim().isNotEmpty) {
-                            // Perform search later
+                            _handleScannerSubmit(_searchController.text.trim().toUpperCase());
                           }
                         },
                         child: Container(
@@ -176,18 +277,29 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                   children: [
                     // CARD HEADER (Date Picker on right)
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisAlignment: (!_logic.isLoadingFlights && _logic.flights.isNotEmpty) ? MainAxisAlignment.spaceBetween : MainAxisAlignment.end,
                       children: [
+                        if (!_logic.isLoadingFlights && _logic.flights.isNotEmpty)
+                          Text(
+                            appLanguage.value == 'es'
+                                ? 'Vuelos en esta fecha'
+                                : 'Flights on this date',
+                            style: TextStyle(
+                              color: textS,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         // DATE PICKER
                         ElevatedButton.icon(
                           onPressed: () => _pickDate(context),
                           icon: const Icon(Icons.calendar_today_rounded, size: 16),
                           label: Text(
-                            _selectedDate == null
+                            _logic.selectedDate == null
                                 ? (appLanguage.value == 'es'
                                       ? 'Seleccionar Fecha'
                                       : 'Select Date')
-                                : DateFormat('MM/dd/yyyy').format(_selectedDate!),
+                                : DateFormat('MM/dd/yyyy').format(_logic.selectedDate!),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF6366f1),
@@ -205,21 +317,102 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                     ),
                     const SizedBox(height: 32),
                     
-                    // PLACEHOLDER FOR CONTENT
-                    Expanded(
-                      child: Center(
+                    // CONTENT
+                    if (_logic.isLoadingFlights)
+                      const Center(
+                        child: CircularProgressIndicator(color: Color(0xFF6366f1)),
+                      )
+                    else if (_logic.selectedDate != null && _logic.flights.isEmpty)
+                      Center(
                         child: Text(
-                          _selectedDate == null
-                              ? (appLanguage.value == 'es'
-                                    ? 'Selecciona una fecha.'
-                                    : 'Pick a date to load flights.')
-                              : (appLanguage.value == 'es'
-                                    ? 'No se encontraron vuelos para esta fecha.'
-                                    : 'No flights found for this date.'),
+                          appLanguage.value == 'es'
+                              ? 'No se encontraron vuelos para esta fecha.'
+                              : 'No flights found for this date.',
                           style: TextStyle(color: textS),
                         ),
+                      )
+                    else if (_logic.selectedDate == null)
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            appLanguage.value == 'es'
+                                  ? 'Selecciona una fecha.'
+                                  : 'Pick a date to load flights.',
+                            style: TextStyle(color: textS),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              children: _logic.flights.map((f) {
+                                final chipId = f['id_flight']?.toString() ?? '';
+                                final isSel = _logic.selectedFlightId == chipId && chipId.isNotEmpty;
+                                final isReady = f['is_ready'] == true;
+
+                                Color textColor = isSel
+                                    ? Colors.white
+                                    : (isReady ? const Color(0xFF10b981) : textP);
+                                Color selColor = isReady
+                                    ? const Color(0xFF10b981)
+                                    : const Color(0xFF6366f1);
+                                Color unselBgColor = isReady
+                                    ? const Color(0xFF10b981).withAlpha(15)
+                                    : (dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff));
+                                Color borderColor = isSel
+                                    ? Colors.transparent
+                                    : (isReady
+                                        ? const Color(0xFF10b981).withAlpha(50)
+                                        : borderCard);
+
+                                return ChoiceChip(
+                                  label: Text(
+                                    '${f['carrier'] ?? ''} ${f['number'] ?? ''}',
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                  selected: isSel,
+                                  selectedColor: selColor,
+                                  backgroundColor: unselBgColor,
+                                  showCheckmark: false,
+                                  side: BorderSide(color: borderColor),
+                                  onSelected: (v) {
+                                    if (chipId.isNotEmpty) {
+                                      _logic.selectFlight(chipId);
+                                      Future.delayed(const Duration(milliseconds: 50), () {
+                                        _searchFocus.requestFocus();
+                                      });
+                                    }
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            if (_logic.selectedFlightId != null) ...[
+                              const SizedBox(height: 16),
+                              LocationV2Ulds(
+                                logic: _logic,
+                                dark: dark,
+                                textP: textP,
+                                textS: textS,
+                                bgCard: dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff),
+                                borderC: borderCard,
+                                onUldCompleted: () {
+                                  if (mounted) {
+                                    _searchFocus.requestFocus();
+                                  }
+                                },
+                              ),
+                            ]
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
