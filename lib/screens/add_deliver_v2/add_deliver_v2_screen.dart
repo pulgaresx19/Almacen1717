@@ -55,8 +55,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
 
   bool _isLoadingAwbs = true;
   StreamSubscription<List<Map<String, dynamic>>>? _awbSub;
-  StreamSubscription<List<Map<String, dynamic>>>? _deliversSub;
-  List<Map<String, dynamic>> _allDelivers = [];
+  final Map<String, bool> _overLimitErrors = {};
 
   bool _showUldTab = false;
   List<Map<String, dynamic>> _allUlds = [];
@@ -83,16 +82,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
       }
     });
 
-    _deliversSub = Supabase.instance.client
-        .from('deliveries')
-        .select()
-        .asStream().listen((data) {
-      if (mounted) {
-        setState(() {
-          _allDelivers = List<Map<String, dynamic>>.from(data);
-        });
-      }
-    });
+
 
     _uldSub = Supabase.instance.client
         .from('ulds')
@@ -108,33 +98,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     });
   }
 
-  int getInProcessPieces(String awbNum) {
-    int count = 0;
-    for (var del in _allDelivers) {
-      final status = del['status']?.toString() ?? '';
-      if (status == 'Delivered' || status == 'Canceled') continue;
-      
-      final listPickup = del['list_deliver'];
-      if (listPickup != null) {
-        if (listPickup is List) {
-          for (var item in listPickup) {
-            if (item is Map && (item['awb'] == awbNum || item['AWB-number'] == awbNum)) {
-              count += int.tryParse(item['found']?.toString() ?? item['pieces']?.toString() ?? '0') ?? 0;
-            }
-          }
-        } else {
-          final str = listPickup.toString();
-          if (str.isNotEmpty) {
-             final parts = str.split(' - ');
-             if (parts.isNotEmpty && parts[0].trim() == awbNum) {
-               count += int.tryParse(parts.length > 1 ? parts[1].trim().replaceAll(RegExp(r'[^0-9]'), '') : '0') ?? 0;
-             }
-          }
-        }
-      }
-    }
-    return count;
-  }
+
 
   bool get hasDataSync {
     return _truckCompanyCtrl.text.isNotEmpty || 
@@ -212,7 +176,6 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
   @override
   void dispose() {
     _awbSub?.cancel();
-    _deliversSub?.cancel();
     _uldSub?.cancel();
     for (var c in _deliveryPcsControllers.values) {
       c.dispose();

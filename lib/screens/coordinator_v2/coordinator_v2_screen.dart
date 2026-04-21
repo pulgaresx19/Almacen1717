@@ -57,18 +57,6 @@ class _CoordinatorV2ScreenState extends State<CoordinatorV2Screen> {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          appLanguage.value == 'es'
-                              ? 'Módulo para chequear AWBs de vuelos.'
-                              : 'Module to check flight AWBs.',
-                          style: TextStyle(
-                            color: dark
-                                ? const Color(0xFF94a3b8)
-                                : const Color(0xFF4B5563),
-                            fontSize: 13,
-                          ),
-                        ),
                       ],
                     ),
                     const Spacer(),
@@ -170,7 +158,7 @@ class _CoordinatorV2ScreenState extends State<CoordinatorV2Screen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 16),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(

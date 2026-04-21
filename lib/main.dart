@@ -18,6 +18,7 @@ import 'screens/system_v2/system_v2_screen.dart';
 import 'screens/coordinator_v2/coordinator_v2_screen.dart';
 import 'screens/awbs_v2/awbs_v2_screen.dart';
 import 'screens/delivers_v2/delivers_v2_screen.dart';
+import 'screens/location_v2/location_v2_screen.dart';
 
 // import 'screens/add_uld_v2/add_uld_v2_screen.dart';
 
@@ -840,6 +841,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Location',
                                   8,
                                 ),
+                              if (can('location'))
+                                _buildNavItem(
+                                  Icons.location_on_outlined,
+                                  'Location V2',
+                                  18,
+                                ),
                               if (can('driver'))
                                 _buildNavItem(
                                   Icons.local_shipping_rounded,
@@ -1169,6 +1176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const CoordinatorV2Screen(),
         AwbsV2Screen(isActive: _selectedIndex == 16),
         DeliversV2Screen(isActive: _selectedIndex == 17),
+        LocationV2Screen(isActive: _selectedIndex == 18),
       ],
     );
   }

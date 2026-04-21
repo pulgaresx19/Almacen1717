@@ -213,9 +213,9 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
           children: [
             Icon(Icons.flight_takeoff_rounded, size: 64, color: dark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(20)),
             const SizedBox(height: 16),
-            Text(appLanguage.value == 'es' ? 'Listado en construcción...' : 'List under construction...', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(appLanguage.value == 'es' ? 'Aún no hay vuelos registrados' : 'No flights registered yet', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(appLanguage.value == 'es' ? 'Este diseño listará los vuelos pronto.' : 'This layout will list flights soon.', style: TextStyle(color: textS)),
+            Text(appLanguage.value == 'es' ? 'Agrega un nuevo vuelo o espera a que se registren desde el formulario.' : 'Add a new flight or wait for them to be registered from the form.', style: TextStyle(color: textS, fontSize: 13), textAlign: TextAlign.center),
           ],
         )
       );
@@ -369,8 +369,18 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
             rows: List.generate(groupedList.length, (index) {
               final item = groupedList[index];
               if (item is String) {
+                final isCollapsed = _collapsedDates.contains(item);
                 return DataRow(
                   color: WidgetStateProperty.all(dark ? const Color(0xFF334155).withAlpha(150) : const Color(0xFFE5E7EB)),
+                  onSelectChanged: (_) {
+                    setState(() {
+                      if (isCollapsed) {
+                        _collapsedDates.remove(item);
+                      } else {
+                        _collapsedDates.add(item);
+                      }
+                    });
+                  },
                   cells: List.generate(12, (cellIdx) {
                     if (cellIdx == 0) {
                       final count = dateCounts[item] ?? 0;
@@ -401,30 +411,6 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                             const SizedBox(width: 8),
                             Text(item, style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
                           ]
-                        )
-                      );
-                    } else if (cellIdx == 11) {
-                      final isCollapsed = _collapsedDates.contains(item);
-                      return DataCell(
-                        Align(
-                          alignment: Alignment.center,
-                          child: IconButton(
-                            icon: Icon(
-                              isCollapsed ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
-                              size: 18, 
-                              color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                if (isCollapsed) {
-                                  _collapsedDates.remove(item);
-                                } else {
-                                  _collapsedDates.add(item);
-                                }
-                              });
-                            },
-                            tooltip: isCollapsed ? (appLanguage.value == 'es' ? 'Mostrar vuelos' : 'Show flights') : (appLanguage.value == 'es' ? 'Ocultar vuelos' : 'Hide flights'),
-                          ),
                         )
                       );
                     }

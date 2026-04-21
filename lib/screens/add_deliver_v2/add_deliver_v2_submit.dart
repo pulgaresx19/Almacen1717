@@ -140,15 +140,26 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       }
       final List<Map<String, dynamic>> combinedToValidate = [..._selectedAwbs, ..._selectedUlds];
       for (var item in combinedToValidate) {
-        final awbNum = item['AWB-number']?.toString() ?? item['uld_number']?.toString() ?? item['ULD-number']?.toString() ?? '';
+        final awbNum = item['awb_number']?.toString() ?? item['AWB-number']?.toString() ?? item['uld_number']?.toString() ?? item['ULD-number']?.toString() ?? '';
         final pcsStr = _deliveryPcsControllers[awbNum]?.text.trim() ?? '';
         final pcs = int.tryParse(pcsStr) ?? 0;
+        
         if (pcs <= 0) {
           _showMissingFieldAlert(
             'Pieces for $awbNum', 
             customMessage: appLanguage.value == 'es'
                 ? 'Las piezas a entregar para la guía o ULD $awbNum tienen un valor numérico no válido ($pcsStr).\nPor favor, introduzca un número mayor a 0 para guardar.'
                 : 'The pieces for item $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.'
+          );
+          return;
+        }
+
+        if (_overLimitErrors[awbNum] == true) {
+          _showMissingFieldAlert(
+            'Pieces Exceeded for $awbNum', 
+            customMessage: appLanguage.value == 'es'
+                ? 'La cantidad de piezas a entregar para $awbNum supera la cantidad de piezas disponibles.\nPor favor, reduzca el número de piezas.'
+                : 'The amount of pieces to deliver for $awbNum exceeds the available pieces.\nPlease reduce the number of pieces.'
           );
           return;
         }

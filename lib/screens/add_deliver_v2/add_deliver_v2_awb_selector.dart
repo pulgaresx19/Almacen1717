@@ -82,12 +82,9 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                     columns: [
                       const DataColumn(label: Text('#')),
                       const DataColumn(label: Text('AWB Number')),
-                      const DataColumn(label: Text('Expected')),
-                      const DataColumn(label: Text('Received')),
-                      const DataColumn(label: Text('Delivered')),
-                      const DataColumn(label: Text('Remaining')),
-                      const DataColumn(label: Text('Total')),
-                      const DataColumn(label: Text('Weight')),
+                      const DataColumn(label: Text('Remaining Pcs')),
+                      const DataColumn(label: Text('Total Pieces')),
+                      const DataColumn(label: Text('Total Weight')),
                       const DataColumn(label: Text('Status')),
                       const DataColumn(label: Text('')),
                     ],
@@ -160,23 +157,22 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                         }
                       }
 
-                      int remainingPieces = 0;
-                      if (awb['pieces_remaining'] != null) {
-                        remainingPieces = int.tryParse(awb['pieces_remaining'].toString()) ?? 0;
-                      } else {
-                        remainingPieces = expectedPieces - deliveredPieces;
-                        if (remainingPieces < 0) remainingPieces = 0;
-                      }
+                      int inProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
+                      int remainingPieces = receivedPieces - deliveredPieces - inProcess;
+                      if (remainingPieces < 0) remainingPieces = 0;
                       
                       final int totalValInt = int.tryParse(awb['total_pieces']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
                       
-                      String status = 'Waiting';
-                      if (deliveredPieces >= totalValInt && totalValInt > 0) {
-                         status = 'Delivered';
-                      } else if (deliveredPieces > 0) {
-                         status = 'In Process';
-                      } else if (receivedPieces > 0) {
-                         status = 'Received';
+                      String status = awb['status']?.toString() ?? '';
+                      if (status.isEmpty) {
+                        status = 'Waiting';
+                        if (deliveredPieces >= totalValInt && totalValInt > 0) {
+                           status = 'Delivered';
+                        } else if (deliveredPieces > 0) {
+                           status = 'In Process';
+                        } else if (receivedPieces > 0) {
+                           status = 'Received';
+                        }
                       }
 
                       return DataRow(
@@ -197,27 +193,12 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                         cells: [
                           DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600))),
                           DataCell(Text(awbNumber, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
-                          DataCell(Text('$expectedPieces pcs')),
-                          DataCell(Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.amber.withAlpha(30), borderRadius: BorderRadius.circular(4)),
-                            child: Text('$receivedPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.amber)),
-                          )),
-                          DataCell(Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4)),
-                            child: Text('$deliveredPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981))),
-                          )),
                           DataCell(Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4)),
                             child: Text('$remainingPieces pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1))),
                           )),
-                          DataCell(Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.blue.withAlpha(30), borderRadius: BorderRadius.circular(4)),
-                            child: Text('$totalValInt pcs', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue)),
-                          )),
+                          DataCell(Text('${totalValInt > 0 ? totalValInt : expectedPieces} pcs')),
                           DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\.$|\.0$'), '')} kg')),
                           DataCell(_buildStatusBadge(status)),
                           DataCell(
@@ -225,7 +206,7 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                               alignment: Alignment.centerRight,
                               child: IconButton(
                                 icon: Icon(Icons.info_outline_rounded, color: dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af), size: 16),
-                                onPressed: () => _showAwbDrawer(context, awb, dark, receivedPieces, expectedPieces, status),
+                                onPressed: () => _showAwbDrawer(context, awb, dark, receivedPieces, expectedPieces, deliveredPieces, inProcess, remainingPieces, totalValInt, status),
                                 tooltip: 'Ver Info',
                               ),
                             ),

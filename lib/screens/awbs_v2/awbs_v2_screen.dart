@@ -340,8 +340,17 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           int totalPieces = int.tryParse(u['total_pieces']?.toString() ?? '0') ?? 0;
                           double totalWeight = double.tryParse(u['total_weight']?.toString() ?? '0') ?? 0.0;
 
-                          String status = 'Waiting';
-
+                          String status = u['status']?.toString() ?? '';
+                          if (status.isEmpty) {
+                            status = 'Waiting';
+                            if (deliveredPieces >= expectedPieces && expectedPieces > 0) {
+                               status = 'Delivered';
+                            } else if (deliveredPieces > 0) {
+                               status = 'In Process';
+                            } else if (receivedPieces > 0) {
+                               status = 'Received';
+                            }
+                          }
                           return DataRow(
                             onSelectChanged: (_) => AwbsV2Drawer.show(context, u, dark, 0, expectedPieces, status),
                             cells: [

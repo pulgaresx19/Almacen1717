@@ -402,18 +402,6 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                                       ]
                                     )
                                   );
-                                } else if (cellIdx == 9) {
-                                  final isExpanded = _expandedFlights.contains(item);
-                                  return DataCell(
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Icon(
-                                        isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded, 
-                                        size: 20, 
-                                        color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)
-                                      ),
-                                    )
-                                  );
                                 }
                                 return DataCell(const SizedBox.shrink());
                               }),

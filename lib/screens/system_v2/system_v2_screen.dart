@@ -137,21 +137,11 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'System V2',
+                          'System',
                           style: TextStyle(
                             color: dark ? Colors.white : const Color(0xFF111827),
                             fontSize: 32,
                             fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          appLanguage.value == 'es'
-                              ? 'Módulo dedicado a la recepción de ULDs.'
-                              : 'Module dedicated to receiving ULDs.',
-                          style: TextStyle(
-                            color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563),
-                            fontSize: 13,
                           ),
                         ),
                       ],
@@ -238,7 +228,7 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 16), // Reduced margin to increase table space
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(

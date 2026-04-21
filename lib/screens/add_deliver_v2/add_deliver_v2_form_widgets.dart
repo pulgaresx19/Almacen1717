@@ -288,15 +288,33 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                 
                 int remainingPieces = 0;
                 if (isAwb) {
-                   int expectedPieces = 0;
-                   if (data['total_espected'] != null) {
-                      expectedPieces = int.tryParse(data['total_espected'].toString()) ?? 0;
-                   } else if (data['data-AWB'] is List) {
-                     for (var a in data['data-AWB']) {
-                        expectedPieces += int.tryParse(a['pieces']?.toString() ?? '0') ?? 0;
-                     }
-                   } else if (data['data-AWB'] is Map) {
-                        expectedPieces += int.tryParse(data['data-AWB']['pieces']?.toString() ?? '0') ?? 0;
+                   int receivedPieces = 0;
+                   if (data['pieces_received'] != null) {
+                      receivedPieces = int.tryParse(data['pieces_received'].toString()) ?? 0;
+                   } else if (data['data-coordinator'] != null) {
+                      List dcList = [];
+                      if (data['data-coordinator'] is List) {
+                        dcList = data['data-coordinator'] as List;
+                      } else if (data['data-coordinator'] is Map && (data['data-coordinator'] as Map).isNotEmpty) {
+                        dcList = [data['data-coordinator']];
+                      }
+                      for (var item in dcList) {
+                         if (item is Map) {
+                            if (item.containsKey('breakdown') && item['breakdown'] is Map) {
+                               Map breakdown = item['breakdown'];
+                               if (breakdown['AGI Skid'] is List) {
+                                  for (var val in breakdown['AGI Skid']) {
+                                     receivedPieces += int.tryParse(val.toString()) ?? 0;
+                                  }
+                               }
+                               for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
+                                  receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
+                               }
+                            } else {
+                               receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+                            }
+                         }
+                      }
                    }
 
                    int deliveredPieces = 0;
@@ -314,13 +332,9 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                       }
                    }
 
-                   if (data['pieces_remaining'] != null) {
-                      remainingPieces = int.tryParse(data['pieces_remaining'].toString()) ?? 0;
-                   } else {
-                      int inProcessPieces = getInProcessPieces(itemNumber);
-                      remainingPieces = expectedPieces - deliveredPieces - inProcessPieces;
-                      if (remainingPieces < 0) remainingPieces = 0;
-                   }
+                   int inProcessPieces = int.tryParse(data['pieces_in_process']?.toString() ?? '0') ?? 0;
+                   remainingPieces = receivedPieces - deliveredPieces - inProcessPieces;
+                   if (remainingPieces < 0) remainingPieces = 0;
                 } else {
                    if (data['pieces_total'] != null) {
                       remainingPieces = int.tryParse(data['pieces_total'].toString()) ?? 0;
@@ -363,55 +377,77 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                         flex: 5,
                         child: Text(itemNumber, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
-                      Container(
-                        height: 28,
-                        width: 80,
-                        decoration: BoxDecoration(
-                          color: dark ? Colors.black26 : Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: dark ? Colors.white.withAlpha(30) : const Color(0xFFD1D5DB)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              alignment: Alignment.center,
-                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                              decoration: BoxDecoration(
-                                color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
-                                borderRadius: const BorderRadius.horizontal(left: Radius.circular(5)),
-                                border: Border(right: BorderSide(color: dark ? Colors.white.withAlpha(30) : const Color(0xFFD1D5DB))),
-                              ),
-                              child: Tooltip(
-                                message: appLanguage.value == 'es' ? 'Piezas a entregar' : 'Pieces to deliver',
-                                child: Icon(Icons.local_shipping_rounded, size: 14, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280))
-                              ),
-                            ),
-                            Expanded(
-                              child: TextField(
-                                controller: pcsCtrl,
-                                readOnly: !isAwb,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  TextInputFormatter.withFunction((oldValue, newValue) {
-                                    if (newValue.text.isEmpty) return newValue;
-                                    final val = int.tryParse(newValue.text) ?? 0;
-                                    if (isAwb && val > remainingPieces) return oldValue;
-                                    return newValue;
-                                  }),
-                                ],
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12, fontWeight: FontWeight.bold),
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                  border: InputBorder.none,
+                      () {
+                          bool isOverLimit = _overLimitErrors[itemNumber] == true;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 85,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: dark ? Colors.black26 : Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isOverLimit 
+                                        ? Colors.redAccent 
+                                        : (dark ? Colors.white.withAlpha(30) : const Color(0xFFD1D5DB)),
+                                    width: isOverLimit ? 1.5 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                                      decoration: BoxDecoration(
+                                        color: isOverLimit ? Colors.redAccent.withAlpha(20) : (dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)),
+                                        borderRadius: const BorderRadius.horizontal(left: Radius.circular(5)),
+                                        border: Border(right: BorderSide(color: isOverLimit ? Colors.redAccent.withAlpha(50) : (dark ? Colors.white.withAlpha(30) : const Color(0xFFD1D5DB)))),
+                                      ),
+                                      child: Tooltip(
+                                        message: appLanguage.value == 'es' ? 'Piezas a entregar' : 'Pieces to deliver',
+                                        child: Icon(Icons.local_shipping_rounded, size: 14, color: isOverLimit ? Colors.redAccent : (dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)))
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: pcsCtrl,
+                                        readOnly: !isAwb,
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                        ],
+                                        onChanged: (val) {
+                                          final parsed = int.tryParse(val) ?? 0;
+                                          setState(() {
+                                            if (isAwb && parsed > remainingPieces) {
+                                              _overLimitErrors[itemNumber] = true;
+                                            } else {
+                                              _overLimitErrors[itemNumber] = false;
+                                            }
+                                          });
+                                        },
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(color: isOverLimit ? Colors.redAccent : (dark ? Colors.white : const Color(0xFF111827)), fontSize: 12, fontWeight: FontWeight.bold),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                          border: InputBorder.none,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
+                              if (isOverLimit)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4.0),
+                                  child: Text('Max: $remainingPieces', style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          );
+                        }(),
                       Expanded(
                         flex: 9,
                         child: Padding(
@@ -470,8 +506,10 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
     Color fg = const Color(0xFFcbd5e1);
     
     final s = status.toLowerCase();
-    if (s.contains('pending') || s.contains('pendiente') || s.contains('waiting')) {
+    if (s.contains('waiting')) {
       bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
+    } else if (s.contains('pending') || s.contains('pendiente')) {
+      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
     } else if (s.contains('in progress') || s.contains('proceso') || s.contains('process') || s.contains('received')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
     } else if (s.contains('ready') || s.contains('listo') || s.contains('completed')) {
