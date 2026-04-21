@@ -333,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               if (can('flights'))
                                 _buildNavItem(
-                                  Icons.flight_outlined,
+                                  Icons.flight_land_rounded,
                                   'Flights',
                                   12,
                                 ),

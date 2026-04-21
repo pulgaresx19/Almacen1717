@@ -4,7 +4,7 @@ import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier
 import '../add_deliver_v2/add_deliver_v2_screen.dart';
 import 'delivers_v2_logic.dart';
 import 'delivers_v2_table.dart';
-import '../_deliver_pdf_exporter.dart';
+import 'deliver_pdf_exporter.dart';
 
 class DeliversV2Screen extends StatefulWidget {
   final bool isActive;

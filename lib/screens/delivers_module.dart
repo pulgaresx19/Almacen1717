@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import 'add_deliver_screen.dart';
 import '_deliver_print_preview.dart';
-import '_deliver_pdf_exporter.dart';
+import 'delivers_v2/deliver_pdf_exporter.dart';
 
 class DeliversModule extends StatefulWidget {
   final bool isActive;
