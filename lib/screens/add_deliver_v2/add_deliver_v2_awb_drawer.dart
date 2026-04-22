@@ -97,7 +97,7 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                       }
                       final String flightNum = '$carrier $fNumber'.trim() + shortDate;
                       final bool isBreak = uldData['is_break'] == true;
-                      final String remarks = s['remarks']?.toString() ?? '';
+
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -188,167 +188,210 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                                          ])),
                                       ]
                                     ),
-                                    
-                                    if (remarks.isNotEmpty) ...[
-                                       const SizedBox(height: 12),
-                                       Container(
-                                         width: double.infinity,
-                                         padding: const EdgeInsets.all(10),
-                                         decoration: BoxDecoration(color: const Color(0xFFf59e0b).withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFf59e0b).withAlpha(50))),
-                                         child: Text('Remarks: $remarks', style: const TextStyle(color: Color(0xFFd97706), fontSize: 12, fontStyle: FontStyle.italic)),
-                                       )
-                                    ],
+                                                                        if (uldDcData.isNotEmpty || (locList.isNotEmpty && idx == splits.length - 1)) ...[
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Container(
+                                              padding: const EdgeInsets.all(8),
+                                              decoration: BoxDecoration(
+                                                color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: borderC),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.assignment_turned_in_outlined, size: 14, color: textP),
+                                                      const SizedBox(width: 6),
+                                                      Text('Coordinator Audit', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  if (uldDcData.isEmpty)
+                                                    Text('No data', style: TextStyle(color: textS, fontSize: 12))
+                                                  else
+                                                    ...uldDcData.map((dc) {
+                                                      Map bd = {};
+                                                      if (dc['breakdown'] is Map) {
+                                                        bd = dc['breakdown'] as Map;
+                                                      } else {
+                                                        bd = Map.from(dc);
+                                                      }
+                                                      
+                                                      bd.remove('remark');
+                                                      bd.remove('remarks');
+                                                      bd.remove('Remarks');
+                                                      bd.remove('discrepancy_check');
+                                                      bd.remove('discrepancy check');
+                                                      bd.remove('discrepancy_checked');
+                                                      bd.remove('discrepancy checked');
+                                                      bd.remove('discrepancy_expected');
+                                                      bd.remove('discrepancy expected');
+                                                      
+                                                      final discAmount = bd.remove('discrepancy_amount') ?? bd.remove('discrepancy amount');
+                                                      final discType = bd.remove('discrepancy_type') ?? bd.remove('discrepancy type');
+                                                      String discrepancyStr = '';
+                                                      if (discAmount != null && discAmount.toString().isNotEmpty && discAmount.toString() != '0') {
+                                                        discrepancyStr = '${discAmount.toString()} ${discType?.toString() ?? ''}'.trim().toUpperCase();
+                                                      }
+                                                      
+                                                      final locReq1 = bd.remove('location_required');
+                                                      final locReq2 = bd.remove('required_location');
+                                                      final locReq3 = bd.remove('location required');
+                                                      final locReq4 = bd.remove('Location requerida');
+                                                      final locReq5 = bd.remove('location requerida');
+                                                      String locReqStr = (locReq1 ?? locReq2 ?? locReq3 ?? locReq4 ?? locReq5 ?? '').toString();
+                                                      if (locReqStr.toLowerCase() == 'null') locReqStr = '';
+                                                      
+                                                      bd.removeWhere((k, v) => const ['processed_by', 'processed_at', 'user', 'time', 'refULD', 'manual_entry'].contains(k));
+                                                      
+                                                      List<Widget> chips = [];
+                                                      bd.forEach((key, value) {
+                                                        if (value is List && value.isEmpty) return;
+                                                        if (value == null || value.toString().isEmpty || value.toString() == '0') return;
+                                                        chips.add(Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                          decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                                                          child: Text('$key: ${value is List ? value.join(', ') : value}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                        ));
+                                                      });
 
-                                    // --- COORDINATOR AUDIT ---
-                                    if (uldDcData.isNotEmpty) ...[
-                                       const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
-                                       Row(children: [
-                                          Icon(Icons.assignment_turned_in_outlined, size: 16, color: textP),
-                                          const SizedBox(width: 8),
-                                          Text('Coordinator Audit', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
-                                       ]),
-                                       const SizedBox(height: 12),
-                                       ...uldDcData.map((dc) {
-                                          Map bd = {};
-                                          if (dc['breakdown'] is Map) {
-                                            bd = dc['breakdown'] as Map;
-                                          } else {
-                                            bd = Map.from(dc);
-                                            bd.removeWhere((k, v) => const ['processed_by', 'processed_at', 'user', 'time', 'refULD', 'manual_entry'].contains(k));
-                                          }
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 8),
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8)),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                   children: [
-                                                      Icon(Icons.person_outline, size: 14, color: textS),
-                                                      const SizedBox(width: 6),
-                                                      Text(dc['processed_by']?.toString() ?? dc['user']?.toString() ?? 'Unknown', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13)),
-                                                      const Spacer(),
-                                                      Icon(Icons.access_time, size: 14, color: textS),
-                                                      const SizedBox(width: 6),
-                                                      Text(formatChicagoTime(dc['processed_at']?.toString() ?? dc['time']?.toString()), style: TextStyle(color: textS, fontSize: 12)),
-                                                   ]
-                                                ),
-                                                if (bd.isNotEmpty) ...[
-                                                   const SizedBox(height: 10),
-                                                   Wrap(
-                                                     spacing: 6,
-                                                     runSpacing: 6,
-                                                     children: bd.entries.map((entry) {
-                                                       if (entry.value is List && (entry.value as List).isEmpty) return const SizedBox.shrink();
-                                                       if (entry.value is num && entry.value == 0) return const SizedBox.shrink();
-                                                       if (entry.value.toString() == '0') return const SizedBox.shrink();
-                                                       return Container(
-                                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                         decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
-                                                         child: Text('${entry.key}: ${entry.value is List ? entry.value.join(', ') : entry.value}', style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
-                                                       );
-                                                     }).toList(),
-                                                   ),
-                                                ],
-                                                if (dc['manual_entry'] != null) ...[
-                                                   const SizedBox(height: 10),
-                                                   Wrap(
-                                                     spacing: 6,
-                                                     runSpacing: 6,
-                                                     crossAxisAlignment: WrapCrossAlignment.center,
-                                                     children: [
-                                                       Text('Manual Entry:', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
-                                                       ...(dc['manual_entry'] is List ? dc['manual_entry'] as List : [dc['manual_entry']]).map((entry) {
-                                                         return Container(
-                                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                           decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF6366f1).withAlpha(50))),
-                                                           child: Text(entry.toString(), style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.w600)),
-                                                         );
-                                                       }),
-                                                     ],
-                                                   ),
-                                                ]
-                                              ]
-                                            )
-                                          );
-                                       }),
-                                    ],
+                                                      Widget? discWidget;
+                                                      if (discrepancyStr.isNotEmpty) {
+                                                        discWidget = Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                          decoration: BoxDecoration(color: Colors.redAccent.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.redAccent),
+                                                              const SizedBox(width: 4),
+                                                              Flexible(child: Text(discrepancyStr, style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+                                                      
+                                                      Widget? locWidget;
+                                                      if (locReqStr.isNotEmpty && locReqStr.toLowerCase() != 'false' && locReqStr != '0') {
+                                                        locWidget = Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                          decoration: BoxDecoration(color: Colors.blue.withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              const Icon(Icons.location_on, size: 12, color: Colors.blue),
+                                                              const SizedBox(width: 4),
+                                                              Flexible(child: Text(locReqStr, style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }
+                                                      
+                                                      final timeDisp = formatChicagoTime(dc['processed_at']?.toString() ?? dc['time']?.toString());
+                                                      final byDisp = dc['processed_by']?.toString() ?? dc['user']?.toString() ?? 'Unknown';
 
-                                    // --- LOCATION AUDIT ---
-                                    if (locList.isNotEmpty && idx == splits.length - 1) ...[
-                                       const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1)),
-                                       Row(children: [
-                                          Icon(Icons.location_on_outlined, size: 16, color: textP),
-                                          const SizedBox(width: 8),
-                                          Text('Location Audit', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
-                                       ]),
-                                       const SizedBox(height: 12),
-                                       ...locList.map((loc) {
-                                          Map itemLocs = {};
-                                          if (loc['locations'] is Map) {
-                                            itemLocs = loc['locations'] as Map;
-                                          } else if (loc['itemLocations'] is Map) {
-                                            itemLocs = loc['itemLocations'] as Map;
-                                          } else {
-                                            itemLocs = Map.from(loc);
-                                            itemLocs.removeWhere((k, v) => const ['processed_by', 'processed_at', 'user', 'time', 'refULD', 'manual_entry'].contains(k));
-                                          }
-                                          return Container(
-                                            margin: const EdgeInsets.only(bottom: 8),
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(8)),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                   children: [
-                                                      Icon(Icons.person_outline, size: 14, color: textS),
-                                                      const SizedBox(width: 6),
-                                                      Text(loc['processed_by']?.toString() ?? loc['user']?.toString() ?? 'Unknown', style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 13)),
-                                                      const Spacer(),
-                                                      Icon(Icons.access_time, size: 14, color: textS),
-                                                      const SizedBox(width: 6),
-                                                      Text(formatChicagoTime(loc['processed_at']?.toString() ?? loc['time']?.toString()), style: TextStyle(color: textS, fontSize: 12)),
-                                                   ]
-                                                ),
-                                                if (itemLocs.isNotEmpty) ...[
-                                                   const SizedBox(height: 10),
-                                                   Wrap(
-                                                     spacing: 6,
-                                                     runSpacing: 6,
-                                                     children: itemLocs.entries.map((entry) {
-                                                       if (entry.value == null || entry.value.toString().isEmpty) return const SizedBox.shrink();
-                                                       return Container(
-                                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                         decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF10b981).withAlpha(50))),
-                                                         child: Text('${entry.key} ➔ ${entry.value}', style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
-                                                       );
-                                                     }).toList(),
-                                                   ),
+                                                      return Padding(
+                                                        padding: const EdgeInsets.only(bottom: 8),
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text('By: $byDisp [$timeDisp]', style: TextStyle(color: textP, fontSize: 11, fontWeight: FontWeight.w600)),
+                                                            const SizedBox(height: 4),
+                                                            if (chips.isNotEmpty)
+                                                              Wrap(spacing: 4, runSpacing: 4, children: chips)
+                                                            else if (discWidget == null && locWidget == null)
+                                                              Text('No details', style: TextStyle(color: textS, fontSize: 10)),
+                                                            if (discWidget != null || locWidget != null) ...[
+                                                              if (chips.isNotEmpty)
+                                                                Padding(
+                                                                  padding: const EdgeInsets.symmetric(vertical: 6),
+                                                                  child: Divider(height: 1, color: borderC),
+                                                                ),
+                                                              Row(
+                                                                children: [
+                                                                  if (locWidget != null) Expanded(child: locWidget),
+                                                                  if (discWidget != null && locWidget != null) ...[
+                                                                    const SizedBox(width: 8),
+                                                                    Container(width: 1, height: 20, color: borderC),
+                                                                    const SizedBox(width: 8),
+                                                                  ],
+                                                                  if (discWidget != null) Expanded(child: discWidget),
+                                                                ],
+                                                              ),
+                                                            ]
+                                                          ],
+                                                        ),
+                                                      );
+                                                    }),
                                                 ],
-                                                if (loc['manual_entry'] != null) ...[
-                                                   const SizedBox(height: 10),
-                                                   Wrap(
-                                                     spacing: 6,
-                                                     runSpacing: 6,
-                                                     crossAxisAlignment: WrapCrossAlignment.center,
-                                                     children: [
-                                                       Text('Manual Entry:', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.bold)),
-                                                       ...(loc['manual_entry'] is List ? loc['manual_entry'] as List : [loc['manual_entry']]).map((entry) {
-                                                         return Container(
-                                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                           decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4), border: Border.all(color: const Color(0xFF10b981).withAlpha(50))),
-                                                           child: Text(entry.toString(), style: const TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.w600)),
-                                                         );
-                                                       }),
-                                                     ],
-                                                   ),
-                                                ]
-                                              ]
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          if (locList.isNotEmpty && idx == splits.length - 1)
+                                            Expanded(
+                                              child: Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(color: borderC),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Icon(Icons.location_on_outlined, size: 14, color: textP),
+                                                        const SizedBox(width: 6),
+                                                        Text('Location Audit', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold)),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    ...locList.map((loc) {
+                                                      Map itemLocs = {};
+                                                      if (loc['locations'] is Map) {
+                                                        itemLocs = loc['locations'] as Map;
+                                                      } else if (loc['itemLocations'] is Map) {
+                                                        itemLocs = loc['itemLocations'] as Map;
+                                                      } else {
+                                                        itemLocs = Map.from(loc);
+                                                        itemLocs.removeWhere((k, v) => const ['processed_by', 'processed_at', 'user', 'time', 'refULD', 'manual_entry'].contains(k));
+                                                      }
+                                                      
+                                                      List<Widget> locChips = [];
+                                                      itemLocs.forEach((key, value) {
+                                                        if (value == null || value.toString().isEmpty || value.toString() == '0') return;
+                                                        locChips.add(Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(4)),
+                                                          child: Text(value.toString(), style: const TextStyle(color: Color(0xFF10b981), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                        ));
+                                                      });
+
+                                                      if (locChips.isEmpty) return const SizedBox.shrink();
+
+                                                      return Padding(
+                                                        padding: const EdgeInsets.only(bottom: 6),
+                                                        child: Wrap(spacing: 4, runSpacing: 4, children: locChips),
+                                                      );
+                                                    }),
+                                                  ],
+                                                ),
+                                              ),
                                             )
-                                          );
-                                       })
+                                          else
+                                            Expanded(child: const SizedBox.shrink()),
+                                        ],
+                                      ),
                                     ],
                                   ],
                                 ),

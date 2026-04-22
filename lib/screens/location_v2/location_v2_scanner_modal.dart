@@ -95,11 +95,25 @@ class LocationV2ScannerModal {
               final supabase = Supabase.instance.client;
               final splitId = split['id'];
 
+              final user = supabase.auth.currentUser;
+              String byName = user?.email ?? 'Unknown';
+              if (user != null) {
+                if (user.userMetadata?['full_name'] != null) {
+                  byName = user.userMetadata!['full_name'].toString();
+                }
+                try {
+                  final profile = await supabase.from('users').select('full-name').eq('id', user.id).maybeSingle();
+                  if (profile != null && profile['full-name'] != null && profile['full-name'].toString().trim().isNotEmpty) {
+                    byName = profile['full-name'].toString().trim();
+                  }
+                } catch (_) {}
+              }
+
               // Append new location to parsedLocations
               parsedLocations.add({
                 'location': locText,
                 'updated_at': DateTime.now().toUtc().toIso8601String(),
-                'updated_by': supabase.auth.currentUser?.id,
+                'updated_by': byName,
               });
 
               Map<String, dynamic> newLocData = {

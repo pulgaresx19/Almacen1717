@@ -157,11 +157,15 @@ void showDriverConfirmDialog({
                               separatorBuilder: (context, index) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final item = awbsList[index];
-                                final awbNumber = item['awb']?.toString() ?? 'N/A';
+                                  
+                                final String rawNumber = item['awb_number']?.toString() ?? item['uld_number']?.toString() ?? item['awb']?.toString() ?? 'N/A';
+                                final String typeLabel = item.containsKey('uld_id') ? 'ULD: ' : 'AWB: ';
+                                final awbNumber = '$typeLabel$rawNumber';
+                                  
                                 final pieces = item['found']?.toString() ?? '0';
                                 final weight = item['weight']?.toString() ?? '0';
                                 final remar = item['remarks']?.toString() ?? '';
-                                
+                                  
                                 return InkWell(
                                   onTap: () {
                                     showDriverAwbDialog(

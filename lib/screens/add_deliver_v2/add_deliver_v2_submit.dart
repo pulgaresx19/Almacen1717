@@ -212,7 +212,7 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
 
       final listPickup = _typeCtrl.text == 'Import' 
           ? _importAwbs.map((e) => {
-              'awb': e['awbNumber']?.toString() ?? '',
+              'awb_number': e['awbNumber']?.toString() ?? '',
               'found': e['pieces']?.toString() ?? '0',
               'weight': e['weight']?.toString() ?? '0',
               'remarks': e['remarks']?.toString() ?? ''
@@ -234,7 +234,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                 }
 
                 return {
-                  'awb': awbNum,
+                  'awb_id': e['id'],
+                  'awb_number': awbNum,
                   'found': pcs,
                   'weight': expectedWeight.toStringAsFixed(2),
                   'remarks': rem
@@ -246,7 +247,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                  final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
                  final rem = _deliveryRemarkControllers[uNum]?.text.trim() ?? '';
                  return {
-                   'awb': uNum,
+                   'uld_id': e['id_uld'],
+                   'uld_number': uNum,
                    'found': pcs,
                    'weight': e['weight_total']?.toString() ?? e['weight']?.toString() ?? '0.00',
                    'remarks': rem
