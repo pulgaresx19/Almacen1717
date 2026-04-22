@@ -22,7 +22,7 @@ import '../coordinator_v2/coordinator_v2_screen.dart';
 import '../awbs_v2/awbs_v2_screen.dart';
 import '../delivers_v2/delivers_v2_screen.dart';
 import '../location_v2/location_v2_screen.dart';
-
+import '../driver_v2/driver_v2_screen.dart';
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -443,6 +443,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Driver',
                                   9,
                                 ),
+                              if (can('driver'))
+                                _buildNavItem(
+                                  Icons.local_shipping_outlined,
+                                  'Driver V2',
+                                  19,
+                                ),
                               if (can('system_bf'))
                                 _buildNavItem(
                                   Icons.computer_rounded,
@@ -838,6 +844,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         AwbsV2Screen(isActive: _selectedIndex == 16),
         DeliversV2Screen(isActive: _selectedIndex == 17),
         LocationV2Screen(isActive: _selectedIndex == 18),
+        DriverV2Screen(isActive: _selectedIndex == 19),
       ],
     );
   }
