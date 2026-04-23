@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../main.dart' show currentUserData;
 import 'driver_v2_awb_split_card.dart';
 
 void showDriverAwbDialog({
@@ -44,6 +45,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
   final Set<String> selectedLocations = {};
   
   late ValueNotifier<int> foundNotifier;
+  late ValueNotifier<Map<String, dynamic>?> rejectNotifier;
   final Set<String> checkedItems = {};
   late Future<List<dynamic>> _dataFuture;
 
@@ -57,6 +59,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
     totalPieces = widget.awbItem['total_pieces']?.toString() ?? widget.awbItem['pieces']?.toString() ?? '0';
     
     foundNotifier = ValueNotifier<int>(0);
+    rejectNotifier = ValueNotifier<Map<String, dynamic>?>(null);
     _dataFuture = _fetchDetails();
   }
 
@@ -93,6 +96,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
   @override
   void dispose() {
     foundNotifier.dispose();
+    rejectNotifier.dispose();
     super.dispose();
   }
 
@@ -103,6 +107,216 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
         const SizedBox(height: 4),
         Text(value, style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  void _showEditFoundDialog(BuildContext context, int currentVal) {
+    final TextEditingController ctrl = TextEditingController(text: currentVal.toString());
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+          title: Text('Edit Found Pieces', style: TextStyle(color: widget.dark ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            style: TextStyle(color: widget.dark ? Colors.white : Colors.black),
+            decoration: InputDecoration(
+              hintText: 'Pieces',
+              hintStyle: TextStyle(color: widget.dark ? Colors.white54 : Colors.black54),
+              filled: true,
+              fillColor: widget.dark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final val = int.tryParse(ctrl.text);
+                if (val != null) {
+                  foundNotifier.value = val;
+                }
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3b82f6),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  void _showRejectDialog(BuildContext context) {
+    final Map<String, dynamic>? currentRej = rejectNotifier.value;
+    final TextEditingController qtyCtrl = TextEditingController(text: currentRej?['qty']?.toString() ?? '');
+    final TextEditingController reasonCtrl = TextEditingController(text: currentRej?['reason']?.toString() ?? '');
+    
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+          title: Text('Reject Pieces', style: TextStyle(color: widget.dark ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: qtyCtrl,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: widget.dark ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Rejected Quantity',
+                  labelStyle: TextStyle(color: widget.dark ? Colors.white54 : Colors.black54),
+                  filled: true,
+                  fillColor: widget.dark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonCtrl,
+                style: TextStyle(color: widget.dark ? Colors.white : Colors.black),
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Reason',
+                  labelStyle: TextStyle(color: widget.dark ? Colors.white54 : Colors.black54),
+                  filled: true,
+                  fillColor: widget.dark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            if (currentRej != null)
+              TextButton(
+                onPressed: () {
+                  rejectNotifier.value = null;
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Clear', style: TextStyle(color: Colors.redAccent)),
+              ),
+            ElevatedButton(
+              onPressed: () {
+                final qty = int.tryParse(qtyCtrl.text) ?? 0;
+                if (qty > 0 && reasonCtrl.text.trim().isNotEmpty) {
+                  rejectNotifier.value = {
+                    'qty': qty,
+                    'reason': reasonCtrl.text.trim(),
+                    'user': currentUserData.value?['full-name'] ?? 'Unknown',
+                    'time': DateTime.now().toIso8601String(),
+                  };
+                  Navigator.pop(ctx);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  void _showRejectDetailsDialog(BuildContext context, Map<String, dynamic> rejectData) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Rejection Details', style: TextStyle(color: widget.dark ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold))),
+              IconButton(
+                onPressed: () {
+                  rejectNotifier.value = null;
+                  Navigator.pop(ctx);
+                },
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _detailRow('Pieces Rejected:', rejectData['qty']?.toString() ?? '0'),
+              const SizedBox(height: 8),
+              _detailRow('Reason:', rejectData['reason']?.toString() ?? 'N/A'),
+              const SizedBox(height: 8),
+              _detailRow('User:', rejectData['user']?.toString() ?? 'Unknown'),
+              const SizedBox(height: 8),
+              _detailRow('Time:', _formatTime(rejectData['time']?.toString() ?? '')),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
+  String _formatTime(String isoString) {
+    if (isoString.isEmpty) return 'Unknown';
+    try {
+      final dt = DateTime.parse(isoString).toLocal();
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$hour:$min $ampm';
+    } catch (e) {
+      return isoString;
+    }
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: widget.dark ? Colors.white54 : Colors.black54, fontSize: 13, fontWeight: FontWeight.bold)),
+        const SizedBox(width: 8),
+        Expanded(child: Text(value, style: TextStyle(color: widget.dark ? Colors.white : Colors.black, fontSize: 13))),
+      ],
+    );
+  }
+
+  Future<void> _executeDelivery() async {
+    // Database update logic is pending user confirmation.
+    // Future update will write to 'time_deliver' and 'user_deliver'.
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Listo para entregar (Lógica de base de datos pendiente)', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.blueAccent,
+      ),
     );
   }
 
@@ -178,18 +392,62 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
                           _buildSummaryItem('Deliver', '$deliverPieces Pcs', textS, textP),
                           Column(
                             children: [
-                              Text('Found', style: TextStyle(color: textS, fontSize: 11)),
-                              const SizedBox(height: 4),
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.check_box_rounded, color: Color(0xFF10b981), size: 16),
+                                  Text('Found', style: TextStyle(color: textS, fontSize: 11)),
                                   const SizedBox(width: 4),
-                                  Text('$foundVal', style: const TextStyle(color: Color(0xFF10b981), fontSize: 16, fontWeight: FontWeight.bold)),
+                                  InkWell(
+                                    onTap: () => _showEditFoundDialog(context, foundVal),
+                                    child: Icon(Icons.edit_rounded, color: textS.withAlpha(150), size: 12),
+                                  ),
                                 ],
+                              ),
+                              const SizedBox(height: 4),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => _showEditFoundDialog(context, foundVal),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  child: Text(
+                                    '$foundVal', 
+                                    style: TextStyle(
+                                      color: foundVal.toString() == deliverPieces ? const Color(0xFF10b981) : const Color(0xFFf59e0b), 
+                                      fontSize: 16, 
+                                      fontWeight: FontWeight.bold
+                                    )
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                          _buildSummaryItem('Reject', '0', textS, const Color(0xFFef4444)),
+                          ValueListenableBuilder<Map<String, dynamic>?>(
+                            valueListenable: rejectNotifier,
+                            builder: (ctx, rejectData, _) {
+                              return Column(
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text('Reject', style: TextStyle(color: textS, fontSize: 11)),
+                                      if (rejectData != null) ...[
+                                        const SizedBox(width: 4),
+                                        InkWell(
+                                          onTap: () => _showRejectDetailsDialog(context, rejectData),
+                                          child: Icon(Icons.warning_amber_rounded, color: const Color(0xFFef4444).withAlpha(200), size: 12),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${rejectData?['qty'] ?? 0}', 
+                                    style: const TextStyle(color: Color(0xFFef4444), fontSize: 16, fontWeight: FontWeight.bold)
+                                  ),
+                                ],
+                              );
+                            }
+                          ),
                           _buildSummaryItem('Total', totalPieces, textS, textP),
                         ],
                       );
@@ -255,43 +513,59 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
                     color: bgDialog,
                     border: Border(top: BorderSide(color: borderC)),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: widget.dark ? Colors.white.withAlpha(5) : Colors.grey.shade100,
-                            foregroundColor: Colors.redAccent,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3b82f6),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.inventory_2_rounded, size: 18),
-                              SizedBox(width: 8),
-                              Text('Deliver AWB', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: foundNotifier,
+                    builder: (context, foundVal, _) {
+                      return ValueListenableBuilder<Map<String, dynamic>?>(
+                        valueListenable: rejectNotifier,
+                        builder: (context, rejectData, _) {
+                          int rejectQty = rejectData != null ? (int.tryParse(rejectData['qty'].toString()) ?? 0) : 0;
+                          int targetPieces = int.tryParse(deliverPieces) ?? 0;
+                          bool canDeliver = (foundVal + rejectQty) == targetPieces;
+                          
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () => _showRejectDialog(context),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: widget.dark ? Colors.white.withAlpha(5) : Colors.grey.shade100,
+                                    foregroundColor: Colors.redAccent,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: canDeliver ? _executeDelivery : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF3b82f6),
+                                    disabledBackgroundColor: widget.dark ? Colors.white.withAlpha(5) : Colors.grey.shade200,
+                                    foregroundColor: Colors.white,
+                                    disabledForegroundColor: textS.withAlpha(100),
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(Icons.local_shipping_rounded, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Deliver', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
-                          ),
-                        ),
-                      ),
-                    ],
+                          );
+                        }
+                      );
+                    }
                   ),
                 ),
               ],

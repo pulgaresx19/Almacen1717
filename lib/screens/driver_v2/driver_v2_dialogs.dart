@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../main.dart' show currentUserData;
 
 class DriverV2Dialogs {
   static void showNoBreakInfoDialog({
@@ -209,6 +210,7 @@ class DriverV2Dialogs {
     required Map split,
     required String awbNumber,
     required bool dark,
+    VoidCallback? onUpdate,
   }) {
     showDialog(
       context: context,
@@ -216,6 +218,7 @@ class DriverV2Dialogs {
         split: split,
         awbNumber: awbNumber,
         dark: dark,
+        onUpdate: onUpdate,
       ),
     );
   }
@@ -225,11 +228,13 @@ class _CheckItemDialogContent extends StatefulWidget {
   final Map split;
   final String awbNumber;
   final bool dark;
+  final VoidCallback? onUpdate;
 
   const _CheckItemDialogContent({
     required this.split,
     required this.awbNumber,
     required this.dark,
+    this.onUpdate,
   });
 
   @override
@@ -250,6 +255,7 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
   int? other;
 
   bool _showDiscrepancy = false;
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -267,6 +273,128 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
         onAdd(int.parse(ctrl.text));
         ctrl.clear();
       });
+    }
+  }
+
+  Future<void> _saveData({bool isDiscrepancy = false}) async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      String expectedPiecesStr = widget.split['pieces']?.toString() ?? widget.split['pieces_total']?.toString() ?? '0';
+      int expected = int.tryParse(expectedPiecesStr) ?? 0;
+      int totalEntered = agiSkids.fold(0, (sum, val) => sum + val) + (preSkid ?? 0) + (crate ?? 0) + (boxes ?? 0) + (other ?? 0);
+
+      Map<String, dynamic> report = {};
+      
+      // Breakdown data (excluding nulls)
+      for (int i = 0; i < agiSkids.length; i++) {
+        report['${i + 1}. AGI skid'] = agiSkids[i];
+      }
+      if (preSkid != null) report['Pre skid'] = preSkid;
+      if (crate != null) report['Crate'] = crate;
+      if (boxes != null) report['Box'] = boxes;
+      if (other != null) report['Other'] = other;
+
+      // Audit data
+      final now = DateTime.now().toUtc().toIso8601String();
+      final user = Supabase.instance.client.auth.currentUser;
+      final userName = currentUserData.value?['full-name'] ?? user?.email ?? 'Unknown Driver';
+
+      report['processed_at'] = now;
+      report['processed_by'] = userName;
+      report['check_source'] = 'Driver Pick Up';
+
+      // Discrepancy details
+      if (isDiscrepancy) {
+        String diffType = totalEntered > expected ? 'OVER' : 'SHORT';
+        int diffAmount = (totalEntered - expected).abs();
+        
+        report['discrepancy_type'] = diffType;
+        report['discrepancy_amount'] = diffAmount;
+        report['discrepancy_checked'] = totalEntered;
+        report['discrepancy_expected'] = expected;
+
+        // Update ulds table discrepancies_summary
+        String uldId = widget.split['uld_id']?.toString() ?? widget.split['id_uld']?.toString() ?? '';
+        if (uldId.isNotEmpty) {
+           final uldRes = await Supabase.instance.client
+               .from('ulds')
+               .select('discrepancies_summary')
+               .eq('id_uld', uldId)
+               .maybeSingle();
+               
+           if (uldRes != null) {
+               List<dynamic> discSum = [];
+               if (uldRes['discrepancies_summary'] is List) {
+                   discSum = List.from(uldRes['discrepancies_summary']);
+               } else if (uldRes['discrepancies_summary'] != null) {
+                   discSum = [uldRes['discrepancies_summary']];
+               }
+               
+               discSum.add({
+                   'awb': widget.awbNumber,
+                   'type': diffType,
+                   'amount': diffAmount,
+               });
+               
+               await Supabase.instance.client
+                   .from('ulds')
+                   .update({'discrepancies_summary': discSum})
+                   .eq('id_uld', uldId);
+           }
+        }
+      }
+
+      // Merge with existing data_coordinator
+      var existingData = widget.split['data_coordinator'];
+      List<dynamic> updatedCoordinatorList = [];
+      if (existingData is List) {
+        updatedCoordinatorList = List.from(existingData);
+      } else if (existingData is Map && existingData.isNotEmpty) {
+        updatedCoordinatorList = [existingData];
+      }
+      updatedCoordinatorList.add(report);
+
+      // Handle total_checked
+      int currentTotalChecked = 0;
+      if (widget.split['total_checked'] != null) {
+        currentTotalChecked = int.tryParse(widget.split['total_checked'].toString()) ?? 0;
+      }
+      int newTotalChecked = currentTotalChecked + totalEntered;
+
+      // Update Supabase
+      final splitId = widget.split['id'] ?? widget.split['awb_id']; // Usually id is the split id
+      
+      await Supabase.instance.client
+          .from('awb_splits')
+          .update({
+            'data_coordinator': updatedCoordinatorList,
+            'total_checked': newTotalChecked,
+          })
+          .eq('id', splitId);
+
+      // Update local state
+      widget.split['data_coordinator'] = updatedCoordinatorList;
+      widget.split['total_checked'] = newTotalChecked;
+      
+      if (widget.onUpdate != null) {
+        widget.onUpdate!();
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // Close dialog
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -404,6 +532,9 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
     int totalEntered = agiSkids.fold(0, (sum, val) => sum + val) + (preSkid ?? 0) + (crate ?? 0) + (boxes ?? 0) + (other ?? 0);
     Color counterColor = totalEntered == expected ? const Color(0xFF10b981) : const Color(0xFFf59e0b);
 
+    int diffAmount = (totalEntered - expected).abs();
+    String diffType = totalEntered > expected ? 'OVER' : 'SHORT';
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(24),
@@ -529,7 +660,7 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                     children: [
                       const Spacer(),
                       TextButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: _isSaving ? null : () => Navigator.pop(context),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -538,11 +669,11 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: _isSaving ? null : () {
                           if (totalEntered != expected) {
                             setState(() => _showDiscrepancy = true);
                           } else {
-                            Navigator.pop(context);
+                            _saveData(isDiscrepancy: false);
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -552,7 +683,9 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('Save & Check', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: _isSaving 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Save & Check', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ),
@@ -585,6 +718,18 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                         const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 48),
                         const SizedBox(height: 16),
                         const Text('PIECE COUNT DISCREPANCY', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5)),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withAlpha(20),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '$diffAmount pieces $diffType', 
+                            style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -616,7 +761,7 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                           children: [
                             Expanded(
                               child: TextButton(
-                                onPressed: () => setState(() => _showDiscrepancy = false),
+                                onPressed: _isSaving ? null : () => setState(() => _showDiscrepancy = false),
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 14),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -627,9 +772,8 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() => _showDiscrepancy = false);
-                                  Navigator.pop(context);
+                                onPressed: _isSaving ? null : () {
+                                  _saveData(isDiscrepancy: true);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.redAccent,
@@ -638,7 +782,9 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
-                                child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
+                                child: _isSaving 
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Text('Confirm', style: TextStyle(fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ],
@@ -656,3 +802,4 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
     );
   }
 }
+

@@ -31,6 +31,8 @@ class DriverV2AwbSplitCard extends StatefulWidget {
 }
 
 class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
+  bool _localChecked = false;
+
   @override
   Widget build(BuildContext context) {
     final split = widget.split;
@@ -55,6 +57,8 @@ class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
     } else if (split['data_coordinator'] is Map && (split['data_coordinator'] as Map).isNotEmpty) {
       coordList = [split['data_coordinator']];
     }
+    
+    bool hasDriverPickUp = coordList.any((c) => c is Map && c['check_source'] == 'Driver Pick Up');
     
     Map uldData = {};
     if (split.containsKey('id_uld') && !split.containsKey('awb_id')) {
@@ -164,60 +168,69 @@ class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
                   ),
                 ),
               ],
-              if (statusText == 'Recibido' || statusText == 'Received') ...[
-                const SizedBox(width: 8),
-                if (uldData['is_break'] == true || uldData['isbrey'] == true)
-                  InkWell(
-                    onTap: () => DriverV2Dialogs.showCheckItemDialog(
-                      context: context, 
-                      split: split, 
-                      awbNumber: widget.awbNumber,
-                      dark: widget.dark
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.playlist_add_check_rounded, 
-                        color: Color(0xFF3b82f6), 
-                        size: 20
+              SizedBox(
+                width: 72,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (statusText == 'Recibido' || statusText == 'Received') ...[
+                      if (uldData['is_break'] == true || uldData['isbrey'] == true) ...[
+                        if (!hasDriverPickUp)
+                          InkWell(
+                            onTap: () => DriverV2Dialogs.showCheckItemDialog(
+                              context: context, 
+                              split: split, 
+                              awbNumber: widget.awbNumber,
+                              dark: widget.dark,
+                              onUpdate: () => setState(() {}),
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.playlist_add_check_rounded, 
+                                color: Color(0xFF3b82f6), 
+                                size: 20
+                              ),
+                            ),
+                          )
+                      ] else
+                        InkWell(
+                          onTap: () => DriverV2Dialogs.showNoBreakInfoDialog(
+                            context: context, 
+                            uldData: uldData, 
+                            uldName: uldName, 
+                            dark: widget.dark
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.info_outline_rounded, 
+                              color: Color(0xFF94a3b8), 
+                              size: 20
+                            ),
+                          ),
+                        ),
+                    ],
+                    if (locList.isNotEmpty || coordList.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: widget.onToggleCollapse,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            widget.isCollapsed ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
+                            color: widget.isCollapsed ? textS : const Color(0xFF3b82f6), 
+                            size: 20
+                          ),
+                        ),
                       ),
-                    ),
-                  )
-                else
-                  InkWell(
-                    onTap: () => DriverV2Dialogs.showNoBreakInfoDialog(
-                      context: context, 
-                      uldData: uldData, 
-                      uldName: uldName, 
-                      dark: widget.dark
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.info_outline_rounded, 
-                        color: Color(0xFF94a3b8), 
-                        size: 20
-                      ),
-                    ),
-                  ),
-              ],
-              if (locList.isNotEmpty || coordList.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: widget.onToggleCollapse,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      widget.isCollapsed ? Icons.visibility_off_rounded : Icons.visibility_rounded, 
-                      color: widget.isCollapsed ? textS : const Color(0xFF3b82f6), 
-                      size: 20
-                    ),
-                  ),
+                    ]
+                  ],
                 ),
-              ]
+              )
             ],
           ),
           const SizedBox(height: 12),
@@ -231,6 +244,7 @@ class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
                   style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
+
               Container(
                 width: 90,
                 alignment: Alignment.center,
@@ -249,10 +263,48 @@ class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
                   ),
                 ),
               ),
-              if (statusText == 'Recibido' || statusText == 'Received')
-                const SizedBox(width: 36),
-              if (locList.isNotEmpty || coordList.isNotEmpty)
-                const SizedBox(width: 36),
+              SizedBox(
+                width: 72,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!(uldData['is_break'] == true || uldData['isbrey'] == true) || !split.containsKey('awb_id')) ...[
+                      Container(
+                        width: 28,
+                        height: 24,
+                        alignment: Alignment.center,
+                        child: uldData['time_deliver'] != null
+                            ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 22)
+                            : SizedBox(
+                                height: 24,
+                                child: Theme(
+                                  data: ThemeData(
+                                    unselectedWidgetColor: widget.dark ? Colors.white70 : Colors.black54,
+                                  ),
+                                  child: Checkbox(
+                                    value: _localChecked,
+                                    activeColor: const Color(0xFF10b981),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                    onChanged: (bool? value) {
+                                      setState(() {
+                                        _localChecked = value ?? false;
+                                      });
+                                      final pieces = int.tryParse(itemPieces) ?? 0;
+                                      if (_localChecked) {
+                                        widget.foundNotifier.value += pieces;
+                                      } else {
+                                        widget.foundNotifier.value -= pieces;
+                                      }
+                                    },
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ]
+                  ],
+                ),
+              )
             ],
           ),
           if (split.containsKey('awb_id')) ...[
@@ -334,6 +386,7 @@ class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
                               bd.remove('discrepancy checked');
                               bd.remove('discrepancy_expected');
                               bd.remove('discrepancy expected');
+                              bd.remove('check_source');
                               
                               final discAmount = bd.remove('discrepancy_amount') ?? bd.remove('discrepancy amount');
                               final discType = bd.remove('discrepancy_type') ?? bd.remove('discrepancy type');
@@ -553,78 +606,116 @@ class _DriverV2AwbSplitCardState extends State<DriverV2AwbSplitCard> {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          if (locList.isEmpty)
-                            Text('No locations', style: TextStyle(color: textS, fontSize: 12))
-                          else
-                            ...locList.map((item) {
-                              final map = Map.from(item as Map);
-                              final List<Widget> locChips = [];
+                          Builder(
+                            builder: (context) {
+                              if (locList.isEmpty && !hasDriverPickUp) {
+                                return Text('No locations', style: TextStyle(color: textS, fontSize: 12));
+                              }
                               
-                              void extractLocs(Map m) {
-                                m.forEach((key, value) {
-                                  if (['updated_by', 'processed_by', 'user', 'updated_at', 'processed_at', 'time'].contains(key)) return;
-                                  if (value == null || value.toString().isEmpty || value.toString() == '0') return;
-                                  
-                                  final locValue = value.toString();
-                                  final uniqueKey = '${widget.index}-$locValue';
-                                  final isSelected = widget.selectedLocations.contains(uniqueKey);
-                                  
-                                  locChips.add(
-                                    Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        onTap: () {
-                                          setState(() {
-                                            if (isSelected) {
-                                              widget.selectedLocations.remove(uniqueKey);
-                                            } else {
-                                              widget.selectedLocations.add(uniqueKey);
-                                            }
-                                          });
-                                        },
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: isSelected ? const Color(0xFF10b981) : const Color(0xFF10b981).withAlpha(20),
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: isSelected ? const Color(0xFF10b981) : (widget.dark ? Colors.white.withAlpha(30) : const Color(0xFFE5E7EB))),
-                                          ),
-                                          child: Text(
-                                            locValue, 
-                                            style: TextStyle(
-                                              color: isSelected ? Colors.white : const Color(0xFF10b981), 
-                                              fontSize: 12, 
-                                              fontWeight: FontWeight.bold
-                                            )
-                                          ),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (hasDriverPickUp)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 6),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF3b82f6).withAlpha(20),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFF3b82f6).withAlpha(50)),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.local_shipping_rounded, size: 14, color: Color(0xFF3b82f6)),
+                                            SizedBox(width: 6),
+                                            Text(
+                                              'Driver Pick Up',
+                                              style: TextStyle(
+                                                color: Color(0xFF3b82f6),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    )
-                                  );
-                                });
-                              }
+                                    ),
+                                  if (locList.isNotEmpty)
+                                    ...locList.map((item) {
+                                      final map = Map.from(item as Map);
+                                      final List<Widget> locChips = [];
+                                      
+                                      void extractLocs(Map m) {
+                                        m.forEach((key, value) {
+                                          if (['updated_by', 'processed_by', 'user', 'updated_at', 'processed_at', 'time'].contains(key)) return;
+                                          if (value == null || value.toString().isEmpty || value.toString() == '0') return;
+                                          
+                                          final locValue = value.toString();
+                                          final uniqueKey = '${widget.index}-$locValue';
+                                          final isSelected = widget.selectedLocations.contains(uniqueKey);
+                                          
+                                          locChips.add(
+                                            Material(
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                onTap: () {
+                                                  setState(() {
+                                                    if (isSelected) {
+                                                      widget.selectedLocations.remove(uniqueKey);
+                                                    } else {
+                                                      widget.selectedLocations.add(uniqueKey);
+                                                    }
+                                                  });
+                                                },
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: AnimatedContainer(
+                                                  duration: const Duration(milliseconds: 200),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                  decoration: BoxDecoration(
+                                                    color: isSelected ? const Color(0xFF10b981) : const Color(0xFF10b981).withAlpha(20),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    border: Border.all(color: isSelected ? const Color(0xFF10b981) : (widget.dark ? Colors.white.withAlpha(30) : const Color(0xFFE5E7EB))),
+                                                  ),
+                                                  child: Text(
+                                                    locValue, 
+                                                    style: TextStyle(
+                                                      color: isSelected ? Colors.white : const Color(0xFF10b981), 
+                                                      fontSize: 12, 
+                                                      fontWeight: FontWeight.bold
+                                                    )
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          );
+                                        });
+                                      }
 
-                              if (map.containsKey('locations') && map['locations'] is List) {
-                                for (var locItem in map['locations']) {
-                                  if (locItem is Map) extractLocs(locItem);
-                                }
-                              } else {
-                                extractLocs(map);
-                              }
-                              
-                              if (locChips.isEmpty) return const SizedBox.shrink();
-                              
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: locChips,
-                                ),
+                                      if (map.containsKey('locations') && map['locations'] is List) {
+                                        for (var locItem in map['locations']) {
+                                          if (locItem is Map) extractLocs(locItem);
+                                        }
+                                      } else {
+                                        extractLocs(map);
+                                      }
+                                      
+                                      if (locChips.isEmpty) return const SizedBox.shrink();
+                                      
+                                      return Padding(
+                                        padding: const EdgeInsets.only(bottom: 6),
+                                        child: Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: locChips,
+                                        ),
+                                      );
+                                    }),
+                                ],
                               );
-                            }),
+                            }
+                          ),
                         ],
                       ),
                     ),

@@ -260,6 +260,30 @@ void showDriverConfirmDialog({
                       ),
                     ),
                   ),
+                  
+                  // Fixed Bottom Button
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: bgDialog,
+                      border: Border(top: BorderSide(color: borderC)),
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: null, // Initially disabled
+                      icon: const Icon(Icons.task_alt_rounded, size: 20),
+                      label: const Text('Mark Delivery Finished', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10b981),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF10b981).withAlpha(80), // Faded green background
+                        disabledForegroundColor: Colors.white.withAlpha(180), // Slightly muted white text
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
