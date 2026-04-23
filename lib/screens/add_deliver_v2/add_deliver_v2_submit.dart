@@ -215,7 +215,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
               'awb_number': e['awbNumber']?.toString() ?? '',
               'found': e['pieces']?.toString() ?? '0',
               'weight': e['weight']?.toString() ?? '0',
-              'remarks': e['remarks']?.toString() ?? ''
+              'remarks': e['remarks']?.toString() ?? '',
+              'total_pieces': e['total']?.toString() ?? e['pieces']?.toString() ?? '0'
             }).toList() 
           : [
               ..._selectedAwbs.map((e) {
@@ -238,7 +239,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                   'awb_number': awbNum,
                   'found': pcs,
                   'weight': expectedWeight.toStringAsFixed(2),
-                  'remarks': rem
+                  'remarks': rem,
+                  'total_pieces': e['total_pieces']?.toString() ?? e['total']?.toString() ?? e['pieces']?.toString() ?? '0'
                 };
               }),
               ..._selectedUlds.map((e) {
@@ -251,7 +253,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                    'uld_number': uNum,
                    'found': pcs,
                    'weight': e['weight_total']?.toString() ?? e['weight']?.toString() ?? '0.00',
-                   'remarks': rem
+                   'remarks': rem,
+                   'total_pieces': e['total_pieces']?.toString() ?? e['total']?.toString() ?? e['pieces']?.toString() ?? '0'
                  };
               })
             ];

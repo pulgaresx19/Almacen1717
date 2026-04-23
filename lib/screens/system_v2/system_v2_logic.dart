@@ -232,14 +232,12 @@ class SystemPanelLogic extends ChangeNotifier {
         flights[idx]['local_truck_arrived'][uldKey] = truckTime;
       }
       
-      uld['status'] = 'Received';
       uld['time_received'] = truckTime;
       uld['user_received'] = authorName;
 
       Supabase.instance.client.from('ulds').update({
         'time_received': truckTime,
         'user_received': authorName,
-        'status': 'Received',
       }).eq('id_uld', uld['id_uld']).catchError((e) => debugPrint('time_received Update Err: $e'));
 
       final bool isBreak = uld['is_break'] == true || uld['is_break']?.toString().toLowerCase() == 'true';
@@ -259,11 +257,9 @@ class SystemPanelLogic extends ChangeNotifier {
         (flights[idx]['local_truck_arrived'] as Map).remove(uldKey);
       }
       
-      uld['status'] = 'Waiting';
       Supabase.instance.client.from('ulds').update({
         'time_received': null,
         'user_received': null,
-        'status': 'Waiting',
       }).eq('id_uld', uld['id_uld']).catchError((e) => debugPrint('time_received Reset Err: $e'));
     }
     notifyListeners();

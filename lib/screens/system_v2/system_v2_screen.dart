@@ -371,18 +371,18 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                                                   if (isChecked) {
                                                     uItem['time_received'] = truckTime;
                                                     uItem['user_received'] = authorName;
-                                                    uItem['status'] = 'Received';
+                                                    // status update removed
                                                   } else {
                                                     uItem['time_received'] = null;
                                                     uItem['user_received'] = null;
-                                                    uItem['status'] = 'Waiting';
+                                                    // status update removed
                                                   }
                                                 });
                                                 if (isChecked) {
                                                   await Supabase.instance.client.from('ulds').update({
                                                     'time_received': truckTime,
                                                     'user_received': authorName,
-                                                    'status': 'Received'
+                                                    // status update removed
                                                   }).eq('id_uld', uItem['id_uld']);
 
                                                   if (uItem['id_flight'] != null) {
@@ -399,7 +399,7 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
                                                   await Supabase.instance.client.from('ulds').update({
                                                     'time_received': null,
                                                     'user_received': null,
-                                                    'status': 'Waiting'
+                                                    // status update removed
                                                   }).eq('id_uld', uItem['id_uld']);
                                                 }
                                               },

@@ -212,7 +212,7 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
       final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
       listToDisplay = listToDisplay.where((u) {
         final uldNum = (u['uld_number'] ?? '').toString().toLowerCase();
-        final status = (u['status'] ?? '').toString().toLowerCase();
+        final status = _computeUldStatus(u).toLowerCase();
         final flightId = u['id_flight']?.toString();
         
         String refDetails = '';
@@ -445,7 +445,7 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
                               DataCell(u['is_priority'] == true ? const Icon(Icons.star_rounded, color: Colors.orange, size: 20) : const Icon(Icons.star_border_rounded, color: Colors.grey, size: 20)),
                               DataCell(Text(u['is_break'] == true ? 'BREAK' : 'NO BREAK', style: TextStyle(color: u['is_break'] == true ? const Color(0xFF10b981) : const Color(0xFFef4444), fontWeight: FontWeight.bold))),
                               DataCell(SizedBox(width: 150, child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis, maxLines: 2, style: const TextStyle(fontSize: 12)))),
-                              DataCell(_buildV2StatusBadge(u['status']?.toString() ?? 'Waiting')),
+                              DataCell(_buildV2StatusBadge(_computeUldStatus(u))),
                               DataCell(
                                 Checkbox(
                                   visualDensity: VisualDensity.compact,
@@ -569,6 +569,17 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
     );
   }
 
+   String _computeUldStatus(Map<String, dynamic> uld) {
+     if (uld['time_saved'] != null || uld['time-saved'] != null) {
+       return 'Saved';
+     } else if (uld['time_checked'] != null || uld['time-checked'] != null) {
+       return 'Checked';
+     } else if (uld['time_received'] != null || uld['time-received'] != null) {
+       return 'Received';
+     }
+     return 'Waiting';
+   }
+
    Widget _buildV2StatusBadge(String status) {
      Color bg = const Color(0xFF334155);
      Color fg = const Color(0xFFcbd5e1);
@@ -582,6 +593,9 @@ class UldsV2ScreenState extends State<UldsV2Screen> {
          break;
        case 'checked':
          bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
+         break;
+       case 'saved':
+         bg = const Color(0xFF10b981).withAlpha(51); fg = const Color(0xFF34d399);
          break;
        case 'ready':
          bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
