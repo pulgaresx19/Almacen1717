@@ -3,17 +3,23 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show currentUserData;
 import 'driver_v2_awb_split_card.dart';
 
-void showDriverAwbDialog({
+Future<bool?> showDriverAwbDialog({
   required BuildContext context,
   required Map<String, dynamic> awbItem,
+  required Map<String, dynamic> deliveryData,
+  required String company,
+  required String driver,
   required bool dark,
 }) {
-  showDialog(
+  return showDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) {
       return DriverV2AwbDialogScreen(
         awbItem: awbItem,
+        deliveryData: deliveryData,
+        company: company,
+        driver: driver,
         dark: dark,
       );
     },
@@ -22,11 +28,17 @@ void showDriverAwbDialog({
 
 class DriverV2AwbDialogScreen extends StatefulWidget {
   final Map<String, dynamic> awbItem;
+  final Map<String, dynamic> deliveryData;
+  final String company;
+  final String driver;
   final bool dark;
 
   const DriverV2AwbDialogScreen({
     super.key,
     required this.awbItem,
+    required this.deliveryData,
+    required this.company,
+    required this.driver,
     required this.dark,
   });
 
@@ -309,15 +321,47 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
   }
 
   Future<void> _executeDelivery() async {
-    // Database update logic is pending user confirmation.
-    // Future update will write to 'time_deliver' and 'user_deliver'.
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Listo para entregar (Lógica de base de datos pendiente)', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blueAccent,
-      ),
-    );
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(child: CircularProgressIndicator(color: Color(0xFF3b82f6))),
+      );
+
+      final isUld = uldId != null && uldId!.isNotEmpty;
+      final itemId = isUld ? uldId : awbId;
+
+      await Supabase.instance.client.rpc(
+        'execute_driver_delivery',
+        params: {
+          'p_item_id': itemId,
+          'p_item_number': awbNumber,
+          'p_is_uld': isUld,
+          'p_pieces': foundNotifier.value,
+          'p_reject_data': rejectNotifier.value,
+          'p_company': widget.company,
+          'p_door': widget.deliveryData['door']?.toString() ?? '-',
+          'p_type': widget.deliveryData['type']?.toString() ?? '-',
+          'p_id_pickup': widget.deliveryData['id_delivery']?.toString() ?? widget.deliveryData['id_pickup']?.toString() ?? widget.deliveryData['id']?.toString() ?? '-',
+          'p_user_name': currentUserData.value?['full-name'] ?? 'Unknown',
+          'p_time': DateTime.now().toIso8601String(),
+          'p_driver_name': widget.driver,
+        },
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      Navigator.pop(context, true); // Close details dialog with success
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}', style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override
