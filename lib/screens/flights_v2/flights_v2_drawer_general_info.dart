@@ -23,7 +23,6 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
   // ... (keep state variables)
   bool _isEditing = false;
   bool _isLoading = false;
-  bool _expanded = false;
 
   late TextEditingController _carrierCtrl;
   late TextEditingController _numberCtrl;
@@ -292,88 +291,45 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
             ],
           ),
           const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: _buildModernDetail('Carrier', widget.flight['carrier']?.toString() ?? '-', Icons.business, textP, textS, controller: _carrierCtrl)),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(child: _buildModernDetail('Number', widget.flight['number']?.toString() ?? '-', Icons.tag, textP, textS, controller: _numberCtrl)),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
+              const SizedBox(width: 8),
               Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Llegada' : 'Arrive Time', _formatTimestamp(widget.flight['date']?.toString(), textP, textS), Icons.schedule, textP, textS, controller: _dateCtrl, type: FieldType.date)),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Estado' : 'Status', widget.flight['status']?.toString() ?? 'Waiting', Icons.info_outline, textP, textS, controller: _statusCtrl, type: FieldType.status)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('Break ULD', widget.flight['cant_break']?.toString() ?? '0', Icons.inventory_2_outlined, textP, textS, controller: _cantBreakCtrl, type: FieldType.number)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('No-Break ULD', widget.flight['cant_nobreak']?.toString() ?? '0', Icons.all_inbox, textP, textS, controller: _cantNoBreakCtrl, type: FieldType.number)),
             ],
           ),
-          if (_statusCtrl.text == 'Delayed' || (widget.flight['status'] == 'Delayed')) ...[
-            const SizedBox(height: 20),
-            _buildModernDetail(appLanguage.value == 'es' ? 'Hora programada Delay' : 'Delayed Rescheduled Time', _formatTimestamp(widget.flight['time_delay']?.toString(), const Color(0xFFf97316), const Color(0xFFea580c)), Icons.history_toggle_off_rounded, const Color(0xFFf97316), const Color(0xFFea580c), controller: _timeDelayedCtrl, type: FieldType.date, isError: _timeDelayError),
-          ],
-          if (_expanded || _isEditing) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Divider(height: 1, color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-            ),
-            Row(
-              children: [
-                Expanded(child: _buildModernDetail('Break ULD', widget.flight['cant_break']?.toString() ?? '0', Icons.inventory_2_outlined, textP, textS, controller: _cantBreakCtrl, type: FieldType.number)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildModernDetail('No-Break ULD', widget.flight['cant_nobreak']?.toString() ?? '0', Icons.all_inbox, textP, textS, controller: _cantNoBreakCtrl, type: FieldType.number)),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildModernDetail('Start Break', _formatTimestamp(widget.flight['start_break']?.toString(), textP, textS), Icons.play_circle_outline, textP, textS, controller: _startBreakCtrl, type: FieldType.date)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('End Break', _formatTimestamp(widget.flight['end_break']?.toString(), textP, textS), Icons.stop_circle_outlined, textP, textS, controller: _endBreakCtrl, type: FieldType.date)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('First Truck', _formatTimestamp(widget.flight['first_truck']?.toString(), textP, textS), Icons.local_shipping_outlined, textP, textS, controller: _firstTruckCtrl, type: FieldType.date)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('Last Truck', _formatTimestamp(widget.flight['last_truck']?.toString(), textP, textS), Icons.local_shipping, textP, textS, controller: _lastTruckCtrl, type: FieldType.date)),
+              if (_statusCtrl.text == 'Delayed' || (widget.flight['status'] == 'Delayed')) ...[
+                const SizedBox(width: 8),
+                Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Hora Delay' : 'Delayed Time', _formatTimestamp(widget.flight['time_delay']?.toString(), const Color(0xFFf97316), const Color(0xFFea580c)), Icons.history_toggle_off_rounded, const Color(0xFFf97316), const Color(0xFFea580c), controller: _timeDelayedCtrl, type: FieldType.date, isError: _timeDelayError)),
+              ] else ...[
+                const SizedBox(width: 8),
+                const Expanded(child: SizedBox.shrink()),
               ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(child: _buildModernDetail('Start Break', _formatTimestamp(widget.flight['start_break']?.toString(), textP, textS), Icons.play_circle_outline, textP, textS, controller: _startBreakCtrl, type: FieldType.date)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildModernDetail('End Break', _formatTimestamp(widget.flight['end_break']?.toString(), textP, textS), Icons.stop_circle_outlined, textP, textS, controller: _endBreakCtrl, type: FieldType.date)),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(child: _buildModernDetail('First Truck', _formatTimestamp(widget.flight['first_truck']?.toString(), textP, textS), Icons.local_shipping_outlined, textP, textS, controller: _firstTruckCtrl, type: FieldType.date)),
-                const SizedBox(width: 12),
-                Expanded(child: _buildModernDetail('Last Truck', _formatTimestamp(widget.flight['last_truck']?.toString(), textP, textS), Icons.local_shipping, textP, textS, controller: _lastTruckCtrl, type: FieldType.date)),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Divider(height: 1, color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-            ),
-            _buildModernDetail('Remarks', widget.flight['remarks']?.toString() ?? '-', Icons.notes, textP, textS, controller: _remarksCtrl),
-          ],
-
-          if (!_isEditing) ...[
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => setState(() => _expanded = !_expanded),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_expanded ? 'Show Less' : 'Show More', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: 4),
-                        Icon(_expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textS, size: 16),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('Remarks', widget.flight['remarks']?.toString() ?? '-', Icons.notes, textP, textS, controller: _remarksCtrl)),
+            ],
+          ),
         ],
       ),
     );

@@ -6,13 +6,7 @@ import '../../main.dart'; // To get appLanguage, isDarkMode, isSidebarExpandedNo
 import '../auth/login_screen.dart';
 
 import '../users_module.dart';
-import '../flight_module.dart';
 import '../dashboard_view_module.dart';
-import '../uld_module.dart';
-import '../awb_module.dart';
-import '../delivers_module.dart';
-import '../driver_module.dart';
-import '../other_modules.dart';
 import '../system_bf_module.dart';
 import '../area_nobreak_module.dart';
 import '../flights_v2/flights_v2_screen.dart';
@@ -325,40 +319,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Dashboard',
                                   0,
                                 ),
-                              if (can('flights'))
-                                _buildNavItem(
-                                  Icons.flight_land_rounded,
-                                  'Flight',
-                                  1,
-                                ),
+
                               if (can('flights'))
                                 _buildNavItem(
                                   Icons.flight_land_rounded,
                                   'Flights',
                                   12,
                                 ),
-                              if (can('ulds'))
-                                _buildNavItem(
-                                  Icons.inventory_2_rounded,
-                                  'ULD',
-                                  2,
-                                ),
+
                               if (can('ulds'))
                                 _buildNavItem(
                                   Icons.inventory_2_outlined,
                                   'ULDs',
                                   13,
                                 ),
-                              if (can('awbs'))
-                                _buildNavItem(
-                                  Icons.description_rounded,
-                                  'AWB',
-                                  3,
-                                ),
+
                               if (can('awbs'))
                                 _buildNavItem(
                                   Icons.description_outlined,
-                                  'AWBs V2',
+                                  'AWBs',
                                   16,
                                 ),
 
@@ -366,12 +345,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 _buildNavItem(
                                   Icons.local_shipping_outlined,
                                   'Delivers',
-                                  4,
-                                ),
-                              if (can('delivers'))
-                                _buildNavItem(
-                                  Icons.local_shipping_outlined,
-                                  'Delivers V2',
                                   17,
                                 ),
                               if (can('users'))
@@ -402,51 +375,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               if (can('system'))
                                 _buildNavItem(
-                                  Icons.settings_system_daydream_rounded,
-                                  'System',
-                                  6,
-                                ),
-                              if (can('system'))
-                                _buildNavItem(
                                   Icons.settings_system_daydream_outlined,
-                                  'System V2',
+                                  'System',
                                   14,
                                 ),
                               if (can('coordinator'))
                                 _buildNavItem(
-                                  Icons.support_agent_rounded,
-                                  'Coordinator',
-                                  7,
-                                ),
-                              if (can('coordinator'))
-                                _buildNavItem(
                                   Icons.support_agent_outlined,
-                                  'Coordinator V2',
+                                  'Coordinator',
                                   15,
                                 ),
 
                               if (can('location'))
                                 _buildNavItem(
-                                  Icons.location_on_rounded,
-                                  'Location',
-                                  8,
-                                ),
-                              if (can('location'))
-                                _buildNavItem(
                                   Icons.location_on_outlined,
-                                  'Location V2',
+                                  'Location',
                                   18,
                                 ),
                               if (can('driver'))
                                 _buildNavItem(
-                                  Icons.local_shipping_rounded,
-                                  'Driver',
-                                  9,
-                                ),
-                              if (can('driver'))
-                                _buildNavItem(
                                   Icons.local_shipping_outlined,
-                                  'Driver V2',
+                                  'Driver',
                                   19,
                                 ),
                               if (can('system_bf'))
@@ -826,15 +775,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       index: _selectedIndex,
       children: [
         const DashboardViewModule(),
-        FlightModule(isActive: _selectedIndex == 1),
-        UldModule(isActive: _selectedIndex == 2),
-        AwbModule(isActive: _selectedIndex == 3),
-        DeliversModule(isActive: _selectedIndex == 4),
+        const SizedBox.shrink(), // Formerly V1 FlightModule
+        const SizedBox.shrink(), // Formerly V1 UldModule
+        const SizedBox.shrink(), // Formerly V1 AwbModule
+        const SizedBox.shrink(), // Formerly V1 DeliversModule
         UsersModule(isActive: _selectedIndex == 5),
-        const SystemModule(),
-        const CoordinatorModule(singlePanelMode: true),
-        const LocationModule(),
-        const DriverModule(),
+        const SizedBox.shrink(), // Formerly V1 SystemModule
+        const SizedBox.shrink(), // Formerly V1 CoordinatorModule
+        const SizedBox.shrink(), // Formerly V1 LocationModule
+        const SizedBox.shrink(), // Formerly V1 DriverModule
         const SystemBfModule(),
         const AreaNobreakModule(),
         FlightsV2Screen(isActive: _selectedIndex == 12),

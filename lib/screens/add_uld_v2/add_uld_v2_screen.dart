@@ -8,8 +8,9 @@ import 'add_uld_v2_table.dart';
 class AddUldV2Screen extends StatefulWidget {
   final Function(bool)? onPop;
   final bool isInline;
+  final String? initialFlightId;
   
-  const AddUldV2Screen({super.key, this.onPop, this.isInline = false});
+  const AddUldV2Screen({super.key, this.onPop, this.isInline = false, this.initialFlightId});
 
   @override
   State<AddUldV2Screen> createState() => AddUldV2ScreenState();
@@ -38,6 +39,7 @@ class AddUldV2ScreenState extends State<AddUldV2Screen> {
     _logic = AddUldV2Logic()..init();
     _piecesCtrl.text = 'Auto';
     _weightCtrl.text = 'Auto';
+    _selectedFlight = widget.initialFlightId;
   }
 
   @override

@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 
 import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import '../add_flight_v2/add_flight_v2_screen.dart'; // Ensure correct import route to V2
+import '../flight_details_v2/flight_details_v2_screen.dart';
 import 'flights_v2_logic.dart';
-import 'flights_v2_drawer.dart';
 import 'flights_v2_pdf_exporter.dart';
 
 class FlightsV2Screen extends StatefulWidget {
@@ -19,6 +19,7 @@ class FlightsV2Screen extends StatefulWidget {
 class FlightsV2ScreenState extends State<FlightsV2Screen> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
+  Map<String, dynamic>? _selectedFlightDetails;
   final GlobalKey<AddFlightV2ScreenState> _addFlightKey = GlobalKey<AddFlightV2ScreenState>();
   final Set<String> _selectedFlightIds = {};
   final Set<String> _collapsedDates = {};
@@ -69,9 +70,10 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Main Header Row (Title, Search, Buttons)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
+                if (_selectedFlightDetails == null) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
                     ValueListenableBuilder<bool>(
                       valueListenable: isSidebarExpandedNotifier,
                       builder: (context, expanded, child) {
@@ -165,6 +167,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                   ],
                 ),
                 const SizedBox(height: 30),
+                ],
                 
                 // Internal layout
                 if (_showAddForm)
@@ -179,6 +182,19 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                         if (isSaved) {
                           logic.fetchFlights();
                         }
+                      },
+                    ),
+                  )
+                else if (_selectedFlightDetails != null)
+                  Expanded(
+                    child: FlightDetailsV2Screen(
+                      flight: _selectedFlightDetails!,
+                      dark: dark,
+                      onBack: () {
+                        setState(() {
+                          _selectedFlightDetails = null;
+                        });
+                        logic.fetchFlights(silent: true); // Refresh data when closing
                       },
                     ),
                   )
@@ -460,7 +476,9 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
 
               return DataRow(
                 onSelectChanged: (_) {
-                   _showFlightDrawer(context, flight, dark);
+                   setState(() {
+                     _selectedFlightDetails = flight;
+                   });
                 },
                 cells: [
                   DataCell(Text('$displayIndex', style: TextStyle(color: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), fontWeight: FontWeight.bold))),
@@ -616,47 +634,6 @@ if (_selectedFlightIds.isNotEmpty)
           ),
       ],
     );
-  }
-
-  void _showFlightDrawer(BuildContext context, Map<String, dynamic> flight, bool dark) {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Dismiss',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return Align(
-          alignment: Alignment.centerRight,
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 520,
-              height: double.infinity,
-              decoration: BoxDecoration(
-                color: dark ? const Color(0xFF0f172a) : Colors.white,
-                boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10)],
-              ),
-              child: FlightsV2Drawer(
-                flight: flight, 
-                dark: dark,
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return SlideTransition(
-          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic)),
-          child: child,
-        );
-      },
-    ).then((_) {
-      if (mounted) {
-        logic.fetchFlights(silent: true);
-        setState(() {});
-      }
-    });
   }
 
   Widget _buildStatusBadge(String status) {
