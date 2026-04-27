@@ -10,7 +10,6 @@ import '../dashboard_view_module.dart';
 import '../system_bf_v2/system_bf_v2_screen.dart';
 
 import '../flights_v2/flights_v2_screen.dart';
-import '../ulds_v2/ulds_v2_screen.dart';
 import '../system_v2/system_v2_screen.dart';
 import '../coordinator_v2/coordinator_v2_screen.dart';
 import '../awbs_v2/awbs_v2_screen.dart';
@@ -342,17 +341,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   12,
                                 ),
 
-                              if (can('ulds'))
-                                _buildNavItem(
-                                  Icons.inventory_2_outlined,
-                                  'ULDs',
-                                  13,
-                                ),
+
 
                               if (can('awbs'))
                                 _buildNavItem(
                                   Icons.description_outlined,
-                                  'AWBs',
+                                  'Storage',
                                   16,
                                 ),
 
@@ -797,7 +791,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SystemBfV2Screen(),
         const SizedBox.shrink(), // Formerly V1 AreaNobreakModule
         FlightsV2Screen(isActive: _selectedIndex == 12),
-        UldsV2Screen(isActive: _selectedIndex == 13),
+        const SizedBox.shrink(), // Formerly UldsV2Screen
         const SystemV2Screen(),
         const CoordinatorV2Screen(),
         AwbsV2Screen(isActive: _selectedIndex == 16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../services/realtime_service.dart';
 
 class LocationV2Logic extends ChangeNotifier {
   final supabase = Supabase.instance.client;
@@ -20,7 +21,7 @@ class LocationV2Logic extends ChangeNotifier {
   bool isLoadingUldAwbs = false;
   List<Map<String, dynamic>> uldAwbs = [];
 
-  RealtimeChannel? _uldsSubscription;
+  void Function()? _uldsListener;
 
   bool showCompletedUlds = false;
 
@@ -31,7 +32,9 @@ class LocationV2Logic extends ChangeNotifier {
 
   @override
   void dispose() {
-    _uldsSubscription?.unsubscribe();
+    if (_uldsListener != null) {
+      realtimeService.ulds.removeListener(_uldsListener!);
+    }
     super.dispose();
   }
 
@@ -47,8 +50,10 @@ class LocationV2Logic extends ChangeNotifier {
       ulds = [];
       selectedUldId = null;
       uldAwbs = [];
-      _uldsSubscription?.unsubscribe();
-      _uldsSubscription = null;
+      if (_uldsListener != null) {
+        realtimeService.ulds.removeListener(_uldsListener!);
+        _uldsListener = null;
+      }
     } else {
       selectedFlightId = idFlight;
       selectedUldId = null;
@@ -60,24 +65,13 @@ class LocationV2Logic extends ChangeNotifier {
   }
 
   void _subscribeToUlds(String idFlight) {
-    _uldsSubscription?.unsubscribe();
-    _uldsSubscription = supabase
-        .channel('public:ulds:location_$idFlight')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'ulds',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id_flight',
-            value: idFlight,
-          ),
-          callback: (payload) {
-            // Re-fetch ULDs when a change occurs (e.g. coordinator approves one)
-            fetchUldsForFlight(idFlight, isSilent: true);
-          },
-        )
-        .subscribe();
+    if (_uldsListener != null) {
+      realtimeService.ulds.removeListener(_uldsListener!);
+    }
+    _uldsListener = () {
+      fetchUldsForFlight(idFlight, isSilent: true);
+    };
+    realtimeService.ulds.addListener(_uldsListener!);
   }
 
   void selectUld(String idUld) {

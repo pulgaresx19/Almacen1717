@@ -290,7 +290,6 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
                 ),
             ],
           ),
-          const SizedBox(height: 24),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,22 +311,22 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Expanded(child: _buildModernDetail('First Truck', _formatTimestamp(widget.flight['first_truck']?.toString(), textP, textS), Icons.local_shipping_outlined, textP, textS, controller: _firstTruckCtrl, type: FieldType.date)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildModernDetail('Last Truck', _formatTimestamp(widget.flight['last_truck']?.toString(), textP, textS), Icons.local_shipping, textP, textS, controller: _lastTruckCtrl, type: FieldType.date)),
+              const SizedBox(width: 8),
               Expanded(child: _buildModernDetail('Start Break', _formatTimestamp(widget.flight['start_break']?.toString(), textP, textS), Icons.play_circle_outline, textP, textS, controller: _startBreakCtrl, type: FieldType.date)),
               const SizedBox(width: 8),
               Expanded(child: _buildModernDetail('End Break', _formatTimestamp(widget.flight['end_break']?.toString(), textP, textS), Icons.stop_circle_outlined, textP, textS, controller: _endBreakCtrl, type: FieldType.date)),
               const SizedBox(width: 8),
-              Expanded(child: _buildModernDetail('First Truck', _formatTimestamp(widget.flight['first_truck']?.toString(), textP, textS), Icons.local_shipping_outlined, textP, textS, controller: _firstTruckCtrl, type: FieldType.date)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildModernDetail('Last Truck', _formatTimestamp(widget.flight['last_truck']?.toString(), textP, textS), Icons.local_shipping, textP, textS, controller: _lastTruckCtrl, type: FieldType.date)),
+              Expanded(
+                flex: (_statusCtrl.text == 'Delayed' || (widget.flight['status'] == 'Delayed')) ? 1 : 2,
+                child: _buildModernDetail('Remarks', widget.flight['remarks']?.toString() ?? '-', Icons.notes, textP, textS, controller: _remarksCtrl),
+              ),
               if (_statusCtrl.text == 'Delayed' || (widget.flight['status'] == 'Delayed')) ...[
                 const SizedBox(width: 8),
                 Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Hora Delay' : 'Delayed Time', _formatTimestamp(widget.flight['time_delay']?.toString(), const Color(0xFFf97316), const Color(0xFFea580c)), Icons.history_toggle_off_rounded, const Color(0xFFf97316), const Color(0xFFea580c), controller: _timeDelayedCtrl, type: FieldType.date, isError: _timeDelayError)),
-              ] else ...[
-                const SizedBox(width: 8),
-                const Expanded(child: SizedBox.shrink()),
               ],
-              const SizedBox(width: 8),
-              Expanded(child: _buildModernDetail('Remarks', widget.flight['remarks']?.toString() ?? '-', Icons.notes, textP, textS, controller: _remarksCtrl)),
             ],
           ),
         ],

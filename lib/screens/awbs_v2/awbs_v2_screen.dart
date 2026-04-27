@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import '../add_awb_v2/add_awb_v2_screen.dart';
+import '../add_uld_v2/add_uld_v2_screen.dart';
 // removed intl
 // unused import removed
 import 'awbs_v2_pdf_exporter.dart';
 import 'awbs_v2_drawer.dart';
+import '../../services/realtime_service.dart';
 
 class AwbsV2Screen extends StatefulWidget {
   final bool isActive;
@@ -20,14 +22,15 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
   final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
   final GlobalKey<AddAwbV2ScreenState> _addAwbKey = GlobalKey<AddAwbV2ScreenState>();
+  final GlobalKey<AddUldV2ScreenState> _addUldKey = GlobalKey<AddUldV2ScreenState>();
   final Set<String> _selectedAwbIds = {};
   bool _showAddForm = false;
-  late Stream<List<Map<String, dynamic>>> _awbStream;
+  bool _showAddUldForm = false;
+  bool _showUldTab = false;
 
   @override
   void initState() {
     super.initState();
-    _awbStream = Supabase.instance.client.from('awbs').stream(primaryKey: ['id']).order('awb_number', ascending: true);
   }
 
   @override
@@ -125,18 +128,81 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           Text(appLanguage.value == 'es' ? 'Añadir Nuevo Aerobill' : 'Add New Air Waybill', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         ],
                       )
-                    else
-                      Text(appLanguage.value == 'es' ? 'Guías Aéreas' : 'Air Waybills (AWB)', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    if (_showAddForm)
-                      Text(appLanguage.value == 'es' ? 'Crea y registra detalles de los aerobills.' : 'Create and register Air Waybill details.', style: TextStyle(color: textS, fontSize: 13))
-                    else
-                      Text(appLanguage.value == 'es' ? 'Administración y desglose de guías aéreas.' : 'Management and breakdown of Air Waybills.', style: TextStyle(color: textS, fontSize: 13)),
+                    else if (_showAddUldForm)
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () async {
+                              if (_addUldKey.currentState != null) {
+                                final canPop = await _addUldKey.currentState!.handleBackRequest();
+                                if (canPop) {
+                                  setState(() => _showAddUldForm = false);
+                                }
+                              } else {
+                                setState(() => _showAddUldForm = false);
+                              }
+                            },
+                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
+                          ),
+                          const SizedBox(width: 8),
+                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo ULD' : 'Add New ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    if (_showAddForm) ...[
+                      const SizedBox(height: 4),
+                      Text(appLanguage.value == 'es' ? 'Crea y registra detalles de los aerobills.' : 'Create and register Air Waybill details.', style: TextStyle(color: textS, fontSize: 13)),
+                    ] else if (_showAddUldForm) ...[
+                      const SizedBox(height: 4),
+                      Text(appLanguage.value == 'es' ? 'Registra un ULD en la nueva base de datos.' : 'Register a ULD in the new database.', style: TextStyle(color: textS, fontSize: 13)),
+                    ] else ...[
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              if (_showUldTab) {
+                                setState(() {
+                                  _showUldTab = false;
+                                  _searchController.clear();
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: !_showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(appLanguage.value == 'es' ? 'Números AWB' : 'AWB Numbers', style: TextStyle(color: !_showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              if (!_showUldTab) {
+                                setState(() {
+                                  _showUldTab = true;
+                                  _searchController.clear();
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(appLanguage.value == 'es' ? 'ULDs No Break' : 'No Break ULDs', style: TextStyle(color: _showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
                 const Spacer(),
                 
-                if (!_showAddForm) ...[
+                if (!_showAddForm && !_showAddUldForm) ...[
                   // Search Box
                   Container(
                     width: 300,
@@ -190,24 +256,42 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                   ),
                   const SizedBox(width: 16),
                   
-                  // Add AWB Button
-                  if (currentUserData.value?['position'] != 'Supervisor')
+                  // Add Buttons
+                  if (currentUserData.value?['position'] != 'Supervisor') ...[
                     SizedBox(
-                    height: 40,
-                    child: ElevatedButton.icon(
-                      onPressed: () => setState(() => _showAddForm = true),
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366f1),
-                        foregroundColor: Colors.white,
-                        elevation: 4,
-                        shadowColor: const Color(0xFF6366f1).withAlpha(100),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      height: 40,
+                      child: ElevatedButton.icon(
+                        onPressed: () => setState(() => _showAddForm = true),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton.icon(
+                        onPressed: () => setState(() => _showAddUldForm = true),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(width: 8),
                 ],
               ],
@@ -225,6 +309,18 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                   },
                 ),
               )
+            else if (_showAddUldForm)
+              Expanded(
+                child: AddUldV2Screen(
+                  key: _addUldKey,
+                  isInline: true,
+                  onPop: (didAdd) {
+                    setState(() {
+                      _showAddUldForm = false;
+                    });
+                  },
+                ),
+              )
             else
               Expanded(
                 child: Stack(
@@ -238,33 +334,159 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                         ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: _awbStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
-                  }
+                    child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+                      valueListenable: _showUldTab ? realtimeService.ulds : realtimeService.awbs,
+                builder: (context, dataList, child) {
                   
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)));
+                  if (dataList.isEmpty) {
+                    if (_showUldTab) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.inventory_2_rounded, size: 64, color: dark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(20)),
+                            const SizedBox(height: 16),
+                            Text(appLanguage.value == 'es' ? 'No hay ULDs' : 'No Break ULDs', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Text(appLanguage.value == 'es' ? 'Aún no hay ULDs registrados.' : 'There are no registered ULDs yet.', style: TextStyle(color: textS)),
+                          ],
+                        )
+                      );
+                    } else {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.flight_land_rounded, size: 64, color: dark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(20)),
+                            const SizedBox(height: 16),
+                            Text(appLanguage.value == 'es' ? 'No hay AWBs' : 'No AWBs', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            Text(appLanguage.value == 'es' ? 'Aún no hay AWBs registrados.' : 'There are no registered AWBs yet.', style: TextStyle(color: textS)),
+                          ],
+                        )
+                      );
+                    }
                   }
 
-                  if (snapshot.data == null || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.flight_land_rounded, size: 64, color: dark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(20)),
-                          const SizedBox(height: 16),
-                          Text(appLanguage.value == 'es' ? 'No hay AWBs' : 'No AWBs', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text(appLanguage.value == 'es' ? 'Aún no hay AWBs registrados.' : 'There are no registered AWBs yet.', style: TextStyle(color: textS)),
-                        ],
-                      )
+                  if (_showUldTab) {
+                    var ulds = dataList.where((u) => u['is_break'] != true).toList();
+                    
+                    if (_searchController.text.isNotEmpty) {
+                      final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
+                      ulds = ulds.where((u) {
+                        final uldSearch = (u['uld_number']?.toString() ?? u['ULD-number']?.toString() ?? '').toLowerCase();
+                        final statusSearch = (u['status']?.toString() ?? 'Received').toLowerCase();
+                        final combinedString = '$uldSearch $statusSearch';
+                        return terms.every((term) => combinedString.contains(term));
+                      }).toList();
+                    }
+
+                    if (ulds.isEmpty) {
+                      return Center(child: Text(appLanguage.value == 'es' ? 'No se encontraron ULDs.' : 'No ULDs found matching the search.', style: const TextStyle(color: Colors.grey)));
+                    }
+
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Scrollbar(
+                          controller: _horizontalScrollController,
+                          thumbVisibility: true,
+                          thickness: 8,
+                          radius: const Radius.circular(8),
+                          interactive: true,
+                          child: SingleChildScrollView(
+                            controller: _horizontalScrollController,
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minWidth: constraints.maxWidth, minHeight: constraints.maxHeight),
+                              child: SingleChildScrollView(
+                                child: DataTable(
+                                  columnSpacing: 28,
+                                  showCheckboxColumn: false,
+                                  headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
+                                  dataRowColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.hovered) ? (dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6)) : Colors.transparent),
+                                  dataTextStyle: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13),
+                                  headingTextStyle: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600, fontSize: 12),
+                                  columns: const [
+                                    DataColumn(label: Text('#')),
+                                    DataColumn(label: Text('ULD Number')),
+                                    DataColumn(label: Text('Ref. Flight')),
+                                    DataColumn(label: Text('Time Received')),
+                                    DataColumn(label: Text('Total Pieces')),
+                                    DataColumn(label: Text('Total Weight')),
+                                    DataColumn(label: Text('Status')),
+                                  ],
+                                  rows: List.generate(ulds.length, (index) {
+                                    final u = ulds[index];
+                                    final uldNum = u['uld_number']?.toString() ?? u['ULD-number']?.toString() ?? '-';
+                                    int totalPieces = int.tryParse(u['pieces_total']?.toString() ?? '0') ?? 0;
+                                    double totalWeight = double.tryParse(u['weight_total']?.toString() ?? '0') ?? 0.0;
+                                    String status = u['status']?.toString() ?? 'Received';
+
+                                    final flightId = u['id_flight']?.toString();
+                                    String flightDisplay = '-';
+                                    if (flightId != null) {
+                                      try {
+                                        final fList = realtimeService.flights.value;
+                                        final flight = fList.firstWhere((f) => f['id_flight'].toString() == flightId, orElse: () => <String, dynamic>{});
+                                        if (flight.isNotEmpty) {
+                                          flightDisplay = '${flight['carrier'] ?? ''} ${flight['number'] ?? ''}'.trim();
+                                          final fDate = flight['date']?.toString();
+                                          if (fDate != null && fDate.isNotEmpty && fDate != '-') {
+                                            try {
+                                              final dt = DateTime.parse(fDate).toLocal();
+                                              final padDate = "${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}";
+                                              if (flightDisplay.isNotEmpty) {
+                                                flightDisplay += ' ($padDate)';
+                                              } else {
+                                                flightDisplay = padDate;
+                                              }
+                                            } catch (_) {}
+                                          }
+                                        }
+                                      } catch (_) {}
+                                    }
+
+                                    String timeReceivedDisplay = '-';
+                                    final timeRecvStr = u['time_received']?.toString() ?? u['time-received']?.toString();
+                                    if (timeRecvStr != null && timeRecvStr.isNotEmpty) {
+                                      try {
+                                        final dt = DateTime.parse(timeRecvStr).toLocal();
+                                        final padDate = "${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}";
+                                        int hour = dt.hour;
+                                        final isPm = hour >= 12;
+                                        if (hour == 0) {
+                                          hour = 12;
+                                        } else if (hour > 12) {
+                                          hour -= 12;
+                                        }
+                                        final amPm = isPm ? 'PM' : 'AM';
+                                        final padMin = dt.minute.toString().padLeft(2, '0');
+                                        timeReceivedDisplay = '$padDate $hour:$padMin $amPm';
+                                      } catch (_) {}
+                                    }
+
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(Text('${index + 1}')),
+                                        DataCell(Text(uldNum, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
+                                        DataCell(Text(flightDisplay, style: const TextStyle(fontWeight: FontWeight.w600))),
+                                        DataCell(Text(timeReceivedDisplay)),
+                                        DataCell(Text(totalPieces.toString())),
+                                        DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\.$|\.0$'), '')} kg')),
+                                        DataCell(Text(status, style: TextStyle(color: status == 'Received' ? Colors.blue : Colors.green))),
+                                      ],
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     );
                   }
 
-                  var awbs = snapshot.data ?? [];
+                  var awbs = dataList;
                   
                   if (_searchController.text.isNotEmpty) {
                     final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();

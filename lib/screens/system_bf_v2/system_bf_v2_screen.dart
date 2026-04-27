@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show isDarkMode;
+import '../../services/realtime_service.dart';
 
 class SystemBfV2Screen extends StatefulWidget {
   const SystemBfV2Screen({super.key});
@@ -10,15 +11,11 @@ class SystemBfV2Screen extends StatefulWidget {
 }
 
 class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
-  late Stream<List<Map<String, dynamic>>> _system1Stream;
-  late Stream<List<Map<String, dynamic>>> _system2Stream;
   bool _isSplitView = false;
 
   @override
   void initState() {
     super.initState();
-    _system1Stream = Supabase.instance.client.from('system1').stream(primaryKey: ['id']).eq('id', 1);
-    _system2Stream = Supabase.instance.client.from('system2').stream(primaryKey: ['id']).eq('id', 1);
   }
 
   @override
@@ -45,7 +42,7 @@ class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
                           context: context,
                           systemName: 'ULD Received',
                           tableName: 'system1',
-                          stream: _system1Stream,
+                          valueListenable: realtimeService.system1,
                           dark: dark,
                           index: 1,
                           isLeft: true,
@@ -59,7 +56,7 @@ class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
                           context: context,
                           systemName: 'System 1',
                           tableName: 'system1',
-                          stream: _system1Stream,
+                          valueListenable: realtimeService.system1,
                           dark: dark,
                           index: 1,
                           isLeft: true,
@@ -72,7 +69,7 @@ class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
                           context: context,
                           systemName: 'System 2',
                           tableName: 'system2',
-                          stream: _system2Stream,
+                          valueListenable: realtimeService.system2,
                           dark: dark,
                           index: 2,
                           isLeft: false,
@@ -104,7 +101,7 @@ class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
     required BuildContext context,
     required String systemName,
     required String tableName,
-    required Stream<List<Map<String, dynamic>>> stream,
+    required ValueNotifier<List<Map<String, dynamic>>> valueListenable,
     required bool dark,
     required int index,
     required bool isLeft,
@@ -117,25 +114,12 @@ class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
         ? Colors.white.withAlpha(20)
         : Colors.black.withAlpha(20);
 
-    return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: stream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return Container(
-            decoration: BoxDecoration(
-              color: bgCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderC),
-            ),
-            child: const Center(
-              child: CircularProgressIndicator(color: Color(0xFF6366f1)),
-            ),
-          );
-        }
+    return ValueListenableBuilder<List<Map<String, dynamic>>>(
+      valueListenable: valueListenable,
+      builder: (context, systemList, _) {
 
-        final data = (snapshot.data != null && snapshot.data!.isNotEmpty)
-            ? snapshot.data!.first
+        final data = systemList.isNotEmpty
+            ? systemList.first
             : <String, dynamic>{};
 
         final carrier = data['carrier_flight$index']?.toString() ?? 'N/A';

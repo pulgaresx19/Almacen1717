@@ -6,6 +6,7 @@ import 'delivers_v2_logic.dart';
 import 'delivers_v2_table.dart';
 import 'deliver_pdf_exporter.dart';
 import 'delivers_v2_history.dart';
+import '../../services/realtime_service.dart';
 
 class DeliversV2Screen extends StatefulWidget {
   final bool isActive;
@@ -21,7 +22,6 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
   bool _showAddForm = false;
   bool _showHistory = false;
   final GlobalKey<AddDeliverV2ScreenState> _addDeliverKey = GlobalKey<AddDeliverV2ScreenState>();
-  late Stream<List<Map<String, dynamic>>> _deliversStream;
 
   @override
   void initState() {
@@ -29,7 +29,6 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
     _searchController.addListener(() {
       _logic.updateSearchQuery(_searchController.text);
     });
-    _deliversStream = Supabase.instance.client.from('deliveries').stream(primaryKey: ['id_delivery']).order('time', ascending: true);
   }
 
   @override
@@ -202,17 +201,10 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                           ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: StreamBuilder<List<Map<String, dynamic>>>(
-                            stream: _deliversStream,
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                                return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
-                              }
-                              if (snapshot.hasError) {
-                                return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)));
-                              }
-        
-                              var items = snapshot.data ?? [];
+                          child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+                            valueListenable: realtimeService.deliveries,
+                            builder: (context, deliversList, child) {
+                              var items = deliversList;
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 _logic.setDelivers(items);
                               });

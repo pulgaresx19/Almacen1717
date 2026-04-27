@@ -212,16 +212,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              appLanguage.value == 'es' ? 'ULDs del Vuelo' : 'ULDs in Flight',
-              style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
+
         Expanded(
           child: widget.isLoading
               ? const Center(child: CircularProgressIndicator())

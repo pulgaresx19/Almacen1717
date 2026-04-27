@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../main.dart' show isDarkMode;
 import 'package:intl/intl.dart';
 import 'driver_v2_verify_dialog.dart';
+import '../../services/realtime_service.dart';
 
 class DriverV2Panel extends StatelessWidget {
   const DriverV2Panel({super.key});
@@ -13,20 +14,10 @@ class DriverV2Panel extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
-        return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: Supabase.instance.client
-              .from('deliveries')
-              .stream(primaryKey: ['id_delivery'])
-              .order('time', ascending: true),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
-            }
-
-            var items = List<Map<String, dynamic>>.from(snapshot.data ?? []);
+        return ValueListenableBuilder<List<Map<String, dynamic>>>(
+          valueListenable: realtimeService.deliveries,
+          builder: (context, deliversList, child) {
+            var items = List<Map<String, dynamic>>.from(deliversList);
             
             // Sort by priority (true first), then by time (oldest first)
             items.sort((a, b) {

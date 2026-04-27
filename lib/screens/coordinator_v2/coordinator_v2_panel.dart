@@ -636,7 +636,7 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                     ),
                 ],
               ],
-              if (widget.logic.selectedFlightId != null)
+              if (widget.logic.selectedFlightId != null && widget.logic.ulds.isNotEmpty)
                 CoordinatorV2Footer(dark: dark, logic: widget.logic),
             ],
           ),
