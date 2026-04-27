@@ -31,16 +31,26 @@ class SystemV2UldItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isLastTouched = logic.lastReceivedUld?['id_uld'] == uld['id_uld'];
+    
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: bgCard,
+            color: isLastTouched ? const Color(0xFF10b981).withAlpha(dark ? 25 : 15) : bgCard,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: borderC),
+            border: Border.all(
+              color: isLastTouched ? const Color(0xFF10b981).withAlpha(150) : borderC,
+              width: 1.0,
+            ),
+            boxShadow: isLastTouched
+                ? [BoxShadow(color: const Color(0xFF10b981).withAlpha(15), blurRadius: 4, offset: const Offset(0, 2))]
+                : [],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -77,24 +87,20 @@ class SystemV2UldItem extends StatelessWidget {
                       child: Text('${uld['uld_number'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      width: 75,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(6),
+                    SizedBox(
+                      width: 55,
+                      child: Text(
+                        '${uld['pieces_total'] ?? uld['pieces'] ?? '-'} pcs',
+                        style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
-                      child: Text('PCs: ${uld['pieces_total'] ?? uld['pieces'] ?? '-'}', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      width: 90,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
-                        borderRadius: BorderRadius.circular(6),
+                    SizedBox(
+                      width: 60,
+                      child: Text(
+                        '${uld['weight_total'] ?? uld['weight'] ?? '-'} kg',
+                        style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
                       ),
-                      child: Text('${uld['weight_total'] ?? uld['weight'] ?? '-'} kg', style: TextStyle(color: textS, fontSize: 12), overflow: TextOverflow.ellipsis),
                     ),
                     if (uld['remarks'] != null && uld['remarks'].toString().trim().isNotEmpty) ...[
                       const SizedBox(width: 12),

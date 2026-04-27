@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../main.dart' show isDarkMode;
+import '../../main.dart' show isDarkMode;
 
-class SystemBfModule extends StatefulWidget {
-  const SystemBfModule({super.key});
+class SystemBfV2Screen extends StatefulWidget {
+  const SystemBfV2Screen({super.key});
 
   @override
-  State<SystemBfModule> createState() => _SystemBfModuleState();
+  State<SystemBfV2Screen> createState() => _SystemBfV2ScreenState();
 }
 
-class _SystemBfModuleState extends State<SystemBfModule> {
+class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
   late Stream<List<Map<String, dynamic>>> _system1Stream;
   late Stream<List<Map<String, dynamic>>> _system2Stream;
   bool _isSplitView = false;
@@ -17,8 +17,8 @@ class _SystemBfModuleState extends State<SystemBfModule> {
   @override
   void initState() {
     super.initState();
-    _system1Stream = Supabase.instance.client.from('System1').select().eq('id', 1).limit(1).asStream();
-    _system2Stream = Supabase.instance.client.from('System2').select().eq('id', 1).limit(1).asStream();
+    _system1Stream = Supabase.instance.client.from('system1').stream(primaryKey: ['id']).eq('id', 1);
+    _system2Stream = Supabase.instance.client.from('system2').stream(primaryKey: ['id']).eq('id', 1);
   }
 
   @override
@@ -44,7 +44,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                         child: _buildSystemCard(
                           context: context,
                           systemName: 'ULD Received',
-                          tableName: 'System1',
+                          tableName: 'system1',
                           stream: _system1Stream,
                           dark: dark,
                           index: 1,
@@ -58,7 +58,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                         child: _buildSystemCard(
                           context: context,
                           systemName: 'System 1',
-                          tableName: 'System1',
+                          tableName: 'system1',
                           stream: _system1Stream,
                           dark: dark,
                           index: 1,
@@ -71,7 +71,7 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                         child: _buildSystemCard(
                           context: context,
                           systemName: 'System 2',
-                          tableName: 'System2',
+                          tableName: 'system2',
                           stream: _system2Stream,
                           dark: dark,
                           index: 2,
@@ -138,9 +138,9 @@ class _SystemBfModuleState extends State<SystemBfModule> {
             ? snapshot.data!.first
             : <String, dynamic>{};
 
-        final carrier = data['carrier-flight$index']?.toString() ?? 'N/A';
-        final number = data['number-flight$index']?.toString() ?? 'N/A';
-        final rawDate = data['date-flight$index']?.toString() ?? 'N/A';
+        final carrier = data['carrier_flight$index']?.toString() ?? 'N/A';
+        final number = data['number_flight$index']?.toString() ?? 'N/A';
+        final rawDate = data['date_flight$index']?.toString() ?? 'N/A';
 
         String formattedDate = rawDate;
         if (rawDate != 'N/A') {
@@ -165,11 +165,11 @@ class _SystemBfModuleState extends State<SystemBfModule> {
           }
         }
 
-        final uldNumber = data['ULD-number$index']?.toString() ?? 'N/A';
-        final hasBreakValue = data['ULD-isBreak$index'] != null;
+        final uldNumber = data['ULD_number$index']?.toString() ?? 'N/A';
+        final hasBreakValue = data['ULD_isBreak$index'] != null;
         final isBreak =
-            data['ULD-isBreak$index'] == true ||
-            data['ULD-isBreak$index']?.toString().toLowerCase() == 'true';
+            data['ULD_isBreak$index'] == true ||
+            data['ULD_isBreak$index']?.toString().toLowerCase() == 'true';
 
         return Container(
           padding: const EdgeInsets.all(24.0),
@@ -238,18 +238,18 @@ class _SystemBfModuleState extends State<SystemBfModule> {
               // Datos del vuelo compactos
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 20,
+                  horizontal: 24,
+                  vertical: 36,
                 ),
                 decoration: BoxDecoration(
                   color: dark
-                      ? Colors.black.withAlpha(20)
-                      : Colors.grey.withAlpha(20),
-                  borderRadius: BorderRadius.circular(12),
+                      ? Colors.black.withAlpha(40)
+                      : Colors.grey.withAlpha(30),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: dark
-                        ? Colors.white.withAlpha(10)
-                        : Colors.black.withAlpha(5),
+                        ? Colors.white.withAlpha(20)
+                        : Colors.black.withAlpha(10),
                   ),
                 ),
                 child: Column(
@@ -257,10 +257,10 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     Text(
                       'FLIGHT DATA',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 18,
                         color: textS,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.1,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -269,24 +269,24 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                           ? 'No flight assigned'
                           : '$carrier $number',
                       style: TextStyle(
-                        fontSize: 26,
+                        fontSize: 48,
                         color: textP,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.0,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.calendar_month, color: textS, size: 16),
-                        const SizedBox(width: 6),
+                        Icon(Icons.calendar_month, color: textS, size: 24),
+                        const SizedBox(width: 8),
                         Text(
                           formattedDate,
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 24,
                             color: textS,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -304,11 +304,31 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: dark
-                          ? Colors.white.withAlpha(5)
-                          : const Color(0xFFF9FAFB),
+                      color: hasBreakValue
+                          ? (isBreak
+                                ? const Color(0xFF10b981)
+                                : const Color(0xFFef4444))
+                          : (dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB)),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderC),
+                      border: Border.all(
+                        color: hasBreakValue
+                            ? (isBreak
+                                  ? const Color(0xFF059669)
+                                  : const Color(0xFFdc2626))
+                            : borderC,
+                        width: hasBreakValue ? 4 : 1,
+                      ),
+                      boxShadow: [
+                        if (hasBreakValue)
+                          BoxShadow(
+                            color: (isBreak
+                                    ? const Color(0xFF10b981)
+                                    : const Color(0xFFef4444))
+                                .withAlpha(80),
+                            blurRadius: 24,
+                            spreadRadius: 6,
+                          ),
+                      ],
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -317,60 +337,31 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                         Text(
                           uldNumber,
                           style: TextStyle(
-                            fontSize: 48,
+                            fontSize: 64,
                             fontWeight: FontWeight.w900,
-                            color: textP,
-                            letterSpacing: 2,
+                            color: hasBreakValue ? Colors.white : textP,
+                            letterSpacing: 3,
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 16),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 48,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: hasBreakValue
-                                ? (isBreak
-                                      ? const Color(0xFF10b981).withAlpha(40)
-                                      : const Color(0xFFef4444).withAlpha(40))
-                                : Colors.grey.withAlpha(40),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: hasBreakValue
-                                  ? (isBreak
-                                        ? const Color(0xFF10b981)
-                                        : const Color(0xFFef4444))
-                                  : Colors.grey,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              if (hasBreakValue)
-                                BoxShadow(
-                                  color:
-                                      (isBreak
-                                              ? const Color(0xFF10b981)
-                                              : const Color(0xFFef4444))
-                                          .withAlpha(20),
-                                  blurRadius: 12,
-                                  spreadRadius: 2,
-                                ),
-                            ],
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                          decoration: hasBreakValue 
+                            ? BoxDecoration(
+                                color: Colors.white.withAlpha(30),
+                                borderRadius: BorderRadius.circular(12),
+                              ) 
+                            : null,
                           child: Text(
                             hasBreakValue
                                 ? (isBreak ? 'BREAK' : 'NO BREAK')
                                 : 'N/A',
                             style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              color: hasBreakValue
-                                  ? (isBreak
-                                        ? const Color(0xFF10b981)
-                                        : const Color(0xFFef4444))
-                                  : Colors.grey.shade600,
-                              letterSpacing: 1.5,
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                              color: hasBreakValue ? Colors.white : Colors.grey.shade600,
+                              letterSpacing: 2.0,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -393,8 +384,8 @@ class _SystemBfModuleState extends State<SystemBfModule> {
                       await Supabase.instance.client
                           .from(tableName)
                           .update({
-                            'ULD-number$index': null,
-                            'ULD-isBreak$index': null,
+                            'ULD_number$index': null,
+                            'ULD_isBreak$index': null,
                           })
                           .eq('id', 1);
                     } catch (e) {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../main.dart' show appLanguage;
 import 'location_v2_logic.dart';
-import 'location_v2_awbs.dart';
+import 'location_v2_uld_modal.dart';
 
 class LocationV2Ulds extends StatelessWidget {
   final LocationV2Logic logic;
@@ -206,7 +206,16 @@ class LocationV2Ulds extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
                     final id = uld['id_uld']?.toString() ?? '';
-                    if (id.isNotEmpty) logic.selectUld(id);
+                    if (id.isNotEmpty) {
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => LocationV2UldModal(
+                          uld: uld,
+                          logic: logic,
+                        ),
+                      );
+                    }
                   },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -326,11 +335,8 @@ class LocationV2Ulds extends StatelessWidget {
                                   onPressed: isReadyToComplete ? () {
                                     final idUld = uld['id_uld']?.toString();
                                     if (idUld != null && idUld.isNotEmpty) {
-                                      if (logic.selectedUldId == idUld) {
-                                        logic.selectUld(idUld); // Collapses the ULD immediately
-                                      }
                                       onUldCompleted?.call();
-                                      logic.markUldAsCompleted(idUld); // Fire and forget
+                                      logic.markUldAsCompleted(idUld);
                                     }
                                   } : null,
                                 ),
@@ -344,8 +350,8 @@ class LocationV2Ulds extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            isSelected ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                            color: isSelected ? const Color(0xFF6366f1) : textS,
+                            Icons.keyboard_arrow_right_rounded,
+                            color: textS,
                             size: 20,
                           ),
                         ],
@@ -353,11 +359,6 @@ class LocationV2Ulds extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (isSelected)
-                  LocationV2Awbs(
-                    logic: logic,
-                    dark: dark,
-                  ),
               ],
             ),
           );

@@ -7,7 +7,7 @@ import '../auth/login_screen.dart';
 
 import '../users_module.dart';
 import '../dashboard_view_module.dart';
-import '../system_bf_module.dart';
+import '../system_bf_v2/system_bf_v2_screen.dart';
 import '../area_nobreak_module.dart';
 import '../flights_v2/flights_v2_screen.dart';
 import '../ulds_v2/ulds_v2_screen.dart';
@@ -784,7 +784,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox.shrink(), // Formerly V1 CoordinatorModule
         const SizedBox.shrink(), // Formerly V1 LocationModule
         const SizedBox.shrink(), // Formerly V1 DriverModule
-        const SystemBfModule(),
+        const SystemBfV2Screen(),
         const AreaNobreakModule(),
         FlightsV2Screen(isActive: _selectedIndex == 12),
         UldsV2Screen(isActive: _selectedIndex == 13),

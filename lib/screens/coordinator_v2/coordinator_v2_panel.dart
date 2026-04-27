@@ -1,19 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import 'coordinator_v2_logic.dart';
 import 'coordinator_v2_uld_awbs.dart';
 import 'coordinator_v2_footer.dart';
 
-class CoordinatorV2Panel extends StatelessWidget {
+class CoordinatorV2Panel extends StatefulWidget {
   final CoordinatorV2Logic logic;
 
   const CoordinatorV2Panel({super.key, required this.logic});
 
+  @override
+  State<CoordinatorV2Panel> createState() => _CoordinatorV2PanelState();
+}
+
+class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickDate(BuildContext context) async {
     final dt = await showDatePicker(
       context: context,
-      initialDate: logic.selectedDate ?? DateTime.now(),
+      initialDate: widget.logic.selectedDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       builder: (context, child) {
@@ -36,7 +50,7 @@ class CoordinatorV2Panel extends StatelessWidget {
       },
     );
     if (dt != null) {
-      logic.setDate(dt);
+      widget.logic.setDate(dt);
     }
   }
 
@@ -150,7 +164,7 @@ class CoordinatorV2Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([logic, isDarkMode]),
+      listenable: Listenable.merge([widget.logic, isDarkMode]),
       builder: (context, child) {
         final dark = isDarkMode.value;
         final textP = dark ? Colors.white : const Color(0xFF111827);
@@ -165,31 +179,82 @@ class CoordinatorV2Panel extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: (!logic.isLoadingFlights && logic.flights.isNotEmpty)
-                    ? MainAxisAlignment.spaceBetween
-                    : MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  if (!logic.isLoadingFlights && logic.flights.isNotEmpty)
-                    Text(
-                      appLanguage.value == 'es'
-                          ? 'Vuelos en esta fecha'
-                          : 'Flights on this date',
-                      style: TextStyle(
-                        color: textS,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                  SizedBox(
+                    width: 200,
+                    child: Container(
+                      height: 40,
+                      margin: const EdgeInsets.only(right: 16),
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(10),
+                          TextInputFormatter.withFunction(
+                            (oldValue, newValue) => newValue.copyWith(
+                              text: newValue.text.toUpperCase(),
+                            ),
+                          ),
+                        ],
+                        style: TextStyle(
+                          color: textP,
+                          fontSize: 13,
+                        ),
+                        onChanged: (v) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...',
+                          hintStyle: TextStyle(
+                            color: textS.withAlpha(150),
+                            fontSize: 13,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.close, size: 16),
+                                  color: textS,
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                )
+                              : const Icon(Icons.search, size: 16, color: Colors.grey),
+                        ),
                       ),
                     ),
+                  ),
+                  
+                  Text(
+                    appLanguage.value == 'es' ? 'Coordinador de Vuelos' : 'Flight Coordinator',
+                    style: TextStyle(
+                      color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+
                   ElevatedButton.icon(
                     onPressed: () => _pickDate(context),
                     icon: const Icon(Icons.calendar_today_rounded, size: 16),
                     label: Text(
-                      logic.selectedDate == null
+                      widget.logic.selectedDate == null
                           ? (appLanguage.value == 'es'
                               ? 'Seleccionar Fecha'
                               : 'Select Date')
-                          : DateFormat('MM/dd/yyyy').format(logic.selectedDate!),
+                          : DateFormat('MM/dd/yyyy').format(widget.logic.selectedDate!),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF6366f1),
@@ -205,20 +270,18 @@ class CoordinatorV2Panel extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
-              if (logic.isLoadingFlights)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.only(top: 40),
+              const SizedBox(height: 16),
+              if (widget.logic.isLoadingFlights)
+                const Expanded(
+                  child: Center(
                     child: CircularProgressIndicator(color: Color(0xFF6366f1)),
                   ),
                 )
-              else if (logic.flights.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 40),
+              else if (widget.logic.flights.isEmpty)
+                Expanded(
+                  child: Center(
                     child: Text(
-                      logic.selectedDate == null
+                      widget.logic.selectedDate == null
                           ? (appLanguage.value == 'es'
                               ? 'Selecciona una fecha.'
                               : 'Pick a date to load flights.')
@@ -233,9 +296,9 @@ class CoordinatorV2Panel extends StatelessWidget {
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
-                  children: logic.flights.map((f) {
+                  children: widget.logic.flights.map((f) {
                     final chipId = f['id_flight']?.toString() ?? '';
-                    final isSel = logic.selectedFlightId == chipId && chipId.isNotEmpty;
+                    final isSel = widget.logic.selectedFlightId == chipId && chipId.isNotEmpty;
                     final isChecked = f['is_checked'] == true;
 
                     Color textColor = isSel
@@ -268,17 +331,17 @@ class CoordinatorV2Panel extends StatelessWidget {
                       side: BorderSide(color: borderColor),
                       onSelected: (v) {
                         if (chipId.isNotEmpty) {
-                          logic.selectFlight(chipId);
+                          widget.logic.selectFlight(chipId);
                         }
                       },
                     );
                   }).toList(),
                 ),
-                if (logic.selectedFlightId != null) ...[
+                if (widget.logic.selectedFlightId != null) ...[
                   const SizedBox(height: 16),
-                  if (logic.isLoadingUlds)
+                  if (widget.logic.isLoadingUlds)
                     const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: Color(0xFF6366f1))))
-                  else if (logic.ulds.isEmpty)
+                  else if (widget.logic.ulds.isEmpty)
                     Text(
                       appLanguage.value == 'es'
                           ? 'No hay ULDs encontrados para este vuelo.'
@@ -287,10 +350,29 @@ class CoordinatorV2Panel extends StatelessWidget {
                     )
                   else
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: logic.ulds.length,
-                        itemBuilder: (context, index) {
-                          final uld = logic.ulds[index];
+                      child: Builder(
+                        builder: (context) {
+                          final query = _searchController.text.trim().toLowerCase();
+                          final filteredUlds = query.isEmpty 
+                              ? widget.logic.ulds 
+                              : widget.logic.ulds.where((u) {
+                                  final uldNum = u.cast<String, dynamic>()['uld_number']?.toString().toLowerCase() ?? '';
+                                  return uldNum.contains(query);
+                                }).toList();
+
+                          if (filteredUlds.isEmpty) {
+                            return Center(
+                              child: Text(
+                                appLanguage.value == 'es' ? 'No se encontraron resultados.' : 'No results found.',
+                                style: TextStyle(color: textS),
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            itemCount: filteredUlds.length,
+                            itemBuilder: (context, index) {
+                              final uld = filteredUlds[index];
                           final int pieces = uld['pieces_total'] ?? 0;
                           final num weight = uld['weight_total'] ?? 0;
                           final String remarks = uld['remarks']?.toString() ?? '';
@@ -302,10 +384,10 @@ class CoordinatorV2Panel extends StatelessWidget {
                                 margin: const EdgeInsets.only(bottom: 12),
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(10) : bgCard,
+                                  color: widget.logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(10) : bgCard,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(50) : borderC
+                                    color: widget.logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1).withAlpha(50) : borderC
                                   ),
                                 ),
                                 child: Column(
@@ -314,7 +396,7 @@ class CoordinatorV2Panel extends StatelessWidget {
                                   behavior: HitTestBehavior.opaque,
                                   onTap: () {
                                     final id = uld['id_uld']?.toString() ?? '';
-                                    if (id.isNotEmpty) logic.selectUld(id);
+                                    if (id.isNotEmpty) widget.logic.selectUld(id);
                                   },
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -356,31 +438,19 @@ class CoordinatorV2Panel extends StatelessWidget {
                                         ),
                                       ),
                                       const SizedBox(width: 12),
-                                      Container(
-                                        width: 75,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
+                                      SizedBox(
+                                        width: 55,
                                         child: Text(
-                                          'PCs: $pieces',
-                                          style: TextStyle(color: textS, fontSize: 12),
-                                          overflow: TextOverflow.ellipsis,
+                                          '$pieces pcs',
+                                          style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
                                         ),
                                       ),
                                       const SizedBox(width: 12),
-                                      Container(
-                                        width: 90,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
+                                      SizedBox(
+                                        width: 60,
                                         child: Text(
                                           '$weight kg',
-                                          style: TextStyle(color: textS, fontSize: 12),
-                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
                                         ),
                                       ),
                                       if (remarks.trim().isNotEmpty) ...[
@@ -493,7 +563,7 @@ class CoordinatorV2Panel extends StatelessWidget {
                                           ],
                                           ElevatedButton(
                                             onPressed: (isAllChecked && !isReady) ? () {
-                                              logic.markUldReady(uld['id_uld']?.toString() ?? '');
+                                              widget.logic.markUldReady(uld['id_uld']?.toString() ?? '');
                                             } : null,
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: isReady ? const Color(0xFF10b981) : const Color(0xFF6366f1),
@@ -525,18 +595,18 @@ class CoordinatorV2Panel extends StatelessWidget {
                                   ),
                                 const SizedBox(width: 12),
                                 Icon(
-                                  logic.selectedUldId == uld['id_uld']?.toString() ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                                  color: logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1) : textS,
+                                  widget.logic.selectedUldId == uld['id_uld']?.toString() ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                  color: widget.logic.selectedUldId == uld['id_uld']?.toString() ? const Color(0xFF6366f1) : textS,
                                   size: 20,
                                 ),
                               ],
                             ),
                           ),
-                          if (logic.selectedUldId == uld['id_uld']?.toString())
+                          if (widget.logic.selectedUldId == uld['id_uld']?.toString())
                             CoordinatorV2UldAwbs(
-                              logic: logic, 
+                              logic: widget.logic, 
                               dark: dark,
-                              flightId: logic.selectedFlightId ?? '',
+                              flightId: widget.logic.selectedFlightId ?? '',
                               uldId: uld['id_uld']?.toString() ?? '',
                             ),
                         ],
@@ -558,12 +628,15 @@ class CoordinatorV2Panel extends StatelessWidget {
                       ),
                   ],
                 );
-                  },
-                ),
-              ),
-              CoordinatorV2Footer(dark: dark, logic: logic),
-                ]
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ],
+              if (widget.logic.selectedFlightId != null)
+                CoordinatorV2Footer(dark: dark, logic: widget.logic),
             ],
           ),
         );

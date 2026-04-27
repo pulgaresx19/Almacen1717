@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SystemPanelLogic extends ChangeNotifier {
   final int panelId;
   String authorName;
+  final Function(String, bool, String, String)? onUldToggled;
+  final Function(String, String)? onFlightReceived;
 
   DateTime? date;
   List<Map<String, dynamic>> flights = [];
@@ -15,6 +17,8 @@ class SystemPanelLogic extends ChangeNotifier {
   List<Map<String, dynamic>> ulds = [];
   bool isLoadingUlds = false;
 
+  String searchQuery = '';
+
   bool showReceivedOverlay = false;
   Map<String, dynamic>? lastReceivedUld;
   Map<String, dynamic>? activeAwbOverlay;
@@ -22,7 +26,12 @@ class SystemPanelLogic extends ChangeNotifier {
   StreamSubscription<List<Map<String, dynamic>>>? _uldSub;
   StreamSubscription<List<Map<String, dynamic>>>? _flightSub;
 
-  SystemPanelLogic({required this.panelId, required this.authorName});
+  SystemPanelLogic({
+    required this.panelId,
+    required this.authorName,
+    this.onUldToggled,
+    this.onFlightReceived,
+  });
 
   @override
   void dispose() {
@@ -100,16 +109,79 @@ class SystemPanelLogic extends ChangeNotifier {
       notifyListeners();
       Future.microtask(() {
         _fetchUldsForFlight(flight);
-        final sysTable = panelId == 1 ? 'System1' : 'System2';
+        final sysTable = panelId == 1 ? 'system1' : 'system2';
         Supabase.instance.client
             .from(sysTable)
             .update({
-              'carrier-flight$panelId': flight['carrier'],
-              'number-flight$panelId': flight['number'],
-              'date-flight$panelId': flight['date'] ?? flight['date_arrived'],
+              'carrier_flight$panelId': flight['carrier'],
+              'number_flight$panelId': flight['number'],
+              'date_flight$panelId': flight['date'] ?? flight['date_arrived'],
             })
             .eq('id', 1)
             .then((_) {}, onError: (e) => debugPrint('Err updating $sysTable: $e'));
+      });
+    }
+  }
+
+  // Cross-panel sync methods
+  List<Map<String, dynamic>> get filteredUlds {
+    if (searchQuery.trim().isEmpty) return ulds;
+    final q = searchQuery.trim().toLowerCase();
+    return ulds.where((u) {
+      final uldNum = (u['uld_number']?.toString() ?? '').toLowerCase();
+      final uldPcs = (u['pieces_total']?.toString() ?? '').toLowerCase();
+      final uldWgt = (u['weight_total']?.toString() ?? '').toLowerCase();
+      final isBreakStr = (u['is_break'] == true) ? 'break' : 'no break';
+      
+      return uldNum.contains(q) || uldPcs.contains(q) || uldWgt.contains(q) || isBreakStr.contains(q);
+    }).toList();
+  }
+
+  void setSearchQuery(String query) {
+    searchQuery = query;
+    notifyListeners();
+  }
+
+  void syncUldToggled(String uldId, bool isChecked, String truckTime, String author) {
+    try {
+      final uld = ulds.firstWhere((u) => u['id_uld'] == uldId);
+      final idx = flights.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedFlightId);
+      
+      if (isChecked) {
+        if (idx != -1) {
+          if (flights[idx]['local_first_truck'] == null && flights[idx]['first_truck'] == null) {
+            flights[idx]['local_first_truck'] = truckTime;
+          }
+          flights[idx]['local_truck_arrived'] ??= <String, dynamic>{};
+          String uldKey = uld['uld_number']?.toString() ?? 'Unknown';
+          flights[idx]['local_truck_arrived'][uldKey] = truckTime;
+        }
+        uld['time_received'] = truckTime;
+        uld['user_received'] = author;
+      } else {
+        uld['time_received'] = null;
+        uld['user_received'] = null;
+        if (idx != -1 && flights[idx]['local_truck_arrived'] != null) {
+          String uldKey = uld['uld_number']?.toString() ?? 'Unknown';
+          (flights[idx]['local_truck_arrived'] as Map).remove(uldKey);
+        }
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void syncFlightReceived(String firstTruckTime, String lastTruckTime) {
+    final currentFlightIdx = flights.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedFlightId);
+    if (currentFlightIdx != -1) {
+      flights[currentFlightIdx]['is_received'] = true;
+      flights[currentFlightIdx]['status'] = 'Received';
+      flights[currentFlightIdx]['first_truck'] = firstTruckTime;
+      flights[currentFlightIdx]['last_truck'] = lastTruckTime;
+      showReceivedOverlay = true;
+      notifyListeners();
+      Future.delayed(const Duration(seconds: 2), () {
+        showReceivedOverlay = false;
+        notifyListeners();
       });
     }
   }
@@ -241,12 +313,13 @@ class SystemPanelLogic extends ChangeNotifier {
       }).eq('id_uld', uld['id_uld']).catchError((e) => debugPrint('time_received Update Err: $e'));
 
       final bool isBreak = uld['is_break'] == true || uld['is_break']?.toString().toLowerCase() == 'true';
-      final sysTable = panelId == 1 ? 'System1' : 'System2';
+      final sysTable = panelId == 1 ? 'system1' : 'system2';
       Supabase.instance.client.from(sysTable).update({
-        'ULD-number$panelId': uld['uld_number'],
-        'ULD-isBreak$panelId': isBreak,
+        'ULD_number$panelId': uld['uld_number'],
+        'ULD_isBreak$panelId': isBreak,
       }).eq('id', 1).catchError((e) => debugPrint('Err updating $sysTable ULD: $e'));
       
+      onUldToggled?.call(uld['id_uld'].toString(), true, truckTime, authorName);
     } else {
       uld['time_received'] = null;
       uld['user_received'] = null;
@@ -261,6 +334,14 @@ class SystemPanelLogic extends ChangeNotifier {
         'time_received': null,
         'user_received': null,
       }).eq('id_uld', uld['id_uld']).catchError((e) => debugPrint('time_received Reset Err: $e'));
+
+      final sysTable = panelId == 1 ? 'system1' : 'system2';
+      Supabase.instance.client.from(sysTable).update({
+        'ULD_number$panelId': null,
+        'ULD_isBreak$panelId': null,
+      }).eq('id', 1).catchError((e) => debugPrint('Err updating $sysTable ULD: $e'));
+
+      onUldToggled?.call(uld['id_uld'].toString(), false, '', '');
     }
     notifyListeners();
   }
@@ -302,16 +383,18 @@ class SystemPanelLogic extends ChangeNotifier {
         flights[currentFlightIdx]['status'] = 'Received';
         flights[currentFlightIdx]['first_truck'] = firstTruckTime;
         flights[currentFlightIdx]['last_truck'] = lastTruckTime;
+        
+        onFlightReceived?.call(firstTruckTime, lastTruckTime);
       }
     }
 
-    final sysTable = panelId == 1 ? 'System1' : 'System2';
+    final sysTable = panelId == 1 ? 'system1' : 'system2';
     Supabase.instance.client.from(sysTable).update({
-      'carrier-flight$panelId': null,
-      'number-flight$panelId': null,
-      'date-flight$panelId': null,
-      'ULD-number$panelId': null,
-      'ULD-isBreak$panelId': null,
+      'carrier_flight$panelId': null,
+      'number_flight$panelId': null,
+      'date_flight$panelId': null,
+      'ULD_number$panelId': null,
+      'ULD_isBreak$panelId': null,
     }).eq('id', 1).catchError((e) => debugPrint('Error $sysTable reset: $e'));
 
     showReceivedOverlay = true;

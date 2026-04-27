@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import 'system_v2_logic.dart';
@@ -9,9 +10,10 @@ class SystemV2Panel extends StatefulWidget {
   final bool isSplitView;
   final VoidCallback onToggleSplit;
   final VoidCallback onCloseSplit;
-  final String? oppositeSelectedFlightId;
   final ValueChanged<String?> onFlightSelected;
   final String authorName;
+  final Function(String uldId, bool isChecked, String truckTime, String author)? onUldToggled;
+  final Function(String firstTruck, String lastTruck)? onFlightReceived;
 
   const SystemV2Panel({
     super.key,
@@ -19,22 +21,29 @@ class SystemV2Panel extends StatefulWidget {
     required this.isSplitView,
     required this.onToggleSplit,
     required this.onCloseSplit,
-    required this.oppositeSelectedFlightId,
     required this.onFlightSelected,
     required this.authorName,
+    this.onUldToggled,
+    this.onFlightReceived,
   });
 
   @override
-  State<SystemV2Panel> createState() => _SystemV2PanelState();
+  State<SystemV2Panel> createState() => SystemV2PanelState();
 }
 
-class _SystemV2PanelState extends State<SystemV2Panel> {
+class SystemV2PanelState extends State<SystemV2Panel> {
   late final SystemPanelLogic _logic;
+  final TextEditingController _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _logic = SystemPanelLogic(panelId: widget.panelId, authorName: widget.authorName);
+    _logic = SystemPanelLogic(
+      panelId: widget.panelId,
+      authorName: widget.authorName,
+      onUldToggled: widget.onUldToggled,
+      onFlightReceived: widget.onFlightReceived,
+    );
   }
 
   @override
@@ -45,8 +54,17 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
     }
   }
 
+  void syncUld(String uldId, bool isChecked, String truckTime, String author) {
+    _logic.syncUldToggled(uldId, isChecked, truckTime, author);
+  }
+
+  void syncFlightRec(String firstTruck, String lastTruck) {
+    _logic.syncFlightReceived(firstTruck, lastTruck);
+  }
+
   @override
   void dispose() {
+    _searchCtrl.dispose();
     _logic.dispose();
     super.dispose();
   }
@@ -120,37 +138,66 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (widget.isSplitView || _logic.date != null)
-                                Text(
-                                  (widget.isSplitView ? '[System ${widget.panelId}]' : '') +
-                                      (widget.isSplitView && _logic.date != null ? ' ' : '') +
-                                      (_logic.date != null ? (appLanguage.value == 'es' ? 'Vuelos en esta fecha' : 'Flights on this date') : ''),
-                                  style: TextStyle(color: textS, fontSize: 14, fontWeight: FontWeight.bold),
+                              Container(
+                                width: 200,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
+                                  ),
                                 ),
-                              if (!isFlightReceived && _logic.lastReceivedUld != null) ...[
-                                if (widget.isSplitView || _logic.date != null) const SizedBox(width: 16),
-                                Builder(
-                                  builder: (context) {
-                                    final uld = _logic.lastReceivedUld!;
-                                    final bool isBreak = uld['is_break'] == true;
-                                    final String uldNum = uld['uld_number']?.toString() ?? '-';
-                                    final Color statusColor = isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444);
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: statusColor.withAlpha(20),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: statusColor.withAlpha(80)),
+                                child: TextField(
+                                  controller: _searchCtrl,
+                                  onChanged: _logic.setSearchQuery,
+                                  textCapitalization: TextCapitalization.characters,
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(10),
+                                    TextInputFormatter.withFunction(
+                                      (oldValue, newValue) => newValue.copyWith(
+                                        text: newValue.text.toUpperCase(),
                                       ),
-                                      child: Text(
-                                        uldNum,
-                                        style: TextStyle(color: statusColor, fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 1.1),
-                                      ),
-                                    );
-                                  },
+                                    ),
+                                  ],
+                                  style: TextStyle(
+                                    color: dark ? Colors.white : const Color(0xFF111827),
+                                    fontSize: 13,
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...',
+                                    hintStyle: TextStyle(
+                                      color: dark ? const Color(0xFF94a3b8).withAlpha(150) : const Color(0xFF4B5563).withAlpha(150),
+                                      fontSize: 13,
+                                    ),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    suffixIcon: _logic.searchQuery.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.close, size: 16),
+                                            color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563),
+                                            onPressed: () {
+                                              _searchCtrl.clear();
+                                              _logic.setSearchQuery('');
+                                            },
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                          )
+                                        : const Icon(Icons.search, size: 16, color: Colors.grey),
+                                  ),
                                 ),
-                              ],
+                              ),
                             ],
+                          ),
+                          Text(
+                            'System ${widget.panelId}',
+                            style: TextStyle(
+                              color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -195,16 +242,14 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
                     ),
                     const SizedBox(height: 16),
                     if (_logic.isLoading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.only(top: 24),
+                      const Expanded(
+                        child: Center(
                           child: CircularProgressIndicator(color: Color(0xFF6366f1)),
                         ),
                       )
                     else if (_logic.flights.isEmpty)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 24),
+                      Expanded(
+                        child: Center(
                           child: Text(
                             _logic.date == null
                                 ? (appLanguage.value == 'es' ? 'Selecciona una fecha.' : 'Pick a date to load flights.')
@@ -220,18 +265,11 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
                         children: _logic.flights.map((f) {
                           final chipId = '${f['carrier']}-${f['number']}';
                           final isSel = _logic.selectedFlightId == chipId;
-                          final isOppositeSel = widget.oppositeSelectedFlightId == chipId;
                           final isReceived = f['is_received'] == true;
-                          Color textColor = isOppositeSel
-                              ? (dark ? Colors.white30 : Colors.black26)
-                              : (isSel ? Colors.white : (isReceived ? const Color(0xFF10b981) : textP));
+                          Color textColor = isSel ? Colors.white : (isReceived ? const Color(0xFF10b981) : textP);
                           Color selColor = isReceived ? const Color(0xFF10b981) : const Color(0xFF6366f1);
-                          Color unselBgColor = isOppositeSel
-                              ? (dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6))
-                              : (isReceived ? const Color(0xFF10b981).withAlpha(15) : bgCard);
-                          Color borderColor = isSel || isOppositeSel
-                              ? Colors.transparent
-                              : (isReceived ? const Color(0xFF10b981).withAlpha(80) : borderC);
+                          Color unselBgColor = isReceived ? const Color(0xFF10b981).withAlpha(15) : bgCard;
+                          Color borderColor = isSel ? Colors.transparent : (isReceived ? const Color(0xFF10b981).withAlpha(80) : borderC);
 
                           return ChoiceChip(
                             label: Text(
@@ -243,9 +281,7 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
                             backgroundColor: unselBgColor,
                             showCheckmark: false,
                             side: BorderSide(color: borderColor),
-                            onSelected: isOppositeSel
-                                ? null
-                                : (v) => _logic.selectFlight(v ? chipId : null, v ? f : null, widget.onFlightSelected),
+                            onSelected: (v) => _logic.selectFlight(v ? chipId : null, v ? f : null, widget.onFlightSelected),
                           );
                         }).toList(),
                       ),
@@ -266,9 +302,9 @@ class _SystemV2PanelState extends State<SystemV2Panel> {
                         else
                           Expanded(
                             child: ListView.builder(
-                              itemCount: _logic.ulds.length,
+                              itemCount: _logic.filteredUlds.length,
                               itemBuilder: (context, index) {
-                                final uld = _logic.ulds[index];
+                                final uld = _logic.filteredUlds[index];
                                 return SystemV2UldItem(
                                   uld: uld,
                                   isFlightReceived: isFlightReceived,
