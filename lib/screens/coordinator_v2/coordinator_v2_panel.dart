@@ -218,6 +218,7 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                           ),
                           border: InputBorder.none,
                           isDense: true,
+                          prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
@@ -230,7 +231,7 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                 )
-                              : const Icon(Icons.search, size: 16, color: Colors.grey),
+                              : null,
                         ),
                       ),
                     ),

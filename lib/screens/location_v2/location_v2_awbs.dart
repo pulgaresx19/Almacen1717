@@ -169,19 +169,28 @@ class LocationV2Awbs extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      if (awbSplit['data_location'] != null && awbSplit['data_location'] is Map)
+                      if (awbSplit['data_location'] != null)
                         Builder(
                           builder: (context) {
-                            final locData = awbSplit['data_location'] as Map;
+                            final locData = awbSplit['data_location'];
                             List<String> locs = [];
-                            if (locData['locations'] != null && locData['locations'] is List) {
-                              for (var item in locData['locations']) {
+                            
+                            if (locData is List) {
+                              for (var item in locData) {
                                 if (item is Map && item['location'] != null) {
                                   locs.add(item['location'].toString());
                                 }
                               }
-                            } else if (locData['location'] != null) {
-                              locs.add(locData['location'].toString());
+                            } else if (locData is Map) {
+                              if (locData['locations'] != null && locData['locations'] is List) {
+                                for (var item in locData['locations']) {
+                                  if (item is Map && item['location'] != null) {
+                                    locs.add(item['location'].toString());
+                                  }
+                                }
+                              } else if (locData['location'] != null) {
+                                locs.add(locData['location'].toString());
+                              }
                             }
 
                             if (locs.isEmpty) return const SizedBox.shrink();

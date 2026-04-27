@@ -54,19 +54,25 @@ class LocationV2ScannerModal {
     
     // Parse existing locations
     List<Map<String, dynamic>> parsedLocations = [];
-    if (split['data_location'] != null && split['data_location'] is Map) {
-      final locData = split['data_location'] as Map;
-      if (locData['locations'] != null && locData['locations'] is List) {
-        for (var item in locData['locations']) {
+    if (split['data_location'] != null) {
+      if (split['data_location'] is List) {
+        for (var item in split['data_location']) {
           if (item is Map) parsedLocations.add(Map<String, dynamic>.from(item));
         }
-      } else if (locData['location'] != null) {
-        // Migration from old format
-        parsedLocations.add({
-          'location': locData['location'].toString(),
-          'updated_by': locData['updated_by'],
-          'updated_at': locData['updated_at'],
-        });
+      } else if (split['data_location'] is Map) {
+        final locData = split['data_location'] as Map;
+        if (locData['locations'] != null && locData['locations'] is List) {
+          for (var item in locData['locations']) {
+            if (item is Map) parsedLocations.add(Map<String, dynamic>.from(item));
+          }
+        } else if (locData['location'] != null) {
+          // Migration from old format
+          parsedLocations.add({
+            'location': locData['location'].toString(),
+            'updated_by': locData['updated_by'],
+            'updated_at': locData['updated_at'] ?? locData['time_saved'],
+          });
+        }
       }
     }
 
@@ -102,9 +108,9 @@ class LocationV2ScannerModal {
                   byName = user.userMetadata!['full_name'].toString();
                 }
                 try {
-                  final profile = await supabase.from('users').select('full-name').eq('id', user.id).maybeSingle();
-                  if (profile != null && profile['full-name'] != null && profile['full-name'].toString().trim().isNotEmpty) {
-                    byName = profile['full-name'].toString().trim();
+                  final profile = await supabase.from('users').select('full_name').eq('id', user.id).maybeSingle();
+                  if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+                    byName = profile['full_name'].toString().trim();
                   }
                 } catch (_) {}
               }
@@ -116,17 +122,13 @@ class LocationV2ScannerModal {
                 'updated_by': byName,
               });
 
-              Map<String, dynamic> newLocData = {
-                'locations': parsedLocations,
-              };
-
               bool isConfirmed = split['is_location_confirmed'] == true;
               if (hasReqLoc && locText.toUpperCase() == reqLoc.toUpperCase()) {
                 isConfirmed = true;
               }
 
               await supabase.from('awb_splits').update({
-                'data_location': newLocData,
+                'data_location': parsedLocations,
                 'is_location_confirmed': isConfirmed,
               }).eq('id', splitId);
 
@@ -434,6 +436,15 @@ class LocationV2ScannerModal {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: Color(0xFF10b981)),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(Icons.clear, color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280), size: 20),
+                          onPressed: () {
+                            setDialogState(() {
+                              locationCtrl.clear();
+                              locationError = null;
+                            });
+                          },
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),

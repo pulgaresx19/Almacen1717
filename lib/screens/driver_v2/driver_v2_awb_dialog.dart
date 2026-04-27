@@ -230,7 +230,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
                   rejectNotifier.value = {
                     'qty': qty,
                     'reason': reasonCtrl.text.trim(),
-                    'user': currentUserData.value?['full-name'] ?? 'Unknown',
+                    'user': currentUserData.value?['full_name'] ?? 'Unknown',
                     'time': DateTime.now().toIso8601String(),
                   };
                   Navigator.pop(ctx);
@@ -343,7 +343,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
           'p_door': widget.deliveryData['door']?.toString() ?? '-',
           'p_type': widget.deliveryData['type']?.toString() ?? '-',
           'p_id_pickup': widget.deliveryData['id_delivery']?.toString() ?? widget.deliveryData['id_pickup']?.toString() ?? widget.deliveryData['id']?.toString() ?? '-',
-          'p_user_name': currentUserData.value?['full-name'] ?? 'Unknown',
+          'p_user_name': currentUserData.value?['full_name'] ?? 'Unknown',
           'p_time': DateTime.now().toIso8601String(),
           'p_driver_name': widget.driver,
         },

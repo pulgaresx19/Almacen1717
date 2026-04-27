@@ -299,7 +299,7 @@ class _CheckItemDialogContentState extends State<_CheckItemDialogContent> {
       // Audit data
       final now = DateTime.now().toUtc().toIso8601String();
       final user = Supabase.instance.client.auth.currentUser;
-      final userName = currentUserData.value?['full-name'] ?? user?.email ?? 'Unknown Driver';
+      final userName = currentUserData.value?['full_name'] ?? user?.email ?? 'Unknown Driver';
 
       report['processed_at'] = now;
       report['processed_by'] = userName;

@@ -342,8 +342,8 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
 
       String userFullName = 'Unknown User';
       try {
-        if (currentUserData.value != null && currentUserData.value!['full-name'] != null) {
-          userFullName = currentUserData.value!['full-name'];
+        if (currentUserData.value != null && currentUserData.value!['full_name'] != null) {
+          userFullName = currentUserData.value!['full_name'];
         }
       } catch (_) {}
       

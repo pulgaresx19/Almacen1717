@@ -227,13 +227,13 @@ class AddUserScreenState extends State<AddUserScreen> {
         final userData = {
           'id': userId,
           'email': _emailCtrl.text.trim(),
-          'full-name': _nameCtrl.text.trim(),
+          'full_name': _nameCtrl.text.trim(),
           'position': _position,
           'building': _buildingCtrl.text.trim(),
           'shift': _shift,
-          'phone-number': _phoneCtrl.text.trim(),
-          'master-driver': _masterDriver,
-          'access-page': _accessMap,
+          'phone_number': _phoneCtrl.text.trim(),
+          'master_driver': _masterDriver,
+          'access_page': _accessMap,
         };
 
         // Try to insert (sometimes signUp trigger creates it, so we upsert or just update)

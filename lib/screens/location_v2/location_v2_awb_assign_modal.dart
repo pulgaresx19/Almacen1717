@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../main.dart' show appLanguage;
+import 'location_v2_logic.dart';
+import 'location_v2_history_modal.dart';
 
 class LocationV2AwbAssignModal extends StatefulWidget {
   final Map<String, dynamic> awb;
-  final Function(String location, bool isOversize, bool isConfirmed) onSave;
+  final Function(String location, bool isConfirmed) onSave;
+  final LocationV2Logic logic;
 
   const LocationV2AwbAssignModal({
     super.key,
     required this.awb,
     required this.onSave,
+    required this.logic,
   });
 
   @override
@@ -18,7 +23,6 @@ class LocationV2AwbAssignModal extends StatefulWidget {
 class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
   final TextEditingController _locationController = TextEditingController();
   final FocusNode _locationFocus = FocusNode();
-  bool _isOversize = false;
 
   @override
   void initState() {
@@ -41,7 +45,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
   void _save({bool isConfirmed = false, String? exactLocation}) {
     final loc = exactLocation ?? _locationController.text.trim().toUpperCase();
     if (loc.isNotEmpty) {
-      widget.onSave(loc, _isOversize, isConfirmed);
+      widget.onSave(loc, isConfirmed);
       Navigator.pop(context); // close modal
     }
   }
@@ -52,6 +56,28 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
     final String awbNumber = awbObj['awb_number']?.toString() ?? widget.awb['awb_number']?.toString() ?? '-';
     final String pieces = widget.awb['pieces']?.toString() ?? '-';
     final String weight = widget.awb['weight']?.toString() ?? '-';
+
+    List<Map<String, dynamic>> parsedLocations = [];
+    if (widget.awb['data_location'] != null) {
+      if (widget.awb['data_location'] is List) {
+        for (var item in widget.awb['data_location']) {
+          if (item is Map) parsedLocations.add(Map<String, dynamic>.from(item));
+        }
+      } else if (widget.awb['data_location'] is Map) {
+        final locData = widget.awb['data_location'] as Map;
+        if (locData['locations'] != null && locData['locations'] is List) {
+          for (var item in locData['locations']) {
+            if (item is Map) parsedLocations.add(Map<String, dynamic>.from(item));
+          }
+        } else if (locData['location'] != null) {
+          parsedLocations.add({
+            'location': locData['location'].toString(),
+            'updated_by': locData['updated_by'],
+            'updated_at': locData['updated_at'] ?? locData['time_saved'],
+          });
+        }
+      }
+    }
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -73,10 +99,29 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
               children: [
                 const Icon(Icons.location_on_outlined, color: Color(0xFF10b981), size: 24),
                 const SizedBox(width: 8),
-                Text(
-                  appLanguage.value == 'es' ? 'Asignar Locación' : 'Assign Location',
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    appLanguage.value == 'es' ? 'Asignar Locación' : 'Assign Location',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
+                if (parsedLocations.isNotEmpty)
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.history, color: Color(0xFF6366f1), size: 22),
+                    onPressed: () {
+                      LocationV2HistoryModal.show(
+                        context, 
+                        parsedLocations, 
+                        widget.awb, 
+                        widget.logic,
+                        () {
+                          setState(() {});
+                        }
+                      );
+                    },
+                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -135,29 +180,35 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6366f1).withAlpha(20),
+                        color: const Color(0xFFf59e0b).withAlpha(15),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF6366f1).withAlpha(50)),
+                        border: Border.all(color: const Color(0xFFf59e0b).withAlpha(30)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            appLanguage.value == 'es' ? 'Ubicación Requerida:' : 'Required Location:',
-                            style: TextStyle(color: const Color(0xFF6366f1).withAlpha(200), fontSize: 12, fontWeight: FontWeight.bold),
+                          Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Color(0xFFf59e0b), size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                appLanguage.value == 'es' ? 'Locación Requerida:' : 'Required Location:',
+                                style: const TextStyle(color: Color(0xFFf59e0b), fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(requiredLoc, style: const TextStyle(color: Color(0xFF818cf8), fontSize: 18, fontWeight: FontWeight.bold)),
+                              Text(requiredLoc, style: const TextStyle(color: Color(0xFFf59e0b), fontSize: 18, fontWeight: FontWeight.bold)),
                               if (!isConfirmed)
                                 ElevatedButton.icon(
                                   onPressed: () => _save(isConfirmed: true, exactLocation: requiredLoc),
                                   icon: const Icon(Icons.check, size: 16),
                                   label: Text(appLanguage.value == 'es' ? 'Confirmar' : 'Confirm'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF6366f1),
+                                    backgroundColor: const Color(0xFFf59e0b),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   ),
@@ -197,17 +248,17 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                 GestureDetector(
                   onTap: () {
                     setState(() {
-                      _isOversize = !_isOversize;
+                      _locationController.text = 'OVERSIZE';
                     });
                   },
                   child: Row(
                     children: [
-                      Icon(Icons.open_in_full_rounded, size: 14, color: _isOversize ? const Color(0xFF10b981) : Colors.white.withAlpha(150)),
+                      Icon(Icons.open_in_full_rounded, size: 14, color: Colors.white.withAlpha(150)),
                       const SizedBox(width: 4),
                       Text(
                         'OVERSIZE',
                         style: TextStyle(
-                          color: _isOversize ? const Color(0xFF10b981) : Colors.white.withAlpha(150),
+                          color: Colors.white.withAlpha(150),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -231,12 +282,27 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                 controller: _locationController,
                 focusNode: _locationFocus,
                 textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  TextInputFormatter.withFunction((oldValue, newValue) {
+                    return TextEditingValue(
+                      text: newValue.text.toUpperCase(),
+                      selection: newValue.selection,
+                    );
+                  }),
+                ],
                 style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   hintText: 'Ej. RACK-A1, FLOOR-2',
                   hintStyle: TextStyle(color: Colors.white.withAlpha(80), fontSize: 16),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.clear, color: Colors.white.withAlpha(150), size: 20),
+                    onPressed: () {
+                      _locationController.clear();
+                      _locationFocus.requestFocus();
+                    },
+                  ),
                 ),
                 onSubmitted: (_) => _save(),
               ),

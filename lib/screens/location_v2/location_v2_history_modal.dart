@@ -23,7 +23,13 @@ class LocationV2HistoryModal {
           Future<void> handleDelete(Map<String, dynamic> locObj) async {
             try {
               final supabase = Supabase.instance.client;
-              parsedLocations.remove(locObj);
+              parsedLocations.removeWhere((item) => 
+                item['location'] == locObj['location'] && 
+                item['updated_at'] == locObj['updated_at']
+              );
+
+              // Update the in-memory object so parent widgets see the new data
+              split['data_location'] = List<Map<String, dynamic>>.from(parsedLocations);
 
               bool isConfirmed = false;
               final reqLoc = split['required_location']?.toString().trim();
@@ -32,7 +38,7 @@ class LocationV2HistoryModal {
               }
 
               await supabase.from('awb_splits').update({
-                'data_location': {'locations': parsedLocations},
+                'data_location': parsedLocations,
                 'is_location_confirmed': isConfirmed,
               }).eq('id', split['id']);
 

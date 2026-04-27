@@ -236,8 +236,8 @@ class CoordinatorV2Logic extends ChangeNotifier {
       
       final validList = <Map<String, dynamic>>[];
       for (var f in res) {
-        bool isDel = f['status']?.toString().toLowerCase() == 'delayed';
-        if (isDel && f['time_delay'] != null && f['time_delay'].toString().isNotEmpty && f['time_delay'].toString() != '-') {
+        bool hasDelay = f['time_delay'] != null && f['time_delay'].toString().isNotEmpty && f['time_delay'].toString() != '-';
+        if (hasDelay) {
           try {
             final localDt = DateTime.parse(f['time_delay'].toString()).toLocal();
             if (DateFormat('yyyy-MM-dd').format(localDt) == dateStr) {
@@ -321,7 +321,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
         }
       }
 
-      final String userFullName = currentUserData.value?['full-name'] ?? 'Unknown User';
+      final String userFullName = currentUserData.value?['full_name'] ?? 'Unknown User';
       final String nowIso = DateTime.now().toUtc().toIso8601String();
       
       await supabase.from('ulds').update({
@@ -538,7 +538,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
     
     try {
       List<Map<String, dynamic>> reportItems = [];
-      final String reporter = currentUserData.value?['full-name']?.toString() ?? 'Unknown';
+      final String reporter = currentUserData.value?['full_name']?.toString() ?? 'Unknown';
       final String reportTime = DateTime.now().toLocal().toString();
       
       for (var d in finalDiscrepancies) {

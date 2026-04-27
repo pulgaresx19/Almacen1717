@@ -225,7 +225,7 @@ void showDriverConfirmDialog({
                                 final pendingReport = {
                                   'reason': reasonController.text.trim(),
                                   'time': DateTime.now().toIso8601String(),
-                                  'user': currentUserData.value?['full-name'] ?? 'Unknown',
+                                  'user': currentUserData.value?['full_name'] ?? 'Unknown',
                                 };
                                 
                                 final idStr = deliveryData['id_delivery']?.toString() ?? deliveryData['id_pickup']?.toString() ?? deliveryData['id']?.toString();

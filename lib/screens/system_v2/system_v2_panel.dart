@@ -138,12 +138,14 @@ class SystemV2PanelState extends State<SystemV2Panel> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
+                              SizedBox(
                                 width: 200,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
-                                  borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  height: 40,
+                                  margin: const EdgeInsets.only(right: 16),
+                                  decoration: BoxDecoration(
+                                    color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                                    borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
                                   ),
@@ -172,6 +174,7 @@ class SystemV2PanelState extends State<SystemV2Panel> {
                                     ),
                                     border: InputBorder.none,
                                     isDense: true,
+                                    prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                     suffixIcon: _logic.searchQuery.isNotEmpty
                                         ? IconButton(
@@ -184,7 +187,8 @@ class SystemV2PanelState extends State<SystemV2Panel> {
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(),
                                           )
-                                        : const Icon(Icons.search, size: 16, color: Colors.grey),
+                                        : null,
+                                  ),
                                   ),
                                 ),
                               ),

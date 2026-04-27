@@ -60,10 +60,10 @@ class SystemPanelLogic extends ChangeNotifier {
       (data) {
         final validList = <Map<String, dynamic>>[];
         for (var f in data) {
-          bool isDel = f['status']?.toString().toLowerCase() == 'delayed';
-          if (isDel && f['time_delayed'] != null && f['time_delayed'].toString().isNotEmpty) {
+          bool hasDelay = f['time_delay'] != null && f['time_delay'].toString().isNotEmpty && f['time_delay'].toString() != '-';
+          if (hasDelay) {
             try {
-              final localDt = DateTime.parse(f['time_delayed'].toString()).toLocal();
+              final localDt = DateTime.parse(f['time_delay'].toString()).toLocal();
               if (DateFormat('yyyy-MM-dd').format(localDt) == dateStr) {
                 validList.add(f);
               }

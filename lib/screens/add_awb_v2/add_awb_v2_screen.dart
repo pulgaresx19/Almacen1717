@@ -327,9 +327,9 @@ class AddAwbV2ScreenState extends State<AddAwbV2Screen> {
           userName = session.user.userMetadata!['full_name'].toString();
         }
         try {
-          final profile = await Supabase.instance.client.from('users').select('full-name').eq('id', session.user.id).maybeSingle();
-          if (profile != null && profile['full-name'] != null && profile['full-name'].toString().trim().isNotEmpty) {
-            userName = profile['full-name'].toString().trim();
+          final profile = await Supabase.instance.client.from('users').select('full_name').eq('id', session.user.id).maybeSingle();
+          if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+            userName = profile['full_name'].toString().trim();
           }
         } catch (_) {}
       }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../main.dart' show appLanguage;
+import '../../main.dart' show appLanguage, isDarkMode;
 import 'location_v2_logic.dart';
 import 'location_v2_awb_assign_modal.dart';
 
@@ -21,6 +21,7 @@ class LocationV2UldModal extends StatefulWidget {
 class _LocationV2UldModalState extends State<LocationV2UldModal> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
+  bool _isRelocating = false;
 
   @override
   void initState() {
@@ -73,22 +74,69 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
     _searchController.clear();
     _searchFocus.requestFocus();
   }
+  bool _isUldCompleted() {
+    final currentUld = widget.logic.ulds.firstWhere(
+      (u) => u['id_uld'].toString() == widget.uld['id_uld'].toString(),
+      orElse: () => widget.uld,
+    );
+    return currentUld['time_saved'] != null;
+  }
 
   void _openAssignModal(Map<String, dynamic> awb) {
+    if (_isUldCompleted() && !_isRelocating) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => LocationV2AwbAssignModal(
         awb: awb,
-        onSave: (location, isOversize, isConfirmed) async {
-          final currentLocData = awb['data_location'] is Map ? Map<String, dynamic>.from(awb['data_location']) : <String, dynamic>{};
-          currentLocData['location'] = location;
-          currentLocData['isOversize'] = isOversize;
-          currentLocData['time_saved'] = DateTime.now().toUtc().toIso8601String();
+        logic: widget.logic,
+        onSave: (location, isConfirmed) async {
+          List<Map<String, dynamic>> parsedLocations = [];
+          if (awb['data_location'] != null) {
+            if (awb['data_location'] is List) {
+              for (var item in awb['data_location']) {
+                if (item is Map) parsedLocations.add(Map<String, dynamic>.from(item));
+              }
+            } else if (awb['data_location'] is Map) {
+              final locData = awb['data_location'] as Map;
+              if (locData['locations'] != null && locData['locations'] is List) {
+                for (var item in locData['locations']) {
+                  if (item is Map) parsedLocations.add(Map<String, dynamic>.from(item));
+                }
+              } else if (locData['location'] != null) {
+                parsedLocations.add({
+                  'location': locData['location'].toString(),
+                  'updated_by': locData['updated_by'],
+                  'updated_at': locData['updated_at'] ?? locData['time_saved'],
+                });
+              }
+            }
+          }
+
+          final user = widget.logic.supabase.auth.currentUser;
+          String byName = user?.email ?? 'Unknown';
+          if (user != null) {
+            if (user.userMetadata?['full_name'] != null) {
+              byName = user.userMetadata!['full_name'].toString();
+            }
+            try {
+              final profile = await widget.logic.supabase.from('users').select('full_name').eq('id', user.id).maybeSingle();
+              if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+                byName = profile['full_name'].toString().trim();
+              }
+            } catch (_) {}
+          }
+
+          parsedLocations.add({
+            'location': location,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+            'updated_by': byName,
+          });
 
           try {
             await widget.logic.supabase.from('awb_splits').update({
-              'data_location': currentLocData,
+              'data_location': parsedLocations,
               'is_location_confirmed': isConfirmed,
             }).eq('id', awb['id']);
             
@@ -96,12 +144,76 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
             widget.logic.fetchAwbsForUld(widget.uld['id_uld'].toString());
             
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(appLanguage.value == 'es' ? 'Locación guardada' : 'Location saved'),
-                  backgroundColor: const Color(0xFF10b981),
-                ),
-              );
+              bool dialogOpen = true;
+              showGeneralDialog(
+                context: context,
+                barrierDismissible: false,
+                barrierColor: Colors.black54,
+                transitionDuration: const Duration(milliseconds: 350),
+                pageBuilder: (context, anim1, anim2) {
+                  final dark = isDarkMode.value;
+                  return Center(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: 320,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                        decoration: BoxDecoration(
+                          color: dark ? const Color(0xFF1e293b) : Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10b981).withAlpha(40),
+                              blurRadius: 40,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                          border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10b981).withAlpha(20),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              appLanguage.value == 'es' ? '¡Locación Guardada!' : 'Location Saved!',
+                              style: TextStyle(
+                                color: dark ? Colors.white : const Color(0xFF111827),
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                transitionBuilder: (context, anim1, anim2, child) {
+                  return Transform.scale(
+                    scale: Curves.easeOutBack.transform(anim1.value),
+                    child: FadeTransition(
+                      opacity: anim1,
+                      child: child,
+                    ),
+                  );
+                },
+              ).then((_) => dialogOpen = false);
+
+              Future.delayed(const Duration(milliseconds: 1500), () {
+                if (dialogOpen && mounted) {
+                  Navigator.of(context).pop();
+                }
+              });
+
               // Focus back to search field
               _searchFocus.requestFocus();
             }
@@ -202,107 +314,182 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
             ),
             const SizedBox(height: 16),
 
-            // AWB List
+            // AWB List and Action Button
             Expanded(
               child: ListenableBuilder(
                 listenable: widget.logic,
                 builder: (context, _) {
-                  if (widget.logic.isLoadingUldAwbs) {
-                    return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
+                  final bool isCompleted = _isUldCompleted();
+
+                  bool isReadyToComplete = false;
+                  if (widget.logic.uldAwbs.isNotEmpty && !widget.logic.isLoadingUldAwbs) {
+                    isReadyToComplete = widget.logic.uldAwbs.every((awb) {
+                      final locData = awb['data_location'];
+                      if (locData is List && locData.isNotEmpty) return true;
+                      if (locData is Map) {
+                        if (locData['locations'] != null && locData['locations'] is List && (locData['locations'] as List).isNotEmpty) return true;
+                        final loc = locData['location']?.toString() ?? '';
+                        if (loc.isNotEmpty) return true;
+                      }
+                      return false;
+                    });
                   }
 
-                  if (widget.logic.uldAwbs.isEmpty) {
-                    return Center(
+                  Widget listWidget;
+                  if (widget.logic.isLoadingUldAwbs) {
+                    listWidget = const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
+                  } else if (widget.logic.uldAwbs.isEmpty) {
+                    listWidget = Center(
                       child: Text(
                         appLanguage.value == 'es' ? 'No hay AWBs en este ULD.' : 'No AWBs in this ULD.',
                         style: TextStyle(color: Colors.white.withAlpha(150)),
                       ),
                     );
-                  }
+                  } else {
+                    final query = _searchController.text.toUpperCase();
+                    final filtered = query.isEmpty 
+                        ? widget.logic.uldAwbs 
+                        : widget.logic.uldAwbs.where((awb) {
+                            final awbObj = awb['awbs'] ?? {};
+                            final awbNumber = awbObj['awb_number']?.toString().toUpperCase() ?? awb['awb_number']?.toString().toUpperCase() ?? '';
+                            final awbFull = awbObj['awb_full']?.toString().toUpperCase() ?? awb['awb_full']?.toString().toUpperCase() ?? '';
+                            return awbNumber.contains(query) || awbFull.contains(query);
+                          }).toList();
 
-                  // Filter logic based on current text
-                  final query = _searchController.text.toUpperCase();
-                  final filtered = query.isEmpty 
-                      ? widget.logic.uldAwbs 
-                      : widget.logic.uldAwbs.where((awb) {
-                          final awbObj = awb['awbs'] ?? {};
-                          final awbNumber = awbObj['awb_number']?.toString().toUpperCase() ?? awb['awb_number']?.toString().toUpperCase() ?? '';
-                          final awbFull = awbObj['awb_full']?.toString().toUpperCase() ?? awb['awb_full']?.toString().toUpperCase() ?? '';
-                          return awbNumber.contains(query) || awbFull.contains(query);
-                        }).toList();
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final awb = filtered[index];
-                      final awbObj = awb['awbs'] ?? {};
-                      final awbNumber = awbObj['awb_number']?.toString() ?? awb['awb_number']?.toString() ?? '-';
-                      final pcs = awb['pieces']?.toString() ?? '-';
-                      final wt = awb['weight']?.toString() ?? '-';
-                      
-                      final locData = awb['data_location'];
-                      bool isLocated = false;
-                      String locationText = '';
-                      if (locData is Map) {
-                        final loc = locData['location']?.toString() ?? '';
-                        if (loc.isNotEmpty) {
+                    listWidget = ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final awb = filtered[index];
+                        final awbObj = awb['awbs'] ?? {};
+                        final awbNumber = awbObj['awb_number']?.toString() ?? awb['awb_number']?.toString() ?? '-';
+                        final pcs = awb['pieces']?.toString() ?? '-';
+                        final wt = awb['weight']?.toString() ?? '-';
+                        
+                        final locData = awb['data_location'];
+                        bool isLocated = false;
+                        if (locData is List && locData.isNotEmpty) {
                           isLocated = true;
-                          locationText = loc;
+                        } else if (locData is Map) {
+                          if (locData['locations'] != null && locData['locations'] is List && (locData['locations'] as List).isNotEmpty) {
+                            isLocated = true;
+                          } else {
+                            final loc = locData['location']?.toString() ?? '';
+                            if (loc.isNotEmpty) {
+                              isLocated = true;
+                            }
+                          }
                         }
-                      }
 
-                      return GestureDetector(
-                        onTap: () => _openAssignModal(awb),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isLocated ? const Color(0xFF10b981).withAlpha(15) : Colors.white.withAlpha(5),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isLocated ? const Color(0xFF10b981).withAlpha(50) : Colors.white.withAlpha(15),
+                        return GestureDetector(
+                          onTap: () => _openAssignModal(awb),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isLocated ? const Color(0xFF10b981).withAlpha(15) : Colors.white.withAlpha(5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isLocated ? const Color(0xFF10b981).withAlpha(50) : Colors.white.withAlpha(15),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(awbNumber, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '$pcs pcs  •  $wt kg',
+                                      style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                                if (isLocated)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10b981).withAlpha(20),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 16),
+                                  )
+                                else
+                                  Icon(Icons.chevron_right, color: Colors.white.withAlpha(100), size: 20),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(awbNumber, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '$pcs pcs  •  $wt kg',
-                                    style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13),
-                                  ),
-                                ],
-                              ),
-                              if (isLocated)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10b981).withAlpha(20),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 14),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        locationText,
-                                        style: const TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold, fontSize: 12),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                Icon(Icons.chevron_right, color: Colors.white.withAlpha(100), size: 20),
-                            ],
+                        );
+                      },
+                    );
+                  }
+
+                  return Column(
+                    children: [
+                      Expanded(child: listWidget),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(5),
+                          border: Border(top: BorderSide(color: Colors.white.withAlpha(15))),
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (isCompleted && !_isRelocating) {
+                              setState(() { _isRelocating = true; });
+                              _searchFocus.requestFocus();
+                              return;
+                            }
+                            if (isCompleted && _isRelocating) {
+                              Navigator.pop(context);
+                              return;
+                            }
+                            if (!isReadyToComplete) return;
+
+                            final idUld = widget.uld['id_uld']?.toString();
+                            if (idUld != null && idUld.isNotEmpty) {
+                              await widget.logic.markUldAsCompleted(idUld);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+                            }
+                          },
+                          icon: Icon(
+                            (isCompleted && !_isRelocating) 
+                              ? Icons.edit_location_alt_rounded 
+                              : (isCompleted && _isRelocating)
+                                ? Icons.check_circle_rounded
+                                : Icons.save_rounded,
+                            size: 20,
+                          ),
+                          label: Text(
+                            (isCompleted && !_isRelocating)
+                              ? (appLanguage.value == 'es' ? 'Reubicar' : 'Relocate')
+                              : (isCompleted && _isRelocating)
+                                ? (appLanguage.value == 'es' ? 'Terminar Reubicación' : 'Finish Relocation')
+                                : (appLanguage.value == 'es' ? 'Marcar Completado' : 'Mark as Completed'),
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: (isCompleted && !_isRelocating) 
+                                ? const Color(0xFFF59E0B) 
+                                : (isCompleted && _isRelocating)
+                                    ? const Color(0xFF10b981) 
+                                    : (!isReadyToComplete) 
+                                        ? Colors.white.withAlpha(20) 
+                                        : const Color(0xFF6366f1),
+                            foregroundColor: (!isReadyToComplete && !isCompleted) 
+                                ? Colors.white.withAlpha(80)
+                                : Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   );
                 },
               ),

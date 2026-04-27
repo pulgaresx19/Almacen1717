@@ -72,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: StatefulBuilder(
                 builder: (context, setModalState) {
                   final userEmail = Supabase.instance.client.auth.currentUser?.email ?? 'Usuario';
-                  final avatarUrl = currentUserData.value?['avatar-url'] as String?;
+                  final avatarUrl = currentUserData.value?['avatar_url'] as String?;
                   
                   return Container(
                     width: 260, // Matches sidebar exactly
@@ -130,8 +130,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                          backgroundColor: const Color(0xFF4f46e5),
                          backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                          child: avatarUrl == null || avatarUrl.isEmpty ? Text(
-                           (currentUserData.value?['full-name'] as String?)?.isNotEmpty == true
-                               ? currentUserData.value!['full-name'][0].toUpperCase()
+                           (currentUserData.value?['full_name'] as String?)?.isNotEmpty == true
+                               ? currentUserData.value!['full_name'][0].toUpperCase()
                                : (userEmail.isNotEmpty ? userEmail[0].toUpperCase() : 'U'),
                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 24),
                          ) : null,
@@ -181,12 +181,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 final publicUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
 
                                 await Supabase.instance.client.from('users').update({
-                                  'avatar-url': publicUrl,
+                                  'avatar_url': publicUrl,
                                 }).eq('id', userId);
 
                                 if (currentUserData.value != null) {
                                   final Map<String, dynamic> updatedData = Map.from(currentUserData.value!);
-                                  updatedData['avatar-url'] = publicUrl;
+                                  updatedData['avatar_url'] = publicUrl;
                                   currentUserData.value = updatedData;
                                 }
                                 
@@ -215,7 +215,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    ),
                    const SizedBox(height: 16),
                    Text(
-                     currentUserData.value?['full-name'] ?? userEmail.split('@')[0],
+                     currentUserData.value?['full_name'] ?? userEmail.split('@')[0],
                      style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 16),
                    ),
                    Text(
@@ -498,7 +498,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: ValueListenableBuilder<Map<String, dynamic>?>(
                             valueListenable: currentUserData,
                             builder: (context, userData, _) {
-                              final String? currentAvatarConfig = userData?['avatar-url'];
+                              final String? currentAvatarConfig = userData?['avatar_url'];
                               return Row(
                                 children: [
                                   InkWell(
@@ -508,8 +508,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       backgroundColor: const Color(0xFF4f46e5),
                                       backgroundImage: currentAvatarConfig != null && currentAvatarConfig.isNotEmpty ? NetworkImage(currentAvatarConfig) : null,
                                       child: currentAvatarConfig == null || currentAvatarConfig.isEmpty ? Text(
-                                        (userData?['full-name'] as String?)?.isNotEmpty == true
-                                            ? userData!['full-name'][0].toUpperCase()
+                                        (userData?['full_name'] as String?)?.isNotEmpty == true
+                                            ? userData!['full_name'][0].toUpperCase()
                                             : (userEmail.isNotEmpty ? userEmail[0].toUpperCase() : 'U'),
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
@@ -526,7 +526,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            userData?['full-name'] ?? userEmail.split('@')[0],
+                                            userData?['full_name'] ?? userEmail.split('@')[0],
                                             style: TextStyle(
                                               color: textP,
                                               fontWeight: FontWeight.w600,
@@ -571,7 +571,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     final userEmail = user?.email ?? 'Usuario';
 
-    final apMap = currentUserData.value?['access-page'] as Map?;
+    final apMap = currentUserData.value?['access_page'] as Map?;
     // Safely parse permissions. If null, we'll allow (backward compatibility for old admin users).
     bool can(String key) => apMap == null || apMap[key] == true;
 
@@ -616,7 +616,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ValueListenableBuilder<Map<String, dynamic>?>(
                   valueListenable: currentUserData,
                   builder: (context, userData, _) {
-                    final String? currentAvatarConfig = userData?['avatar-url'];
+                    final String? currentAvatarConfig = userData?['avatar_url'];
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -628,8 +628,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             backgroundColor: const Color(0xFF4f46e5),
                             backgroundImage: currentAvatarConfig != null && currentAvatarConfig.isNotEmpty ? NetworkImage(currentAvatarConfig) : null,
                             child: currentAvatarConfig == null || currentAvatarConfig.isEmpty ? Text(
-                              (userData?['full-name'] as String?)?.isNotEmpty == true
-                                  ? userData!['full-name'][0].toUpperCase()
+                              (userData?['full_name'] as String?)?.isNotEmpty == true
+                                  ? userData!['full_name'][0].toUpperCase()
                                   : (userEmail.isNotEmpty ? userEmail[0].toUpperCase() : 'U'),
                               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12),
                             ) : null,
@@ -637,7 +637,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          userData?['full-name'] ?? userEmail.split('@')[0],
+                          userData?['full_name'] ?? userEmail.split('@')[0],
                           style: TextStyle(color: textP, fontWeight: FontWeight.w600, fontSize: 12),
                         ),
                         const SizedBox(width: 8),

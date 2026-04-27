@@ -12,6 +12,7 @@ class LocationV2Ulds extends StatelessWidget {
   final Color bgCard;
   final Color borderC;
   final VoidCallback? onUldCompleted;
+  final String searchQuery;
 
   const LocationV2Ulds({
     super.key,
@@ -21,6 +22,7 @@ class LocationV2Ulds extends StatelessWidget {
     required this.textS,
     required this.bgCard,
     required this.borderC,
+    this.searchQuery = '',
     this.onUldCompleted,
   });
 
@@ -142,7 +144,20 @@ class LocationV2Ulds extends StatelessWidget {
       );
     }
 
-    if (logic.ulds.isEmpty) {
+    var uldsToDisplay = logic.ulds.where((u) => u['time_checked'] != null).toList();
+    
+    if (!logic.showCompletedUlds) {
+      uldsToDisplay = uldsToDisplay.where((u) => u['time_saved'] == null).toList();
+    }
+
+    final filteredUlds = searchQuery.isEmpty 
+        ? uldsToDisplay 
+        : uldsToDisplay.where((u) {
+            final uldNumber = u['uld_number']?.toString().toUpperCase() ?? '';
+            return uldNumber.contains(searchQuery.toUpperCase());
+          }).toList();
+
+    if (filteredUlds.isEmpty) {
       return Text(
         appLanguage.value == 'es'
             ? 'No hay ULDs encontrados para este vuelo.'
@@ -153,10 +168,10 @@ class LocationV2Ulds extends StatelessWidget {
 
     return Expanded(
       child: ListView.builder(
-        itemCount: logic.ulds.length,
+        itemCount: filteredUlds.length,
         itemBuilder: (context, index) {
           final isPhone = MediaQuery.of(context).size.width < 600;
-          final uld = logic.ulds[index];
+          final uld = filteredUlds[index];
           final int pieces = uld['pieces_total'] ?? 0;
           final String remarks = uld['remarks']?.toString() ?? '';
 
@@ -165,20 +180,7 @@ class LocationV2Ulds extends StatelessWidget {
           final bool isSelected = logic.selectedUldId == uldIdStr;
           final bool isCompleted = uld['time_saved'] != null;
 
-          bool isReadyToComplete = false;
-          if (!isCompleted && uldIdStr.isNotEmpty) {
-            final uldAwbs = logic.allFlightAwbs.where((awb) => awb['uld_id']?.toString() == uldIdStr).toList();
-            if (uldAwbs.isNotEmpty) {
-              isReadyToComplete = uldAwbs.every((awb) {
-                final locData = awb['data_location'];
-                if (locData is Map) {
-                  if (locData['locations'] is List && (locData['locations'] as List).isNotEmpty) return true;
-                  if (locData['location'] != null && locData['location'].toString().trim().isNotEmpty) return true;
-                }
-                return false;
-              });
-            }
-          }
+
 
           Color getBgColor() {
             if (isCompleted) return const Color(0xFF10b981).withAlpha(10);
@@ -254,23 +256,15 @@ class LocationV2Ulds extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (!isPhone) ...[
-                              const SizedBox(width: 12),
-                              Container(
-                                width: 75,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: dark ? Colors.white.withAlpha(15) : const Color(0xFFF3F4F6),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'PCs: $pieces',
-                                  style: TextStyle(color: textS, fontSize: 12),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: 55,
+                              child: Text(
+                                '$pieces pcs',
+                                style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
                               ),
-                            ],
-                            if (remarks.trim().isNotEmpty) ...[
+                            ),
+                            if (!isPhone && remarks.trim().isNotEmpty) ...[
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Container(
@@ -319,28 +313,7 @@ class LocationV2Ulds extends StatelessWidget {
                                     ],
                                   ],
                                 ),
-                              ) : Align(
-                                alignment: Alignment.centerRight,
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  tooltip: appLanguage.value == 'es' 
-                                    ? (isReadyToComplete ? 'Marcar Completado' : 'Faltan locaciones') 
-                                    : (isReadyToComplete ? 'Mark Completed' : 'Missing locations'),
-                                  icon: Icon(
-                                    Icons.check_circle_outline, 
-                                    color: isReadyToComplete ? const Color(0xFF10b981) : const Color(0xFF94a3b8).withAlpha(100)
-                                  ),
-                                  hoverColor: isReadyToComplete ? const Color(0xFF10b981).withAlpha(20) : Colors.transparent,
-                                  onPressed: isReadyToComplete ? () {
-                                    final idUld = uld['id_uld']?.toString();
-                                    if (idUld != null && idUld.isNotEmpty) {
-                                      onUldCompleted?.call();
-                                      logic.markUldAsCompleted(idUld);
-                                    }
-                                  } : null,
-                                ),
-                              ),
+                              ) : const SizedBox.shrink(),
                             ),
                           ],
                         ),

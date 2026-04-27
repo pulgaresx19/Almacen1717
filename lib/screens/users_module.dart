@@ -22,7 +22,7 @@ class _UsersModuleState extends State<UsersModule> {
   @override
   void initState() {
     super.initState();
-    _usersStream = Supabase.instance.client.from('users').select().order('full-name', ascending: true).asStream();
+    _usersStream = Supabase.instance.client.from('users').select().order('full_name', ascending: true).asStream();
   }
 
   @override
@@ -195,9 +195,9 @@ class _UsersModuleState extends State<UsersModule> {
                       if (_searchController.text.isNotEmpty) {
                         final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
                         users = users.where((u) {
-                          final fn = (u['full-name']?.toString() ?? '').toLowerCase();
+                          final fn = (u['full_name']?.toString() ?? '').toLowerCase();
                           final em = (u['email']?.toString() ?? '').toLowerCase();
-                          final ph = (u['phone-number']?.toString() ?? '').toLowerCase();
+                          final ph = (u['phone_number']?.toString() ?? '').toLowerCase();
                           final bd = (u['building']?.toString() ?? '').toLowerCase();
                           final sh = (u['shift']?.toString() ?? '').toLowerCase();
                           final po = (u['position']?.toString() ?? '').toLowerCase();
@@ -256,9 +256,9 @@ class _UsersModuleState extends State<UsersModule> {
                               DataColumn(label: Text('Position')),
                             ],
                             rows: users.map((u) {
-                              final name = u['full-name'] ?? 'Unknown';
+                              final name = u['full_name'] ?? 'Unknown';
                               final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-                              final String? avatarStr = u['avatar-url']?.toString();
+                              final String? avatarStr = u['avatar_url']?.toString();
                               
                               return DataRow(
                                 onSelectChanged: (_) => _showUserDrawer(context, u, dark),
@@ -280,7 +280,7 @@ class _UsersModuleState extends State<UsersModule> {
                                   DataCell(Text(u['email'] ?? '-')),
                                   DataCell(
                                       Text(
-                                        u['phone-number'] ?? '-',
+                                        u['phone_number'] ?? '-',
                                         style: TextStyle(fontFamily: 'monospace', color: textS),
                                       ),
                                   ),
@@ -412,7 +412,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
   @override
   void initState() {
     super.initState();
-    _phoneCtrl = TextEditingController(text: widget.user['phone-number']);
+    _phoneCtrl = TextEditingController(text: widget.user['phone_number']);
     _buildingCtrl = TextEditingController(text: widget.user['building']);
     
     _shift = widget.user['shift'];
@@ -421,9 +421,9 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     _position = widget.user['position'];
     if (!_positions.contains(_position)) _position = 'Agent';
     
-    _masterDriver = widget.user['master-driver'] == true;
+    _masterDriver = widget.user['master_driver'] == true;
     
-    _accessMap = Map<String, bool>.from((widget.user['access-page'] as Map?)?.cast<String, bool>() ?? {});
+    _accessMap = Map<String, bool>.from((widget.user['access_page'] as Map?)?.cast<String, bool>() ?? {});
     _originalOrder = _pagesList.map((p) => p['key'] as String).toList();
     _sortPages();
   }
@@ -437,9 +437,9 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
 
   Future<void> _saveContact() async {
     try {
-      await Supabase.instance.client.from('users').update({'phone-number': _phoneCtrl.text.trim()}).eq('id', widget.user['id']);
+      await Supabase.instance.client.from('users').update({'phone_number': _phoneCtrl.text.trim()}).eq('id', widget.user['id']);
       setState(() {
-        widget.user['phone-number'] = _phoneCtrl.text.trim();
+        widget.user['phone_number'] = _phoneCtrl.text.trim();
         _isEditingContact = false;
       });
       widget.onUpdate?.call();
@@ -454,13 +454,13 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
         'building': _buildingCtrl.text.trim(),
         'shift': _shift,
         'position': _position,
-        'master-driver': _masterDriver,
+        'master_driver': _masterDriver,
       }).eq('id', widget.user['id']);
       setState(() {
         widget.user['building'] = _buildingCtrl.text.trim();
         widget.user['shift'] = _shift;
         widget.user['position'] = _position;
-        widget.user['master-driver'] = _masterDriver;
+        widget.user['master_driver'] = _masterDriver;
         _isEditingOp = false;
       });
       widget.onUpdate?.call();
@@ -471,9 +471,9 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
 
   Future<void> _saveAccess() async {
     try {
-      await Supabase.instance.client.from('users').update({'access-page': _accessMap}).eq('id', widget.user['id']);
+      await Supabase.instance.client.from('users').update({'access_page': _accessMap}).eq('id', widget.user['id']);
       setState(() {
-        widget.user['access-page'] = _accessMap;
+        widget.user['access_page'] = _accessMap;
         _isEditingAccess = false;
         _sortPages();
       });
@@ -604,9 +604,9 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
     final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
     
-    final name = widget.user['full-name'] ?? 'Unknown';
+    final name = widget.user['full_name'] ?? 'Unknown';
     final initial = name.toString().isNotEmpty ? name.toString()[0].toUpperCase() : '?';
-    final String? avatarStr = widget.user['avatar-url']?.toString();
+    final String? avatarStr = widget.user['avatar_url']?.toString();
 
     return Column(
       children: [
@@ -657,7 +657,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                             () => setState(() => _isEditingContact = true), _saveContact, () {
                               setState(() {
                                 _isEditingContact = false;
-                                _phoneCtrl.text = widget.user['phone-number'] ?? '';
+                                _phoneCtrl.text = widget.user['phone_number'] ?? '';
                               });
                             }, textP),
                           const SizedBox(height: 12),
@@ -669,7 +669,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                           else
                             Row(children: [
                               Expanded(child: _buildInfoCard('Email', '${widget.user['email'] ?? '-'}', textS, textP, icon: Icons.email_outlined)),
-                              Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Teléfono' : 'Phone', '${widget.user['phone-number'] ?? '-'}', textS, textP, icon: Icons.phone_outlined)),
+                              Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Teléfono' : 'Phone', '${widget.user['phone_number'] ?? '-'}', textS, textP, icon: Icons.phone_outlined)),
                             ]),
                         ]
                       )
@@ -690,7 +690,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                                 if (!_shifts.contains(_shift)) _shift = 'Morning';
                                 _position = widget.user['position'];
                                 if (!_positions.contains(_position)) _position = 'Agent';
-                                _masterDriver = widget.user['master-driver'] == true;
+                                _masterDriver = widget.user['master_driver'] == true;
                               });
                             }, textP),
                           const SizedBox(height: 12),
@@ -743,7 +743,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                             const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                             Row(children: [
                               Expanded(child: _buildInfoCard(appLanguage.value == 'es' ? 'Posición' : 'Position', '${widget.user['position'] ?? '-'}', textS, textP, icon: Icons.badge_rounded)),
-                              Expanded(child: _buildInfoCard('Master Driver', widget.user['master-driver'] == true ? 'Yes' : 'No', textS, textP, icon: Icons.verified_user_rounded)),
+                              Expanded(child: _buildInfoCard('Master Driver', widget.user['master_driver'] == true ? 'Yes' : 'No', textS, textP, icon: Icons.verified_user_rounded)),
                             ]),
                           ],
                         ]
@@ -765,7 +765,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
                         () => setState(() => _isEditingAccess = true), _saveAccess, () {
                           setState(() {
                             _isEditingAccess = false;
-                            _accessMap = Map<String, bool>.from((widget.user['access-page'] as Map?)?.cast<String, bool>() ?? {});
+                            _accessMap = Map<String, bool>.from((widget.user['access_page'] as Map?)?.cast<String, bool>() ?? {});
                             _sortPages();
                           });
                         }, textP),

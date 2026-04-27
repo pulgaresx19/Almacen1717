@@ -79,9 +79,9 @@ class _LoginScreenState extends State<LoginScreen>
             currentUserData.value = userData;
           } else {
             currentUserData.value = {
-              'full-name': email.split('@')[0],
+              'full_name': email.split('@')[0],
               'email': email,
-              'master-driver': false,
+              'master_driver': false,
             };
           }
         } catch (e) {

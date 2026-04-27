@@ -22,6 +22,13 @@ class LocationV2Logic extends ChangeNotifier {
 
   RealtimeChannel? _uldsSubscription;
 
+  bool showCompletedUlds = false;
+
+  void toggleShowCompleted(bool v) {
+    showCompletedUlds = v;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _uldsSubscription?.unsubscribe();
@@ -95,8 +102,8 @@ class LocationV2Logic extends ChangeNotifier {
       
       final validList = <Map<String, dynamic>>[];
       for (var f in res) {
-        bool isDel = f['status']?.toString().toLowerCase() == 'delayed';
-        if (isDel && f['time_delay'] != null && f['time_delay'].toString().isNotEmpty && f['time_delay'].toString() != '-') {
+        bool hasDelay = f['time_delay'] != null && f['time_delay'].toString().isNotEmpty && f['time_delay'].toString() != '-';
+        if (hasDelay) {
           try {
             final localDt = DateTime.parse(f['time_delay'].toString()).toLocal();
             if (DateFormat('yyyy-MM-dd').format(localDt) == dateStr) {
@@ -140,9 +147,9 @@ class LocationV2Logic extends ChangeNotifier {
           userName = session.user.userMetadata!['full_name'].toString();
         }
         try {
-          final profile = await supabase.from('users').select('full-name').eq('id', session.user.id).maybeSingle();
-          if (profile != null && profile['full-name'] != null && profile['full-name'].toString().trim().isNotEmpty) {
-            userName = profile['full-name'].toString().trim();
+          final profile = await supabase.from('users').select('full_name').eq('id', session.user.id).maybeSingle();
+          if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+            userName = profile['full_name'].toString().trim();
           }
         } catch (_) {}
       }
@@ -181,8 +188,7 @@ class LocationV2Logic extends ChangeNotifier {
           .from('ulds')
           .select()
           .eq('id_flight', idFlight)
-          .eq('is_break', true)
-          .not('time_checked', 'is', null);
+          .eq('is_break', true);
 
       List<Map<String, dynamic>> fetchedUlds = List<Map<String, dynamic>>.from(res);
       

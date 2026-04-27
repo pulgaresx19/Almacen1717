@@ -41,11 +41,11 @@ class _SystemV2ScreenState extends State<SystemV2Screen> {
       if (uUser != null) {
         final userRow = await Supabase.instance.client
             .from('users')
-            .select('full-name')
+            .select('full_name')
             .eq('id', uUser.id)
             .maybeSingle();
-        if (userRow != null && userRow['full-name'] != null) {
-          userName = userRow['full-name'];
+        if (userRow != null && userRow['full_name'] != null) {
+          userName = userRow['full_name'];
         }
       }
     } catch (_) {}
