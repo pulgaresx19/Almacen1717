@@ -357,10 +357,18 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                                ),
                                child: TextField(
                                   controller: _searchAwbCtrl,
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: (!_showUldTab || _typeCtrl.text == 'Import') ? TextInputType.number : TextInputType.text,
                                   inputFormatters: [
                                     TextInputFormatter.withFunction((oldValue, newValue) {
                                       var text = newValue.text;
+                                      
+                                      if (_showUldTab && _typeCtrl.text != 'Import') {
+                                        return TextEditingValue(
+                                          text: text.toUpperCase(),
+                                          selection: newValue.selection,
+                                        );
+                                      }
+
                                       text = text.replaceAll(RegExp(r'[^0-9]'), '');
                                       if (text.length > 11) text = text.substring(0, 11);
 
@@ -401,8 +409,15 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                         if (_typeCtrl.text != 'Import') ...[
                            Row(
                              children: [
-                               GestureDetector(
-                                 onTap: () => setState(() => _showUldTab = false),
+                                GestureDetector(
+                                 onTap: () {
+                                   if (_showUldTab) {
+                                     setState(() {
+                                       _showUldTab = false;
+                                       _searchAwbCtrl.clear();
+                                     });
+                                   }
+                                 },
                                  child: Container(
                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                    decoration: BoxDecoration(
@@ -414,7 +429,14 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                                ),
                                const SizedBox(width: 8),
                                GestureDetector(
-                                 onTap: () => setState(() => _showUldTab = true),
+                                 onTap: () {
+                                   if (!_showUldTab) {
+                                     setState(() {
+                                       _showUldTab = true;
+                                       _searchAwbCtrl.clear();
+                                     });
+                                   }
+                                 },
                                  child: Container(
                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                    decoration: BoxDecoration(

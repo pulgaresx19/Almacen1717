@@ -5,6 +5,7 @@ import '../add_deliver_v2/add_deliver_v2_screen.dart';
 import 'delivers_v2_logic.dart';
 import 'delivers_v2_table.dart';
 import 'deliver_pdf_exporter.dart';
+import 'delivers_v2_history.dart';
 
 class DeliversV2Screen extends StatefulWidget {
   final bool isActive;
@@ -18,6 +19,7 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
   final DeliversV2Logic _logic = DeliversV2Logic();
   final _searchController = TextEditingController();
   bool _showAddForm = false;
+  bool _showHistory = false;
   final GlobalKey<AddDeliverV2ScreenState> _addDeliverKey = GlobalKey<AddDeliverV2ScreenState>();
   late Stream<List<Map<String, dynamic>>> _deliversStream;
 
@@ -147,6 +149,31 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                       ),
                     ),
                   ),
+                if (!_showAddForm) ...[
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    height: 40,
+                    width: 40,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _showHistory = !_showHistory;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _showHistory ? const Color(0xFF6366f1) : bgCard,
+                        foregroundColor: _showHistory ? Colors.white : const Color(0xFF6366f1),
+                        elevation: _showHistory ? 4 : 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          side: BorderSide(color: _showHistory ? Colors.transparent : borderCard),
+                        ),
+                      ),
+                      child: Icon(_showHistory ? Icons.folder_open_rounded : Icons.folder_special_rounded, size: 20),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 24),
@@ -190,6 +217,17 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                                 _logic.setDelivers(items);
                               });
         
+                              if (_showHistory) {
+                                return DeliversV2History(
+                                  logic: _logic,
+                                  onBackToMain: () {
+                                    setState(() {
+                                      _showHistory = false;
+                                    });
+                                  },
+                                );
+                              }
+
                               return ListenableBuilder(
                                 listenable: _logic,
                                 builder: (context, _) {

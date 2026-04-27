@@ -8,7 +8,7 @@ import '../auth/login_screen.dart';
 import '../users_module.dart';
 import '../dashboard_view_module.dart';
 import '../system_bf_v2/system_bf_v2_screen.dart';
-import '../area_nobreak_module.dart';
+
 import '../flights_v2/flights_v2_screen.dart';
 import '../ulds_v2/ulds_v2_screen.dart';
 import '../system_v2/system_v2_screen.dart';
@@ -17,6 +17,8 @@ import '../awbs_v2/awbs_v2_screen.dart';
 import '../delivers_v2/delivers_v2_screen.dart';
 import '../location_v2/location_v2_screen.dart';
 import '../driver_v2/driver_v2_screen.dart';
+import '../../services/realtime_service.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -27,6 +29,19 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    realtimeService.init();
+  }
+
+  @override
+  void dispose() {
+    // Only dispose if we are destroying the dashboard (e.g. logging out or exiting)
+    // realtimeService.dispose(); 
+    super.dispose();
+  }
 
   void _onDestinationSelected(int index) {
     setState(() {
@@ -353,7 +368,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Users',
                                   5,
                                 ),
-                              if ((can('system') || can('coordinator') || can('location') || can('driver') || can('system_bf') || can('area_nobreak')) &&
+                              if ((can('system') || can('coordinator') || can('location') || can('driver') || can('system_bf')) &&
                                   (currentUserData.value?['position'] == 'Supervisor' || currentUserData.value?['position'] == 'Manager' || currentUserData.value?['position'] == 'Administrator'))
                                 Padding(
                                   padding: const EdgeInsets.only(
@@ -404,12 +419,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'System (BF)',
                                   10,
                                 ),
-                              if (can('area_nobreak'))
-                                _buildNavItem(
-                                  Icons.dashboard_customize_rounded,
-                                  'Area (No break)',
-                                  11,
-                                ),
+
 
 
                             ],
@@ -785,7 +795,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox.shrink(), // Formerly V1 LocationModule
         const SizedBox.shrink(), // Formerly V1 DriverModule
         const SystemBfV2Screen(),
-        const AreaNobreakModule(),
+        const SizedBox.shrink(), // Formerly V1 AreaNobreakModule
         FlightsV2Screen(isActive: _selectedIndex == 12),
         UldsV2Screen(isActive: _selectedIndex == 13),
         const SystemV2Screen(),

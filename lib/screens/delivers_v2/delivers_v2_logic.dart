@@ -5,6 +5,7 @@ class DeliversV2Logic extends ChangeNotifier {
   List<Map<String, dynamic>> allDelivers = [];
   List<Map<String, dynamic>> displayedDelivers = [];
   String searchQuery = '';
+  bool filterTodayOnly = true;
   
   void setDelivers(List<Map<String, dynamic>> delivers) {
     allDelivers = delivers;
@@ -13,6 +14,11 @@ class DeliversV2Logic extends ChangeNotifier {
 
   void updateSearchQuery(String query) {
     searchQuery = query;
+    _filterDelivers();
+  }
+
+  void toggleTodayOnly(bool value) {
+    filterTodayOnly = value;
     _filterDelivers();
   }
 
@@ -41,6 +47,16 @@ class DeliversV2Logic extends ChangeNotifier {
          
          final combinedString = '$comp $dr $door $pId';
          return terms.every((term) => combinedString.contains(term));
+      }).toList();
+    }
+
+    if (filterTodayOnly) {
+      final now = DateTime.now();
+      items = items.where((u) {
+        final taStr = u['time']?.toString() ?? '';
+        final dt = DateTime.tryParse(taStr);
+        if (dt == null) return false;
+        return dt.year == now.year && dt.month == now.month && dt.day == now.day;
       }).toList();
     }
 

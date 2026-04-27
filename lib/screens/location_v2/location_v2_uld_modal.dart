@@ -22,6 +22,7 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   bool _isRelocating = false;
+  bool _searchError = false;
 
   @override
   void initState() {
@@ -61,15 +62,11 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
     );
 
     if (awbMatch.isNotEmpty) {
+      setState(() { _searchError = false; });
+      _searchController.clear();
       _openAssignModal(awbMatch);
     } else {
-      // Show error, not found
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(appLanguage.value == 'es' ? 'AWB no encontrado en este ULD' : 'AWB not found in this ULD'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      setState(() { _searchError = true; });
     }
     _searchController.clear();
     _searchFocus.requestFocus();
@@ -235,46 +232,57 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
     final String pieces = widget.uld['pieces_total']?.toString() ?? '-';
     final String weight = widget.uld['weight_total']?.toString() ?? '-';
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(16),
-      child: Container(
-        width: 400,
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1e293b),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4))],
-        ),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    return ListenableBuilder(
+      listenable: isDarkMode,
+      builder: (context, _) {
+        final dark = isDarkMode.value;
+        final Color bgColor = dark ? const Color(0xFF0f172a) : Colors.white;
+        final Color textP = dark ? Colors.white : const Color(0xFF111827);
+        final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+        final Color cardColor = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
+        final Color inputBgColor = dark ? Colors.white.withAlpha(5) : Colors.transparent;
+        final Color borderColor = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Container(
+            width: 400,
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Column(
+              children: [
+                // Header
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'ULD $uldNumber',
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ULD $uldNumber',
+                            style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${appLanguage.value == 'es' ? 'Piezas' : 'Pieces'}: $pieces  •  ${appLanguage.value == 'es' ? 'Peso' : 'Weight'}: $weight kg',
+                            style: TextStyle(color: textS, fontSize: 13),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${appLanguage.value == 'es' ? 'Piezas' : 'Pieces'}: $pieces  •  ${appLanguage.value == 'es' ? 'Peso' : 'Weight'}: $weight kg',
-                        style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13),
+                      IconButton(
+                        icon: Icon(Icons.close, color: textP),
+                        onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
+                ),
 
             // Search Bar
             Padding(
@@ -282,26 +290,34 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
               child: Container(
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(10),
+                  color: inputBgColor,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withAlpha(20)),
+                  border: Border.all(
+                    color: _searchError ? Colors.redAccent : borderColor,
+                    width: _searchError ? 1.5 : 1.0,
+                  ),
                 ),
                 child: TextField(
                   controller: _searchController,
                   focusNode: _searchFocus,
                   textCapitalization: TextCapitalization.characters,
-                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  style: TextStyle(color: textP, fontSize: 15),
+                  onChanged: (v) {
+                    if (_searchError) {
+                      setState(() { _searchError = false; });
+                    }
+                  },
                   inputFormatters: [
                     AwbTextInputFormatter(),
                   ],
                   decoration: InputDecoration(
                     hintText: appLanguage.value == 'es' ? 'Escanear o Buscar AWB...' : 'Scan or Search AWB...',
-                    hintStyle: TextStyle(color: Colors.white.withAlpha(80), fontSize: 15),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                    hintStyle: TextStyle(color: textS, fontSize: 15),
+                    prefixIcon: Icon(Icons.search, color: textS),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.white54, size: 20),
+                      icon: Icon(Icons.clear, color: textS, size: 20),
                       onPressed: () {
                         _searchController.clear();
                         _searchFocus.requestFocus();
@@ -342,7 +358,7 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                     listWidget = Center(
                       child: Text(
                         appLanguage.value == 'es' ? 'No hay AWBs en este ULD.' : 'No AWBs in this ULD.',
-                        style: TextStyle(color: Colors.white.withAlpha(150)),
+                        style: TextStyle(color: textS),
                       ),
                     );
                   } else {
@@ -387,10 +403,10 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                             margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: isLocated ? const Color(0xFF10b981).withAlpha(15) : Colors.white.withAlpha(5),
+                              color: isLocated ? const Color(0xFF10b981).withAlpha(15) : cardColor,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: isLocated ? const Color(0xFF10b981).withAlpha(50) : Colors.white.withAlpha(15),
+                                color: isLocated ? const Color(0xFF10b981).withAlpha(50) : borderColor,
                               ),
                             ),
                             child: Row(
@@ -399,11 +415,11 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(awbNumber, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                                    Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 15)),
                                     const SizedBox(height: 4),
                                     Text(
                                       '$pcs pcs  •  $wt kg',
-                                      style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13),
+                                      style: TextStyle(color: textS, fontSize: 13),
                                     ),
                                   ],
                                 ),
@@ -417,7 +433,7 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                                     child: const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 16),
                                   )
                                 else
-                                  Icon(Icons.chevron_right, color: Colors.white.withAlpha(100), size: 20),
+                                  Icon(Icons.chevron_right, color: textS, size: 20),
                               ],
                             ),
                           ),
@@ -433,8 +449,8 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(5),
-                          border: Border(top: BorderSide(color: Colors.white.withAlpha(15))),
+                          color: inputBgColor,
+                          border: Border(top: BorderSide(color: borderColor)),
                         ),
                         child: ElevatedButton.icon(
                           onPressed: () async {
@@ -497,6 +513,8 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

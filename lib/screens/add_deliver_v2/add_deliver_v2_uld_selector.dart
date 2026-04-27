@@ -8,7 +8,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
     }
     
     var filteredUlds = _allUlds.where((uld) {
-      final status = uld['status']?.toString() ?? '';
+      final status = uld['status']?.toString() ?? 'Received';
       if (status == 'Delivered' || status == 'Canceled') return false;
       if (uld['is_break'] == true) return false;
       
@@ -19,6 +19,17 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
       }
       return true;
     }).toList();
+
+    filteredUlds.sort((a, b) {
+      int getPriority(Map<String, dynamic> u) {
+        final s = u['status']?.toString() ?? 'Received';
+        if (u['in_process'] == true) return 2;
+        if (s == 'Received') return 1;
+        if (s == 'Waiting') return 3;
+        return 4;
+      }
+      return getPriority(a).compareTo(getPriority(b));
+    });
 
     return Container(
       decoration: BoxDecoration(
@@ -45,6 +56,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                     headingRowHeight: 40,
                     headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
                     dataRowColor: WidgetStateProperty.resolveWith((states) {
+                       if (states.contains(WidgetState.disabled)) return dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5);
                        if (states.contains(WidgetState.selected)) return const Color(0xFF6366f1).withAlpha(40);
                        if (states.contains(WidgetState.hovered)) return dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6);
                        return Colors.transparent;
@@ -108,9 +120,14 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                       }
 
 
+                      final String rawStatus = uld['status']?.toString() ?? 'Received';
+                      final bool isInProcess = uld['in_process'] == true;
+                      final String displayStatus = isInProcess ? 'In Process' : rawStatus;
+                      final bool isSelectable = !isInProcess && rawStatus != 'Waiting';
+
                       return DataRow(
                         selected: isSelected,
-                        onSelectChanged: (val) {
+                        onSelectChanged: isSelectable ? (val) {
                           setState(() {
                             if (val == true) {
                               _selectedUlds.add(uld);
@@ -124,14 +141,14 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                               _deliveryRemarkControllers.remove(uldNum)?.dispose();
                             }
                           });
-                        },
+                        } : null,
                         cells: [
                           DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600))),
                           DataCell(Text(uldNum, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                           DataCell(Text('$totalPieces pcs')),
                           DataCell(Text('${uld['weight_total']?.toString() ?? uld['weight']?.toString() ?? '0'} kg', style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))),
                           DataCell(Text(flightStr.trim() == '' ? '-' : flightStr, style: const TextStyle(fontWeight: FontWeight.w500))),
-                          DataCell(_buildStatusBadge(uld['status']?.toString() ?? 'Received')),
+                          DataCell(_buildStatusBadge(displayStatus)),
                           DataCell(
                             Align(
                               alignment: Alignment.centerRight,

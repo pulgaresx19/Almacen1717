@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../main.dart' show appLanguage;
+import '../../main.dart' show appLanguage, isDarkMode;
 import 'location_v2_logic.dart';
 import 'location_v2_history_modal.dart';
 
@@ -52,12 +52,22 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
 
   @override
   Widget build(BuildContext context) {
-    final awbObj = widget.awb['awbs'] ?? {};
-    final String awbNumber = awbObj['awb_number']?.toString() ?? widget.awb['awb_number']?.toString() ?? '-';
-    final String pieces = widget.awb['pieces']?.toString() ?? '-';
-    final String weight = widget.awb['weight']?.toString() ?? '-';
+    return ListenableBuilder(
+      listenable: isDarkMode,
+      builder: (context, _) {
+        final dark = isDarkMode.value;
+        final Color bgColor = dark ? const Color(0xFF0f172a) : Colors.white;
+        final Color textP = dark ? Colors.white : const Color(0xFF111827);
+        final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+        final Color cardColor = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
+        final Color inputBgColor = dark ? Colors.white.withAlpha(5) : Colors.transparent;
 
-    List<Map<String, dynamic>> parsedLocations = [];
+        final awbObj = widget.awb['awbs'] ?? {};
+        final String awbNumber = awbObj['awb_number']?.toString() ?? widget.awb['awb_number']?.toString() ?? '-';
+        final String pieces = widget.awb['pieces']?.toString() ?? '-';
+        final String weight = widget.awb['weight']?.toString() ?? '-';
+
+        List<Map<String, dynamic>> parsedLocations = [];
     if (widget.awb['data_location'] != null) {
       if (widget.awb['data_location'] is List) {
         for (var item in widget.awb['data_location']) {
@@ -86,7 +96,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
         width: 360,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1e293b), // Dark background for scanner modals
+          color: bgColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 4))],
         ),
@@ -102,7 +112,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                 Expanded(
                   child: Text(
                     appLanguage.value == 'es' ? 'Asignar Locación' : 'Assign Location',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 if (parsedLocations.isNotEmpty)
@@ -130,7 +140,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(10),
+                color: cardColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -139,25 +149,25 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('AWB', style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 12)),
+                      Text('AWB', style: TextStyle(color: textS, fontSize: 12)),
                       const SizedBox(height: 4),
-                      Text(awbNumber, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(awbNumber, style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(appLanguage.value == 'es' ? 'Piezas' : 'Pieces', style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 12)),
+                      Text(appLanguage.value == 'es' ? 'Piezas' : 'Pieces', style: TextStyle(color: textS, fontSize: 12)),
                       const SizedBox(height: 4),
-                      Text(pieces, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(pieces, style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                     ],
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(appLanguage.value == 'es' ? 'Peso' : 'Weight', style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 12)),
+                      Text(appLanguage.value == 'es' ? 'Peso' : 'Weight', style: TextStyle(color: textS, fontSize: 12)),
                       const SizedBox(height: 4),
-                      Text('$weight kg', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text('$weight kg', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ],
@@ -229,7 +239,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                     const SizedBox(height: 16),
                     Text(
                       appLanguage.value == 'es' ? 'O escanea otra ubicación:' : 'Or scan a different location:',
-                      style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 12),
+                      style: TextStyle(color: textS, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -243,7 +253,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
               children: [
                 Text(
                   'Location / Rack / Zone',
-                  style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 13, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 GestureDetector(
                   onTap: () {
@@ -253,12 +263,12 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                   },
                   child: Row(
                     children: [
-                      Icon(Icons.open_in_full_rounded, size: 14, color: Colors.white.withAlpha(150)),
+                      Icon(Icons.open_in_full_rounded, size: 14, color: textS),
                       const SizedBox(width: 4),
                       Text(
                         'OVERSIZE',
                         style: TextStyle(
-                          color: Colors.white.withAlpha(150),
+                          color: textS,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -274,7 +284,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
             Container(
               height: 50,
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(5),
+                color: inputBgColor,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFF10b981), width: 1.5),
               ),
@@ -290,14 +300,14 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                     );
                   }),
                 ],
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   hintText: 'Ej. RACK-A1, FLOOR-2',
-                  hintStyle: TextStyle(color: Colors.white.withAlpha(80), fontSize: 16),
+                  hintStyle: TextStyle(color: textS, fontSize: 16),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   suffixIcon: IconButton(
-                    icon: Icon(Icons.clear, color: Colors.white.withAlpha(150), size: 20),
+                    icon: Icon(Icons.clear, color: textS, size: 20),
                     onPressed: () {
                       _locationController.clear();
                       _locationFocus.requestFocus();
@@ -317,7 +327,7 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                   onPressed: () => Navigator.pop(context),
                   child: Text(
                     appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
-                    style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: textS, fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -339,6 +349,8 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

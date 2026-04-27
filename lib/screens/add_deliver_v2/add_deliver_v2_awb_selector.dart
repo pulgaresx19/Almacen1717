@@ -46,6 +46,64 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
       return true;
     }).toList();
     
+    int getRemaining(Map<String, dynamic> awb) {
+      int receivedPieces = 0;
+      if (awb['pieces_received'] != null) {
+        receivedPieces = int.tryParse(awb['pieces_received'].toString()) ?? 0;
+      } else if (awb['data-coordinator'] != null) {
+        List dcList = [];
+        if (awb['data-coordinator'] is List) {
+          dcList = awb['data-coordinator'] as List;
+        } else if (awb['data-coordinator'] is Map && (awb['data-coordinator'] as Map).isNotEmpty) {
+          dcList = [awb['data-coordinator']];
+        }
+        for (var item in dcList) {
+           if (item is Map) {
+              if (item.containsKey('breakdown') && item['breakdown'] is Map) {
+                 Map breakdown = item['breakdown'];
+                 if (breakdown['AGI Skid'] is List) {
+                    for (var val in breakdown['AGI Skid']) {
+                       receivedPieces += int.tryParse(val.toString()) ?? 0;
+                    }
+                 }
+                 for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
+                    receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
+                 }
+              } else {
+                 receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+              }
+           }
+        }
+      }
+
+      int deliveredPieces = 0;
+      if (awb['pieces_delivered'] != null) {
+        deliveredPieces = int.tryParse(awb['pieces_delivered'].toString()) ?? 0;
+      } else if (awb['data-deliver'] != null) {
+        if (awb['data-deliver'] is List) {
+          for (var item in awb['data-deliver']) {
+            if (item is Map && item.containsKey('found')) {
+              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
+            }
+          }
+        } else if (awb['data-deliver'] is Map) {
+          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
+        }
+      }
+
+      int inProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
+      int remainingPieces = receivedPieces - deliveredPieces - inProcess;
+      return remainingPieces < 0 ? 0 : remainingPieces;
+    }
+
+    filteredAwbs.sort((a, b) {
+      int rA = getRemaining(a);
+      int rB = getRemaining(b);
+      if (rA == 0 && rB > 0) return 1;
+      if (rA > 0 && rB == 0) return -1;
+      return 0;
+    });
+    
     final isImport = _typeCtrl.text == 'Import';
 
     return Container(
@@ -73,6 +131,7 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                     headingRowHeight: 40,
                     headingRowColor: WidgetStateProperty.all(dark ? Colors.white.withAlpha(13) : const Color(0xFFF9FAFB)),
                     dataRowColor: WidgetStateProperty.resolveWith((states) {
+                       if (states.contains(WidgetState.disabled)) return dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5);
                        if (states.contains(WidgetState.selected)) return const Color(0xFF6366f1).withAlpha(40);
                        if (states.contains(WidgetState.hovered)) return dark ? Colors.white.withAlpha(8) : const Color(0xFFF3F4F6);
                        return Colors.transparent;
@@ -177,7 +236,7 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
 
                       return DataRow(
                         selected: !isImport && isSelected,
-                        onSelectChanged: isImport ? null : (val) {
+                        onSelectChanged: (isImport || remainingPieces == 0) ? null : (val) {
                           setState(() {
                             if (val == true) {
                               _selectedAwbs.add(awb);

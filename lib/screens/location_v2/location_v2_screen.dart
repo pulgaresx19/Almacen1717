@@ -19,6 +19,7 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   final LocationV2Logic _logic = LocationV2Logic();
+  bool _searchError = false;
 
   @override
   void dispose() {
@@ -99,7 +100,10 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                                 color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
+                                  color: _searchError 
+                                      ? Colors.redAccent 
+                                      : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                                  width: _searchError ? 1.5 : 1.0,
                                 ),
                               ),
                               child: TextField(
@@ -118,7 +122,13 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                                   color: textP,
                                   fontSize: 13,
                                 ),
-                                onChanged: (v) => setState(() {}),
+                                onChanged: (v) {
+                                  if (_searchError) {
+                                    setState(() { _searchError = false; });
+                                  } else {
+                                    setState(() {});
+                                  }
+                                },
                                 onSubmitted: (v) {
                                   final query = v.trim().toUpperCase();
                                   if (query.isEmpty) return;
@@ -136,7 +146,7 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                                   
                                   if (match != null) {
                                     _searchController.clear();
-                                    setState(() {});
+                                    setState(() { _searchError = false; });
                                     showDialog(
                                       context: context,
                                       barrierDismissible: false,
@@ -148,14 +158,7 @@ class _LocationV2ScreenState extends State<LocationV2Screen> {
                                       _searchFocus.requestFocus();
                                     });
                                   } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(appLanguage.value == 'es' 
-                                          ? 'ULD no encontrado o aún no chequeado' 
-                                          : 'ULD not found or not checked yet'),
-                                        backgroundColor: Colors.redAccent,
-                                      ),
-                                    );
+                                    setState(() { _searchError = true; });
                                     _searchController.clear();
                                     _searchFocus.requestFocus();
                                   }

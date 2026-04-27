@@ -282,6 +282,38 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
 
       await Supabase.instance.client.from('deliveries').insert(payload);
 
+      // Update pieces_in_process for selected AWBs
+      if (_typeCtrl.text != 'Import' && _selectedAwbs.isNotEmpty) {
+        for (var awb in _selectedAwbs) {
+          final awbNum = awb['awb_number']?.toString() ?? awb['AWB-number']?.toString() ?? '';
+          final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+          final pcsToAdd = int.tryParse(pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+          
+          if (pcsToAdd > 0) {
+            int currentInProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
+            int newInProcess = currentInProcess + pcsToAdd;
+            
+            await Supabase.instance.client
+                .from('awbs')
+                .update({'pieces_in_process': newInProcess})
+                .eq('awb_number', awbNum);
+          }
+        }
+      }
+
+      // Update in_process for selected ULDs
+      if (_typeCtrl.text != 'Import' && _selectedUlds.isNotEmpty) {
+        for (var uld in _selectedUlds) {
+          final uldId = uld['id_uld'];
+          if (uldId != null) {
+            await Supabase.instance.client
+                .from('ulds')
+                .update({'in_process': true})
+                .eq('id_uld', uldId);
+          }
+        }
+      }
+
       if (_typeCtrl.text == 'Import' && _importAwbs.isNotEmpty) {
         Map<String, Map<String, dynamic>> mergedAwbs = {};
         final nowUtc = DateTime.now().toUtc().toIso8601String();
