@@ -238,7 +238,7 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                         logic.setDamages(damages);
                       }, logic.localPhotos, () => logic.pickImageLocally(ImageSource.gallery), () => logic.pickImageLocally(ImageSource.camera), (idx) {
                         logic.removePhoto(idx);
-                      }, widget.isReadOnly || logic.notFoundSelected)
+                      }, widget.isReadOnly || logic.notFoundSelected, logic.piecesDamageCtrl)
                     else if (logic.selectedType == 3)
                       buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl, widget.isReadOnly || logic.notFoundSelected)
                     else ...[

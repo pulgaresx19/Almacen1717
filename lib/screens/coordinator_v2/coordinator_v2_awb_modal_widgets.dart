@@ -230,6 +230,7 @@ Widget buildDamageSection(
   VoidCallback onPickCamera,
   Function(int) onRemovePhoto,
   bool isReadOnly,
+  TextEditingController piecesDamageCtrl,
 ) {
   final damagesList = ['Torn', 'Crushed', 'Wet', 'Broken', 'Open', 'Missing', 'Cracked', 'Leaking', 'Other'];
 
@@ -254,6 +255,43 @@ Widget buildDamageSection(
               const Text('DAMAGE REPORT', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 13)),
               Row(
                 children: [
+                  Text(
+                    'Pieces:', 
+                    style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 45,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Center(
+                        child: TextField(
+                          controller: piecesDamageCtrl,
+                          readOnly: isReadOnly,
+                          style: TextStyle(color: textP, fontSize: 13),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          maxLength: 5,
+                          textAlign: TextAlign.center,
+                          decoration: InputDecoration(
+                            counterText: '',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            isDense: true,
+                            hintText: '0',
+                            hintStyle: TextStyle(color: textS.withAlpha(150)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   if (!isReadOnly) ...[
                     InkWell(
                       onTap: onPickGallery,
@@ -389,6 +427,7 @@ Widget buildDamageSection(
               ),
             ),
           ),
+
         ],
       ),
     ),

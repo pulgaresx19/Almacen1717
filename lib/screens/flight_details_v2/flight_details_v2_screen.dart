@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage;
 import '../flights_v2/flights_v2_service.dart';
 import '../flights_v2/flights_v2_drawer_general_info.dart';
 import '../flights_v2/flights_v2_drawer_uld_list.dart';
 import '../flights_v2/flights_v2_print_preview.dart';
 import 'flight_details_v2_add_uld.dart';
+import 'flight_details_v2_reports_dialog.dart';
+import 'flight_details_v2_damage_reports_dialog.dart';
 
 class FlightDetailsV2Screen extends StatefulWidget {
   final Map<String, dynamic> flight;
@@ -25,6 +28,7 @@ class FlightDetailsV2Screen extends StatefulWidget {
 class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
   final FlightsV2Service _service = FlightsV2Service();
   List<Map<String, dynamic>> _ulds = [];
+  int _damageCount = 0;
   bool _isLoading = true;
 
   @override
@@ -41,9 +45,31 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
     }
 
     final ulds = await _service.fetchFlightDetails(flightId);
+    
+    int damages = 0;
+    try {
+      final flightRes = await Supabase.instance.client
+          .from('flights')
+          .select('final_discrepancy_report')
+          .eq('id_flight', flightId)
+          .maybeSingle();
+      if (flightRes != null) {
+        widget.flight['final_discrepancy_report'] = flightRes['final_discrepancy_report'];
+      }
+
+      final res = await Supabase.instance.client
+          .from('damage_reports')
+          .select('id')
+          .eq('flight_id', flightId);
+      damages = res.length;
+    } catch (e) {
+      // Ignore
+    }
+
     if (mounted) {
       setState(() {
         _ulds = ulds;
+        _damageCount = damages;
         _isLoading = false;
       });
     }
@@ -58,6 +84,10 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
     
     final carrier = widget.flight['carrier'] ?? '';
     final number = widget.flight['number'] ?? '';
+    final flightId = widget.flight['id_flight']?.toString() ?? '';
+    
+    final String reportStr = widget.flight['final_discrepancy_report']?.toString() ?? '';
+    final bool hasReport = reportStr.isNotEmpty && reportStr != 'null' && reportStr != '{}';
 
     return Container(
       decoration: BoxDecoration(
@@ -126,8 +156,11 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () {
-                         showAddUldComponent(context, widget.flight, widget.dark, _ulds);
+                      onPressed: () async {
+                         final bool? result = await showAddUldComponent(context, widget.flight, widget.dark, _ulds);
+                         if (result == true) {
+                           _fetchDetails();
+                         }
                       },
                       icon: const Icon(Icons.add_rounded, size: 16),
                       label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -140,26 +173,48 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.orangeAccent.withAlpha(30),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.report_problem_rounded, color: Colors.orangeAccent),
-                        onPressed: () {},
-                        tooltip: appLanguage.value == 'es' ? 'Daño' : 'Damage',
-                      ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.orangeAccent.withAlpha(30),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.report_problem_rounded, color: Colors.orangeAccent),
+                            onPressed: () => showFlightDamageReportsDialog(context, flightId, widget.dark),
+                            tooltip: appLanguage.value == 'es' ? 'Daño' : 'Damage',
+                          ),
+                        ),
+                        if (_damageCount > 0)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: bgCard, width: 1.5),
+                              ),
+                              child: Text(
+                                '$_damageCount',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(width: 8),
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.blueAccent.withAlpha(30),
+                        color: hasReport ? Colors.blueAccent.withAlpha(30) : (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.assignment_rounded, color: Colors.blueAccent),
-                        onPressed: () {},
+                        icon: Icon(Icons.assignment_rounded, color: hasReport ? Colors.blueAccent : textS.withAlpha(100)),
+                        onPressed: hasReport ? () => showFlightReportsDialog(context, widget.flight, widget.dark) : null,
                         tooltip: appLanguage.value == 'es' ? 'Reporte' : 'Report',
                       ),
                     ),
@@ -196,6 +251,7 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
               flight: widget.flight,
               isLoading: _isLoading,
               dark: widget.dark,
+              onRefresh: _fetchDetails,
             ),
           ),
         ],

@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../main.dart' show appLanguage;
 import 'flight_details_v2_add_awb_dialog.dart';
 import 'flight_details_v2_formatters.dart';
 
-Future<void> showAddUldComponent(
+Future<bool?> showAddUldComponent(
   BuildContext context,
   Map<String, dynamic> flight,
   bool dark,
   List<dynamic> existingUlds, [
   Map<String, dynamic>? uld,
 ]) async {
-  await showGeneralDialog(
+  return await showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Dismiss',
@@ -122,6 +123,8 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                 ? (combined['house_number'] as List).join(', ')
                 : combined['house_number']?.toString() ?? '',
             'remarks': combined['remarks']?.toString() ?? '',
+            'awb_id': master['id']?.toString() ?? '',
+            'split_id': split['id']?.toString() ?? '',
           });
         }
       }
@@ -183,7 +186,8 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
   }
 
   Future<void> _handleShowAddAwbDialog() async {
-    final newAwb = await showAddAwbDialog(context, widget.dark, _awbs);
+    final String currentUld = _uldNumberCtrl.text.trim().isNotEmpty ? _uldNumberCtrl.text.trim().toUpperCase() : 'ULD';
+    final newAwb = await showAddAwbDialog(context, widget.dark, _awbs, currentUld);
     if (newAwb != null) {
       setState(() {
         _awbs.add(newAwb);
@@ -642,14 +646,14 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     final currentUld = _uldNumberCtrl.text.trim().toUpperCase();
                     if (currentUld.isEmpty) return;
 
                     final exists = widget.existingUlds.any(
                       (u) =>
                           u['uld_number'] == currentUld &&
-                          (widget.uld == null || u['id'] != widget.uld!['id']),
+                          (widget.uld == null || u['id_uld'] != widget.uld!['id_uld']),
                     );
 
                     if (exists) {
@@ -666,7 +670,86 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       return;
                     }
 
-                    // Logic to be implemented
+                    try {
+                      final supa = Supabase.instance.client;
+                      final uldData = {
+                        'id_flight': widget.flight['id_flight'],
+                        'uld_number': currentUld,
+                        'pieces_total': int.tryParse(_piecesCtrl.text) ?? 0,
+                        'weight_total': double.tryParse(_weightCtrl.text) ?? 0.0,
+                        'is_priority': _isPriority,
+                        'is_break': _isBreak,
+                        'remarks': _remarksCtrl.text,
+                      };
+
+                      String? uldId;
+
+                      if (widget.uld != null) {
+                        uldId = widget.uld!['id_uld']?.toString();
+                        if (uldId != null) {
+                          await supa.from('ulds').update(uldData).eq('id_uld', uldId);
+                        }
+                      } else {
+                        final res = await supa.from('ulds').insert(uldData).select('id_uld').single();
+                        uldId = res['id_uld']?.toString();
+                      }
+
+                      // Calculate AWBs to remove and add
+                      final List<Map<String, dynamic>> itemsToRemove = [];
+                      final List<Map<String, dynamic>> itemsToAdd = [];
+
+                      if (widget.uld != null && widget.uld!['awb_splits'] != null) {
+                        final initialSplits = widget.uld!['awb_splits'] as List;
+                        for (var initialSplit in initialSplits) {
+                          if (initialSplit is! Map) continue;
+                          final splitId = initialSplit['id']?.toString();
+                          if (splitId == null) continue;
+                          
+                          // Check if it still exists in _awbs
+                          final stillExists = _awbs.any((a) => a['split_id'] == splitId);
+                          if (!stillExists) {
+                            itemsToRemove.add({
+                              'split_id': splitId,
+                              'awb_id': initialSplit['awb_id']?.toString(),
+                            });
+                          }
+                        }
+                      }
+
+                      for (var a in _awbs) {
+                        if (a['split_id'] == null || a['split_id'].toString().isEmpty) {
+                          itemsToAdd.add({
+                            'awb_number': a['awb_number'],
+                            'pieces': int.tryParse(a['pieces'].toString()) ?? 0,
+                            'total_pieces': int.tryParse(a['total'].toString()) ?? int.tryParse(a['pieces'].toString()) ?? 0,
+                            'weight': double.tryParse(a['weight'].toString()) ?? 0.0,
+                            'house_number': (a['house']?.toString() ?? '').split(RegExp(r'[,\n]')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+                            'remarks': a['remarks'] ?? '',
+                            'awb_id': a['awb_id'], // Might be empty if brand new
+                          });
+                        }
+                      }
+
+                      await supa.rpc('update_uld_awbs_v2', params: {
+                        'p_uld_id': uldId,
+                        'p_flight_id': widget.flight['id_flight'],
+                        'p_awbs_to_add': itemsToAdd,
+                        'p_awbs_to_remove': itemsToRemove,
+                      });
+
+                      if (context.mounted) {
+                        Navigator.pop(context, true);
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      }
+                    }
                   },
                   child: Text(
                     widget.uld != null

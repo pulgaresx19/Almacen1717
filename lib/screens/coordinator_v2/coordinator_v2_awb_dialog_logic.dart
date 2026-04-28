@@ -22,6 +22,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
   final crateCtrl = TextEditingController();
   final boxCtrl = TextEditingController();
   final otherCtrl = TextEditingController();
+  final piecesDamageCtrl = TextEditingController();
 
   List<Map<String, dynamic>> addedItems = [];
 
@@ -80,6 +81,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
     crateCtrl.dispose();
     boxCtrl.dispose();
     otherCtrl.dispose();
+    piecesDamageCtrl.dispose();
     super.dispose();
   }
 
@@ -96,6 +98,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       locationOtherCtrl.clear();
       notesCtrl.clear();
       selectedDamages.clear();
+      piecesDamageCtrl.clear();
       localPhotos.clear();
     }
     notifyListeners();
@@ -284,10 +287,12 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         }
       }
 
-      if (selectedDamages.isNotEmpty || uploadedUrls.isNotEmpty) {
+      final dmgPieces = int.tryParse(piecesDamageCtrl.text) ?? 0;
+      if (selectedDamages.isNotEmpty || uploadedUrls.isNotEmpty || dmgPieces > 0) {
          final Map<String, dynamic> reportData = {
            'damage_type': selectedDamages,
            'photo_urls': uploadedUrls,
+           'pieces_damage': dmgPieces,
          };
          
          final fId = combined['flight_id'] ?? awbSplit['flight_id'];

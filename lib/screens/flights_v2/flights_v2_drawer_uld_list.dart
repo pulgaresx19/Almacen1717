@@ -7,6 +7,7 @@ class FlightsV2UldList extends StatefulWidget {
   final Map<String, dynamic> flight;
   final bool isLoading;
   final bool dark;
+  final VoidCallback? onRefresh;
 
   const FlightsV2UldList({
     super.key,
@@ -14,6 +15,7 @@ class FlightsV2UldList extends StatefulWidget {
     required this.flight,
     required this.isLoading,
     required this.dark,
+    this.onRefresh,
   });
 
   @override
@@ -279,8 +281,11 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
         top: 0,
         right: 0,
         child: InkWell(
-          onTap: () {
-            showAddUldComponent(context, widget.flight, widget.dark, widget.ulds, uld);
+          onTap: () async {
+            final bool? result = await showAddUldComponent(context, widget.flight, widget.dark, widget.ulds, uld);
+            if (result == true && widget.onRefresh != null) {
+              widget.onRefresh!();
+            }
           },
           borderRadius: const BorderRadius.only(topRight: Radius.circular(12), bottomLeft: Radius.circular(12)),
           child: Container(
