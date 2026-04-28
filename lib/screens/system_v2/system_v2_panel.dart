@@ -140,57 +140,57 @@ class SystemV2PanelState extends State<SystemV2Panel> {
                             children: [
                               SizedBox(
                                 width: 200,
-                                child: Container(
+                                child: _logic.date != null ? Container(
                                   height: 40,
                                   margin: const EdgeInsets.only(right: 16),
                                   decoration: BoxDecoration(
                                     color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
                                     borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
-                                  ),
-                                ),
-                                child: TextField(
-                                  controller: _searchCtrl,
-                                  onChanged: _logic.setSearchQuery,
-                                  textCapitalization: TextCapitalization.characters,
-                                  inputFormatters: [
-                                    LengthLimitingTextInputFormatter(10),
-                                    TextInputFormatter.withFunction(
-                                      (oldValue, newValue) => newValue.copyWith(
-                                        text: newValue.text.toUpperCase(),
-                                      ),
+                                    border: Border.all(
+                                      color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB),
                                     ),
-                                  ],
-                                  style: TextStyle(
-                                    color: dark ? Colors.white : const Color(0xFF111827),
-                                    fontSize: 13,
                                   ),
-                                  decoration: InputDecoration(
-                                    hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...',
-                                    hintStyle: TextStyle(
-                                      color: dark ? const Color(0xFF94a3b8).withAlpha(150) : const Color(0xFF4B5563).withAlpha(150),
+                                  child: TextField(
+                                    controller: _searchCtrl,
+                                    onChanged: _logic.setSearchQuery,
+                                    textCapitalization: TextCapitalization.characters,
+                                    inputFormatters: [
+                                      LengthLimitingTextInputFormatter(10),
+                                      TextInputFormatter.withFunction(
+                                        (oldValue, newValue) => newValue.copyWith(
+                                          text: newValue.text.toUpperCase(),
+                                        ),
+                                      ),
+                                    ],
+                                    style: TextStyle(
+                                      color: dark ? Colors.white : const Color(0xFF111827),
                                       fontSize: 13,
                                     ),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    suffixIcon: _logic.searchQuery.isNotEmpty
-                                        ? IconButton(
-                                            icon: const Icon(Icons.close, size: 16),
-                                            color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563),
-                                            onPressed: () {
-                                              _searchCtrl.clear();
-                                              _logic.setSearchQuery('');
-                                            },
-                                            padding: EdgeInsets.zero,
-                                            constraints: const BoxConstraints(),
-                                          )
-                                        : null,
+                                    decoration: InputDecoration(
+                                      hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...',
+                                      hintStyle: TextStyle(
+                                        color: dark ? const Color(0xFF94a3b8).withAlpha(150) : const Color(0xFF4B5563).withAlpha(150),
+                                        fontSize: 13,
+                                      ),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      prefixIcon: const Icon(Icons.search, size: 16, color: Colors.grey),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      suffixIcon: _logic.searchQuery.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.close, size: 16),
+                                              color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563),
+                                              onPressed: () {
+                                                _searchCtrl.clear();
+                                                _logic.setSearchQuery('');
+                                              },
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            )
+                                          : null,
+                                    ),
                                   ),
-                                  ),
-                                ),
+                                ) : null,
                               ),
                             ],
                           ),

@@ -184,7 +184,7 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                 children: [
                   SizedBox(
                     width: 200,
-                    child: Container(
+                    child: widget.logic.selectedDate != null ? Container(
                       height: 40,
                       margin: const EdgeInsets.only(right: 16),
                       decoration: BoxDecoration(
@@ -234,7 +234,7 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                               : null,
                         ),
                       ),
-                    ),
+                    ) : null,
                   ),
                   
                   Text(

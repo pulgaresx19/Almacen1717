@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../main.dart' show appLanguage;
+import 'flight_details_v2_add_awb_dialog.dart';
+import 'flight_details_v2_formatters.dart';
 
-Future<void> showAddUldComponent(BuildContext context, Map<String, dynamic> flight, bool dark) async {
+Future<void> showAddUldComponent(
+  BuildContext context,
+  Map<String, dynamic> flight,
+  bool dark,
+  List<dynamic> existingUlds, [
+  Map<String, dynamic>? uld,
+]) async {
   await showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -13,7 +22,12 @@ Future<void> showAddUldComponent(BuildContext context, Map<String, dynamic> flig
       return Center(
         child: Material(
           color: Colors.transparent,
-          child: _AddUldComponentInternal(flight: flight, dark: dark),
+          child: _AddUldComponentInternal(
+            flight: flight,
+            dark: dark,
+            existingUlds: existingUlds,
+            uld: uld,
+          ),
         ),
       );
     },
@@ -29,8 +43,15 @@ Future<void> showAddUldComponent(BuildContext context, Map<String, dynamic> flig
 class _AddUldComponentInternal extends StatefulWidget {
   final Map<String, dynamic> flight;
   final bool dark;
+  final List<dynamic> existingUlds;
+  final Map<String, dynamic>? uld;
 
-  const _AddUldComponentInternal({required this.flight, required this.dark});
+  const _AddUldComponentInternal({
+    required this.flight,
+    required this.dark,
+    required this.existingUlds,
+    this.uld,
+  });
 
   @override
   State<_AddUldComponentInternal> createState() => _AddUldComponentInternalState();
@@ -38,8 +59,8 @@ class _AddUldComponentInternal extends StatefulWidget {
 
 class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
   final _uldNumberCtrl = TextEditingController();
-  final _piecesCtrl = TextEditingController(text: 'Auto');
-  final _weightCtrl = TextEditingController(text: 'Auto');
+  final _piecesCtrl = TextEditingController();
+  final _weightCtrl = TextEditingController();
   final _remarksCtrl = TextEditingController();
 
   bool _isPriority = false;
@@ -49,7 +70,75 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
 
   final List<Map<String, dynamic>> _awbs = [];
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNum = false, bool disabled = false, Widget? suffix}) {
+  void _recalcularTotales() {
+    if (!mounted) return;
+    if (_autoPieces) {
+      int totalPieces = 0;
+      for (var a in _awbs) {
+        totalPieces += int.tryParse(a['pieces']?.toString() ?? '0') ?? 0;
+      }
+      _piecesCtrl.text = totalPieces.toString();
+    }
+    if (_autoWeight) {
+      double totalWeight = 0.0;
+      for (var a in _awbs) {
+        totalWeight += double.tryParse(a['weight']?.toString() ?? '0') ?? 0.0;
+      }
+      String formatted = totalWeight.toStringAsFixed(2).replaceAll(RegExp(r'([.]*0+)(?!.*\d)'), '');
+      if (formatted.endsWith('.')) formatted = formatted.substring(0, formatted.length - 1);
+      _weightCtrl.text = formatted;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.uld != null) {
+      final u = widget.uld!;
+      _uldNumberCtrl.text = u['uld_number']?.toString() ?? '';
+      _piecesCtrl.text = (u['pieces_total']?.toString() ?? u['pieces']?.toString() ?? '');
+      _weightCtrl.text = (u['weight_total']?.toString() ?? u['weight']?.toString() ?? '');
+      _remarksCtrl.text = (u['remarks']?.toString().toLowerCase() == 'null' ? '' : u['remarks']?.toString() ?? '');
+
+      _isPriority = u['is_priority'] == true;
+      _isBreak = u['is_break'] == true;
+      _autoPieces = true;
+      _autoWeight = true;
+
+      if (u['awb_splits'] != null) {
+        final List splits = u['awb_splits'];
+        for (var rawSplit in splits) {
+          if (rawSplit is! Map) continue;
+          final split = Map<String, dynamic>.from(rawSplit);
+          final masterRaw = split['awbs'];
+          final master = masterRaw is Map ? Map<String, dynamic>.from(masterRaw) : <String, dynamic>{};
+          final combined = <String, dynamic>{...master, ...split};
+          _awbs.add({
+            'awb_number': master['awb_number']?.toString() ?? '',
+            'pieces': split['pieces']?.toString() ?? split['pieces_split']?.toString() ?? '',
+            'total': master['total_pieces']?.toString() ?? master['pieces']?.toString() ?? '',
+            'weight': split['weight']?.toString() ?? split['weight_split']?.toString() ?? '',
+            'house': combined['house_number'] is List
+                ? (combined['house_number'] as List).join(', ')
+                : combined['house_number']?.toString() ?? '',
+            'remarks': combined['remarks']?.toString() ?? '',
+          });
+        }
+      }
+    }
+    _recalcularTotales();
+  }
+
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl, {
+    bool isNum = false,
+    bool disabled = false,
+    Widget? suffix,
+    int? maxLength,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    List<TextInputFormatter>? formatters,
+  }) {
     final textP = widget.dark ? Colors.white : const Color(0xFF111827);
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b);
     final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
@@ -76,6 +165,11 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
           child: TextField(
             controller: ctrl,
             keyboardType: isNum ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+            textCapitalization: textCapitalization,
+            inputFormatters: [
+              if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
+              if (formatters != null) ...formatters,
+            ],
             style: TextStyle(color: disabled ? textS : textP, fontWeight: FontWeight.w500, fontSize: 14),
             enabled: !disabled,
             decoration: const InputDecoration(
@@ -88,79 +182,14 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
     );
   }
 
-  void _showAddAwbDialog() {
-    final awbNumCtrl = TextEditingController();
-    final awbPiecesCtrl = TextEditingController();
-    final awbTotalCtrl = TextEditingController();
-    final awbWeightCtrl = TextEditingController();
-    final awbHouseCtrl = TextEditingController();
-    final awbRemCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final textP = widget.dark ? Colors.white : const Color(0xFF111827);
-        final bgCard = widget.dark ? const Color(0xFF1e293b) : Colors.white;
-
-        return AlertDialog(
-          backgroundColor: bgCard,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(flex: 2, child: _buildTextField('AWB Number', awbNumCtrl)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildTextField('Pieces', awbPiecesCtrl, isNum: true)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildTextField('Total Pieces', awbTotalCtrl, isNum: true)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildTextField('Weight', awbWeightCtrl, isNum: true)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTextField('House Number', awbHouseCtrl),
-                  const SizedBox(height: 12),
-                  _buildTextField('Remarks', awbRemCtrl),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8))),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              onPressed: () {
-                setState(() {
-                  _awbs.add({
-                    'awb_number': awbNumCtrl.text.toUpperCase(),
-                    'pieces': awbPiecesCtrl.text,
-                    'total': awbTotalCtrl.text,
-                    'weight': awbWeightCtrl.text,
-                    'house': awbHouseCtrl.text,
-                    'remarks': awbRemCtrl.text,
-                  });
-                });
-                Navigator.pop(ctx);
-              },
-              child: Text(appLanguage.value == 'es' ? 'Añadir' : 'Add'),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> _handleShowAddAwbDialog() async {
+    final newAwb = await showAddAwbDialog(context, widget.dark, _awbs);
+    if (newAwb != null) {
+      setState(() {
+        _awbs.add(newAwb);
+        _recalcularTotales();
+      });
+    }
   }
 
   @override
@@ -169,12 +198,12 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b);
     final bgCard = widget.dark ? const Color(0xFF0f172a) : Colors.white;
     final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-    
+
     final carrier = widget.flight['carrier'] ?? '';
     final number = widget.flight['number'] ?? '';
 
     return Container(
-      width: 600,
+      width: 650,
       constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
       decoration: BoxDecoration(
         color: bgCard,
@@ -198,7 +227,14 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(appLanguage.value == 'es' ? 'Añadir ULD al Vuelo' : 'Add ULD to Flight', style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(
+                      widget.uld != null
+                          ? (appLanguage.value == 'es'
+                              ? 'Editar ${_uldNumberCtrl.text.isNotEmpty ? _uldNumberCtrl.text : 'ULD'}'
+                              : 'Edit ${_uldNumberCtrl.text.isNotEmpty ? _uldNumberCtrl.text : 'ULD'}')
+                          : (appLanguage.value == 'es' ? 'Añadir ULD al Vuelo' : 'Add ULD to Flight'),
+                      style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 4),
                     Text('$carrier $number', style: TextStyle(color: textP, fontSize: 22, fontWeight: FontWeight.bold)),
                   ],
@@ -206,7 +242,7 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                 IconButton(
                   icon: Icon(Icons.close_rounded, color: textS),
                   onPressed: () => Navigator.pop(context),
-                )
+                ),
               ],
             ),
           ),
@@ -221,21 +257,36 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Expanded(flex: 4, child: _buildTextField('ULD Number', _uldNumberCtrl)),
-                      const SizedBox(width: 12),
                       Expanded(
                         flex: 3,
                         child: _buildTextField(
-                          'Pieces', _piecesCtrl, isNum: true, disabled: _autoPieces,
+                          'ULD Number',
+                          _uldNumberCtrl,
+                          maxLength: 10,
+                          textCapitalization: TextCapitalization.characters,
+                          formatters: [UpperCaseTextFormatter()],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: _buildTextField(
+                          'Pieces',
+                          _piecesCtrl,
+                          isNum: true,
+                          disabled: _autoPieces,
+                          maxLength: 6,
+                          formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))],
                           suffix: SizedBox(
-                            width: 20, height: 20,
+                            width: 20,
+                            height: 20,
                             child: Checkbox(
                               value: _autoPieces,
                               activeColor: const Color(0xFF6366f1),
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               onChanged: (v) => setState(() {
                                 _autoPieces = v ?? true;
-                                _piecesCtrl.text = _autoPieces ? 'Auto' : '';
+                                if (_autoPieces) _recalcularTotales();
                               }),
                             ),
                           ),
@@ -243,18 +294,24 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        flex: 3,
+                        flex: 2,
                         child: _buildTextField(
-                          'Weight', _weightCtrl, isNum: true, disabled: _autoWeight,
+                          'Weight',
+                          _weightCtrl,
+                          isNum: true,
+                          disabled: _autoWeight,
+                          maxLength: 6,
+                          formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
                           suffix: SizedBox(
-                            width: 20, height: 20,
+                            width: 20,
+                            height: 20,
                             child: Checkbox(
                               value: _autoWeight,
                               activeColor: const Color(0xFF6366f1),
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               onChanged: (v) => setState(() {
                                 _autoWeight = v ?? true;
-                                _weightCtrl.text = _autoWeight ? 'Auto' : '';
+                                if (_autoWeight) _recalcularTotales();
                               }),
                             ),
                           ),
@@ -262,7 +319,7 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        flex: 3,
+                        flex: 2,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -271,7 +328,11 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                             Container(
                               height: 48,
                               padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                              decoration: BoxDecoration(
+                                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: borderC),
+                              ),
                               child: Row(
                                 children: [
                                   Icon(Icons.star_rounded, color: textS, size: 18),
@@ -293,7 +354,7 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        flex: 3,
+                        flex: 2,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -302,7 +363,11 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                             Container(
                               height: 48,
                               padding: const EdgeInsets.symmetric(horizontal: 10),
-                              decoration: BoxDecoration(color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                              decoration: BoxDecoration(
+                                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: borderC),
+                              ),
                               child: Row(
                                 children: [
                                   Icon(Icons.broken_image_rounded, color: textS, size: 18),
@@ -325,10 +390,14 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildTextField('Remarks', _remarksCtrl),
-                  
+                  _buildTextField(
+                    'Remarks',
+                    _remarksCtrl,
+                    textCapitalization: TextCapitalization.sentences,
+                    formatters: [SentenceCaseTextFormatter()],
+                  ),
                   const SizedBox(height: 16),
-                  
+
                   // AWBs Section
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -341,8 +410,14 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), borderRadius: BorderRadius.circular(12)),
-                            child: Text('${_awbs.length}', style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 12)),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF6366f1).withAlpha(30),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '${_awbs.length}',
+                              style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
                           ),
                         ],
                       ),
@@ -351,16 +426,19 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                           backgroundColor: widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF3F4F6),
                           foregroundColor: textP,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: borderC)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: borderC),
+                          ),
                         ),
-                        onPressed: _showAddAwbDialog,
+                        onPressed: _handleShowAddAwbDialog,
                         icon: const Icon(Icons.add_rounded, size: 16),
                         label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB'),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   if (_awbs.isEmpty)
                     Container(
                       width: double.infinity,
@@ -374,7 +452,10 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                         children: [
                           Icon(Icons.assignment_add, color: textS.withAlpha(100), size: 48),
                           const SizedBox(height: 12),
-                          Text(appLanguage.value == 'es' ? 'No hay AWBs añadidos.' : 'No AWBs added yet.', style: TextStyle(color: textS)),
+                          Text(
+                            appLanguage.value == 'es' ? 'No hay AWBs añadidos.' : 'No AWBs added yet.',
+                            style: TextStyle(color: textS),
+                          ),
                         ],
                       ),
                     )
@@ -383,6 +464,13 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       children: _awbs.asMap().entries.map((e) {
                         final i = e.key;
                         final a = e.value;
+
+                        List<String> houses = [];
+                        final hRaw = a['house']?.toString() ?? '';
+                        if (hRaw.isNotEmpty) {
+                          houses = hRaw.split(RegExp(r'[,\n]')).map((str) => str.trim()).where((str) => str.isNotEmpty).toList();
+                        }
+
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(12),
@@ -391,43 +479,146 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: borderC),
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 24, height: 24,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(30), shape: BoxShape.circle),
-                                child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.bold)),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF6366f1).withAlpha(30),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '${i + 1}',
+                                      style: const TextStyle(color: Color(0xFF818cf8), fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          a['awb_number'] ?? '',
+                                          style: TextStyle(color: textP, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Text('${a['pieces']} / ${a['total']?.toString().isEmpty ?? true ? '-' : a['total']} pcs', style: TextStyle(color: textS, fontSize: 13)),
+                                        const SizedBox(width: 16),
+                                        Text('${a['weight']?.toString().isEmpty ?? true ? '-' : a['weight']} kg', style: TextStyle(color: textS, fontSize: 13)),
+                                        
+                                        if (a['remarks'] != null && a['remarks'].toString().isNotEmpty) ...[
+                                          const SizedBox(width: 16),
+                                          Icon(Icons.notes_rounded, size: 14, color: textS.withAlpha(150)),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              a['remarks'],
+                                              style: TextStyle(color: textS, fontSize: 12, fontStyle: FontStyle.italic),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ] else
+                                          const Spacer(),
+
+                                        if (houses.isNotEmpty) ...[
+                                          const SizedBox(width: 16),
+                                          InkWell(
+                                            onTap: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (ctx) => AlertDialog(
+                                                  backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+                                                  title: Text(appLanguage.value == 'es' ? 'House Numbers' : 'House Numbers', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                                  content: SizedBox(
+                                                    width: 300,
+                                                    child: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: houses.asMap().entries.map((eh) {
+                                                        final hi = eh.key;
+                                                        final h = eh.value;
+                                                        return Padding(
+                                                          padding: const EdgeInsets.only(bottom: 8.0),
+                                                          child: Row(
+                                                            children: [
+                                                              Container(
+                                                                width: 24,
+                                                                height: 24,
+                                                                alignment: Alignment.center,
+                                                                decoration: BoxDecoration(
+                                                                  color: const Color(0xFF3b82f6).withAlpha(30),
+                                                                  shape: BoxShape.circle,
+                                                                ),
+                                                                child: Text(
+                                                                  '${hi + 1}',
+                                                                  style: const TextStyle(color: Color(0xFF60a5fa), fontSize: 11, fontWeight: FontWeight.bold),
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 12),
+                                                              Expanded(
+                                                                child: Text(h, style: TextStyle(color: textS, fontSize: 14)),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                      }).toList(),
+                                                    ),
+                                                  ),
+                                                  actions: [
+                                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF3b82f6).withAlpha(30),
+                                                borderRadius: BorderRadius.circular(10),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.house_siding_rounded, size: 12, color: Color(0xFF60a5fa)),
+                                                  const SizedBox(width: 4),
+                                                  Text('${houses.length}', style: const TextStyle(fontSize: 11, color: Color(0xFF60a5fa), fontWeight: FontWeight.bold)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                    onPressed: () {
+                                      setState(() {
+                                        _awbs.removeAt(i);
+                                        _recalcularTotales();
+                                      });
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(a['awb_number'] ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 4),
-                                    Text('Pcs: ${a['pieces']} • Wgt: ${a['weight']}', style: TextStyle(color: textS, fontSize: 12)),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
-                                onPressed: () {
-                                  setState(() {
-                                    _awbs.removeAt(i);
-                                  });
-                                },
-                              )
                             ],
                           ),
                         );
                       }).toList(),
-                    )
+                    ),
                 ],
               ),
             ),
           ),
-          
+
           // Footer
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -437,7 +628,10 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                  child: Text(
+                    appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
+                    style: const TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(
@@ -449,13 +643,41 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () {
+                    final currentUld = _uldNumberCtrl.text.trim().toUpperCase();
+                    if (currentUld.isEmpty) return;
+
+                    final exists = widget.existingUlds.any(
+                      (u) =>
+                          u['uld_number'] == currentUld &&
+                          (widget.uld == null || u['id'] != widget.uld!['id']),
+                    );
+
+                    if (exists) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            appLanguage.value == 'es'
+                                ? 'No se puede guardar: El ULD $currentUld ya existe en este vuelo.'
+                                : 'Cannot save: ULD $currentUld already exists in this flight.',
+                          ),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                      return;
+                    }
+
                     // Logic to be implemented
                   },
-                  child: Text(appLanguage.value == 'es' ? 'Crear ULD' : 'Create ULD', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: Text(
+                    widget.uld != null
+                        ? (appLanguage.value == 'es' ? 'Editar ULD' : 'Edit ULD')
+                        : (appLanguage.value == 'es' ? 'Crear ULD' : 'Create ULD'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );

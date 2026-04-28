@@ -54,7 +54,7 @@ class DeliversV2Logic extends ChangeNotifier {
       final now = DateTime.now();
       items = items.where((u) {
         final taStr = u['time']?.toString() ?? '';
-        final dt = DateTime.tryParse(taStr);
+        final dt = DateTime.tryParse(taStr)?.toLocal();
         if (dt == null) return false;
         return dt.year == now.year && dt.month == now.month && dt.day == now.day;
       }).toList();

@@ -104,6 +104,19 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                             Icon(Icons.flight_land_rounded, color: textP, size: 24),
                             const SizedBox(width: 8),
                             Text('$carrier $number', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                            if (widget.flight['date'] != null && widget.flight['date'].toString().isNotEmpty) ...[
+                              const SizedBox(width: 12),
+                              Builder(
+                                builder: (context) {
+                                  final dt = DateTime.tryParse(widget.flight['date'].toString())?.toLocal();
+                                  final dateStr = dt != null ? "${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}" : widget.flight['date'].toString().split(' ')[0];
+                                  return Text(
+                                    '[$dateStr]',
+                                    style: TextStyle(color: textS, fontSize: 20, fontWeight: FontWeight.w500),
+                                  );
+                                }
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -114,7 +127,7 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                   children: [
                     ElevatedButton.icon(
                       onPressed: () {
-                         showAddUldComponent(context, widget.flight, widget.dark);
+                         showAddUldComponent(context, widget.flight, widget.dark, _ulds);
                       },
                       icon: const Icon(Icons.add_rounded, size: 16),
                       label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -127,6 +140,30 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                       ),
                     ),
                     const SizedBox(width: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.orangeAccent.withAlpha(30),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.report_problem_rounded, color: Colors.orangeAccent),
+                        onPressed: () {},
+                        tooltip: appLanguage.value == 'es' ? 'Daño' : 'Damage',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withAlpha(30),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.assignment_rounded, color: Colors.blueAccent),
+                        onPressed: () {},
+                        tooltip: appLanguage.value == 'es' ? 'Reporte' : 'Report',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Container(
                       decoration: BoxDecoration(
                         color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
@@ -156,6 +193,7 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
           Expanded(
             child: FlightsV2UldList(
               ulds: _ulds,
+              flight: widget.flight,
               isLoading: _isLoading,
               dark: widget.dark,
             ),

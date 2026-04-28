@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../main.dart' show appLanguage;
+import '../flight_details_v2/flight_details_v2_add_uld.dart';
 
 class FlightsV2UldList extends StatefulWidget {
   final List<Map<String, dynamic>> ulds;
+  final Map<String, dynamic> flight;
   final bool isLoading;
   final bool dark;
 
   const FlightsV2UldList({
     super.key,
     required this.ulds,
+    required this.flight,
     required this.isLoading,
     required this.dark,
   });
@@ -48,10 +51,12 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          InkWell(
-            onTap: () {
+          Column(
+            children: [
+              InkWell(
+                onTap: () {
               setState(() {
                 _selectedUldId = isSelected ? null : uldId;
               });
@@ -119,6 +124,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                     ),
                   ),
                   Expanded(child: Center(child: _buildMetric('Status', uld['status']?.toString() ?? 'Ready', textP, textS))),
+                  Expanded(child: Center(child: _buildMetric('Remark', (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? uld['remarks'].toString() : '-', textP, textS))),
                   const SizedBox(width: 16),
                   Icon(
                     isSelected ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
@@ -146,15 +152,15 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                         final masterPieces = master['total_pieces']?.toString() ?? master['pieces']?.toString() ?? '0';
                         final splitWeight = split['weight']?.toString() ?? split['weight_split']?.toString() ?? '0';
                         
-                        String houseNum = '-';
+                        List<String> houseList = [];
                         if (combined['house_number'] != null) {
                           if (combined['house_number'] is List) {
-                            houseNum = (combined['house_number'] as List).join(', ').trim();
-                            if (houseNum.isEmpty) houseNum = '-';
-                          } else {
-                            houseNum = combined['house_number'].toString();
+                            houseList = List<String>.from(combined['house_number']).where((e) => e.trim().isNotEmpty).toList();
+                          } else if (combined['house_number'].toString().trim().isNotEmpty) {
+                            houseList = [combined['house_number'].toString().trim()];
                           }
                         }
+                        int houseCount = houseList.length;
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
@@ -189,8 +195,77 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                               Expanded(child: Center(child: _buildMetric('Pcs', splitPieces, textP, textS))),
                               Expanded(child: Center(child: _buildMetric('Total Pcs', masterPieces, textP, textS))),
                               Expanded(child: Center(child: _buildMetric('Weight', '$splitWeight kg', textP, textS))),
-                              Expanded(child: Center(child: _buildMetric('House', houseNum, textP, textS))),
-                              Expanded(child: Center(child: _buildMetric('Remarks', combined['remarks']?.toString() ?? '-', textP, textS))),
+                              Expanded(
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text('House', style: TextStyle(color: textS, fontSize: 10)),
+                                      const SizedBox(height: 2),
+                                      if (houseList.isEmpty)
+                                        Text('-', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold))
+                                      else
+                                        InkWell(
+                                          onTap: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (ctx) => AlertDialog(
+                                                backgroundColor: widget.dark ? const Color(0xFF1E293B) : Colors.white,
+                                                title: Text('House Numbers', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                                                content: SizedBox(
+                                                  width: 300,
+                                                  child: ListView.separated(
+                                                    shrinkWrap: true,
+                                                    itemCount: houseList.length,
+                                                    separatorBuilder: (context, index) => Divider(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                                                    itemBuilder: (ctx, i) => Padding(
+                                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                                      child: Row(
+                                                        children: [
+                                                          Container(
+                                                            width: 24,
+                                                            height: 24,
+                                                            decoration: BoxDecoration(
+                                                              color: widget.dark ? const Color(0xFF6366f1).withAlpha(40) : const Color(0xFF4F46E5).withAlpha(20),
+                                                              shape: BoxShape.circle,
+                                                              border: Border.all(color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5)),
+                                                            ),
+                                                            alignment: Alignment.center,
+                                                            child: Text('${i + 1}', style: TextStyle(color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                          ),
+                                                          const SizedBox(width: 12),
+                                                          Expanded(child: Text(houseList[i], style: TextStyle(color: textP, fontSize: 14))),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(ctx),
+                                                    child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: const TextStyle(color: Color(0xFF6366f1))),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                          child: Container(
+                                            width: 24,
+                                            height: 24,
+                                            decoration: BoxDecoration(
+                                              color: widget.dark ? const Color(0xFF6366f1).withAlpha(40) : const Color(0xFF4F46E5).withAlpha(20),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5)),
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Text('$houseCount', style: TextStyle(color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Expanded(child: Center(child: _buildMetric('Remarks', (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null') ? combined['remarks'].toString() : '-', textP, textS))),
                             ],
                           ),
                         );
@@ -200,8 +275,30 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
           ]
         ],
       ),
-    );
-  }
+      Positioned(
+        top: 0,
+        right: 0,
+        child: InkWell(
+          onTap: () {
+            showAddUldComponent(context, widget.flight, widget.dark, widget.ulds, uld);
+          },
+          borderRadius: const BorderRadius.only(topRight: Radius.circular(12), bottomLeft: Radius.circular(12)),
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: widget.dark ? const Color(0xFF6366f1).withAlpha(40) : const Color(0xFF4F46E5).withAlpha(20),
+              borderRadius: const BorderRadius.only(topRight: Radius.circular(12), bottomLeft: Radius.circular(12)),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.edit_outlined, color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), size: 13),
+          ),
+        ),
+      ),
+    ],
+  ),
+);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -209,14 +306,31 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final bgCard = widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF3F4F6);
 
+    final sortedUlds = List<Map<String, dynamic>>.from(widget.ulds);
+    sortedUlds.sort((a, b) {
+      final aBreak = a['is_break'] == true;
+      final bBreak = b['is_break'] == true;
+      if (aBreak && !bBreak) return -1;
+      if (!aBreak && bBreak) return 1;
+
+      final aUldNum = (a['uld_number']?.toString() ?? '').toLowerCase();
+      final bUldNum = (b['uld_number']?.toString() ?? '').toLowerCase();
+      
+      final aIsBulk = aUldNum == 'bulk';
+      final bIsBulk = bUldNum == 'bulk';
+      if (aIsBulk && !bIsBulk) return -1;
+      if (!aIsBulk && bIsBulk) return 1;
+
+      return aUldNum.compareTo(bUldNum);
+    });
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-
         Expanded(
           child: widget.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : widget.ulds.isEmpty
+              : sortedUlds.isEmpty
                   ? Center(
                       child: Text(
                         appLanguage.value == 'es' ? 'No se encontraron ULDs.' : 'No ULDs found.',
@@ -226,9 +340,9 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                   : Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: ListView.builder(
-                        itemCount: widget.ulds.length,
+                        itemCount: sortedUlds.length,
                         itemBuilder: (context, index) {
-                          return _buildUldCard(index, widget.ulds[index], textP, textS, bgCard);
+                          return _buildUldCard(index, sortedUlds[index], textP, textS, bgCard);
                         },
                       ),
                     ),

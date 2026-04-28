@@ -95,7 +95,7 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                       )
                     else
                       Text(
-                        appLanguage.value == 'es' ? 'Entregas / Transferencias' : 'Delivers / Transfers',
+                        appLanguage.value == 'es' ? 'Entregas / Transferencias de Hoy' : 'Today\'s Delivers / Transfers',
                         style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
                       ),
                     const SizedBox(height: 4),
@@ -103,7 +103,7 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                       Text(appLanguage.value == 'es' ? 'Registrar un Nuevo Deliver en el sistema.' : 'Register a New Deliver in the system.', style: TextStyle(color: textS, fontSize: 13))
                     else
                       Text(
-                        appLanguage.value == 'es' ? 'Manejo de entregas.' : 'Management of deliveries.',
+                        appLanguage.value == 'es' ? 'Manejo de entregas diarias.' : 'Daily deliveries management.',
                         style: TextStyle(fontSize: 13, color: textS),
                       ),
                   ],
