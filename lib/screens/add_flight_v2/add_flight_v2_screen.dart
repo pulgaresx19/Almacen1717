@@ -200,7 +200,32 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      children: [Icon(Icons.flight_takeoff_rounded, color: textP, size: 20), const SizedBox(width: 8), Text('Flight Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold))],
+                      children: [
+                        if (widget.isInline) ...[
+                          Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: Icon(Icons.arrow_back_rounded, color: textP, size: 20),
+                              onPressed: () async {
+                                final bool shouldPop = await _onBackPressed();
+                                if (shouldPop && mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              },
+                              tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
+                              constraints: const BoxConstraints(),
+                              padding: const EdgeInsets.all(8),
+                            ),
+                          ),
+                        ],
+                        Icon(Icons.flight_takeoff_rounded, color: textP, size: 20), 
+                        const SizedBox(width: 8), 
+                        Text('New Flight Details', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold))
+                      ],
                     ),
                     const SizedBox(height: 16),
         LayoutBuilder(

@@ -239,7 +239,7 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    appLanguage.value == 'es' ? 'Añadir AWB a ${widget.uldNumber}' : 'Add AWB to ${widget.uldNumber}',
+                    appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB',
                     style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   Row(

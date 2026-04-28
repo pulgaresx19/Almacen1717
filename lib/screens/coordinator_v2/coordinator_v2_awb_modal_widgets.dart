@@ -5,6 +5,45 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../main.dart' show appLanguage;
 
+void showImageZoomDialog(BuildContext context, ImageProvider imageProvider, bool dark) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            InteractiveViewer(
+              minScale: 1.0,
+              maxScale: 5.0,
+              child: Image(
+                image: imageProvider,
+                fit: BoxFit.contain,
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
 
 Widget buildHouseItem(int count, Color textP, Color textS, Color bgCard) {
   return Container(
@@ -218,6 +257,7 @@ Widget buildLocationSection(
 }
 
 Widget buildDamageSection(
+  BuildContext context,
   bool dark,
   Color bgCard,
   Color bgModal,
@@ -226,13 +266,16 @@ Widget buildDamageSection(
   List<String> selectedDamages,
   Function(List<String>) onDamagesChanged,
   List<XFile> localPhotos,
+  List<String> networkPhotos,
   VoidCallback onPickGallery,
   VoidCallback onPickCamera,
   Function(int) onRemovePhoto,
+  Function(int) onRemoveNetworkPhoto,
   bool isReadOnly,
   TextEditingController piecesDamageCtrl,
 ) {
   final damagesList = ['Torn', 'Crushed', 'Wet', 'Broken', 'Open', 'Missing', 'Cracked', 'Leaking', 'Other'];
+  final int totalPhotos = networkPhotos.length + localPhotos.length;
 
   return Expanded(
     flex: 2,
@@ -332,7 +375,7 @@ Widget buildDamageSection(
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)),
               ),
-              child: localPhotos.isEmpty
+              child: totalPhotos == 0
                 ? Center(
                     child: Text('No photos added yet', style: TextStyle(color: textS.withAlpha(150), fontSize: 12)),
                   )
@@ -343,22 +386,27 @@ Widget buildDamageSection(
                       crossAxisSpacing: 6,
                       mainAxisSpacing: 6,
                     ),
-                    itemCount: localPhotos.length,
+                    itemCount: totalPhotos,
                     itemBuilder: (context, index) {
+                      final bool isNetwork = index < networkPhotos.length;
+                      final int localIndex = isNetwork ? 0 : index - networkPhotos.length;
+                      
+                      final ImageProvider imgProvider = isNetwork 
+                        ? NetworkImage(networkPhotos[index]) as ImageProvider
+                        : (kIsWeb ? NetworkImage(localPhotos[localIndex].path) : FileImage(File(localPhotos[localIndex].path))) as ImageProvider;
+
                       return Stack(
                         children: [
                           Positioned.fill(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: kIsWeb
-                                ? Image.network(
-                                    localPhotos[index].path,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Image.file(
-                                    File(localPhotos[index].path),
-                                    fit: BoxFit.cover,
-                                  ),
+                            child: InkWell(
+                              onTap: () => showImageZoomDialog(context, imgProvider, dark),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image(
+                                  image: imgProvider,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
                           ),
                           if (!isReadOnly)
@@ -366,7 +414,13 @@ Widget buildDamageSection(
                               top: 4,
                               right: 4,
                               child: InkWell(
-                                onTap: () => onRemovePhoto(index),
+                                onTap: () {
+                                  if (isNetwork) {
+                                    onRemoveNetworkPhoto(index);
+                                  } else {
+                                    onRemovePhoto(localIndex);
+                                  }
+                                },
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: const BoxDecoration(

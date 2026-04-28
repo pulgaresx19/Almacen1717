@@ -13,7 +13,7 @@ Future<bool?> showAddUldComponent(
   List<dynamic> existingUlds, [
   Map<String, dynamic>? uld,
 ]) async {
-  return await showGeneralDialog<bool>(
+  final result = await showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Dismiss',
@@ -39,6 +39,56 @@ Future<bool?> showAddUldComponent(
       );
     },
   );
+  
+  if (result == true && context.mounted) {
+    await _showSaveSuccessDialog(context, dark);
+  }
+  
+  return result;
+}
+
+Future<void> _showSaveSuccessDialog(BuildContext context, bool dark) async {
+  bool dialogOpen = true;
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: false,
+    barrierColor: Colors.black.withAlpha(100),
+    transitionDuration: const Duration(milliseconds: 350),
+    pageBuilder: (context, anim1, anim2) {
+      return Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 300,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF1e293b) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))],
+              border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                const SizedBox(height: 24),
+                Text(appLanguage.value == 'es' ? '¡Actualizado!' : 'Updated!', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(appLanguage.value == 'es' ? 'La información se guardó correctamente.' : 'Information saved successfully.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14), textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (c, a1, a2, child) => Transform.scale(scale: Curves.easeOutBack.transform(a1.value), child: FadeTransition(opacity: a1, child: child)),
+  ).then((_) => dialogOpen = false);
+
+  await Future.delayed(const Duration(milliseconds: 1500));
+  
+  if (context.mounted && dialogOpen) {
+    Navigator.of(context).pop();
+  }
 }
 
 class _AddUldComponentInternal extends StatefulWidget {
@@ -68,6 +118,8 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
   bool _isBreak = true;
   bool _autoPieces = true;
   bool _autoWeight = true;
+
+  bool _isSubmitting = false;
 
   final List<Map<String, dynamic>> _awbs = [];
 
@@ -642,13 +694,17 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6366f1),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: const Color(0xFF6366f1).withAlpha(150),
+                    disabledForegroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () async {
+                  onPressed: _isSubmitting ? null : () async {
                     final currentUld = _uldNumberCtrl.text.trim().toUpperCase();
                     if (currentUld.isEmpty) return;
+
+                    setState(() => _isSubmitting = true);
 
                     final exists = widget.existingUlds.any(
                       (u) =>
@@ -657,6 +713,7 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                     );
 
                     if (exists) {
+                      setState(() => _isSubmitting = false);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -742,6 +799,7 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       }
                     } catch (e) {
                       if (context.mounted) {
+                        setState(() => _isSubmitting = false);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error: $e'),
@@ -751,12 +809,14 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       }
                     }
                   },
-                  child: Text(
-                    widget.uld != null
-                        ? (appLanguage.value == 'es' ? 'Editar ULD' : 'Edit ULD')
-                        : (appLanguage.value == 'es' ? 'Crear ULD' : 'Create ULD'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  child: _isSubmitting
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : Text(
+                              widget.uld != null
+                                  ? (appLanguage.value == 'es' ? 'Editar ULD' : 'Edit ULD')
+                                  : (appLanguage.value == 'es' ? 'Crear ULD' : 'Create ULD'),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
                 ),
               ],
             ),

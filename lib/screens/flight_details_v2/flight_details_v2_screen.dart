@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage;
@@ -89,6 +90,22 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
     final String reportStr = widget.flight['final_discrepancy_report']?.toString() ?? '';
     final bool hasReport = reportStr.isNotEmpty && reportStr != 'null' && reportStr != '{}';
 
+    int reportCount = 0;
+    if (hasReport) {
+      try {
+        final parsed = jsonDecode(reportStr);
+        if (parsed is List) {
+          reportCount = parsed.length;
+        } else if (parsed is Map) {
+          reportCount = parsed.isNotEmpty ? parsed.length : 0;
+        } else {
+          reportCount = 1;
+        }
+      } catch (_) {
+        reportCount = 1;
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: bgCard,
@@ -178,12 +195,12 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: Colors.orangeAccent.withAlpha(30),
+                            color: _damageCount > 0 ? Colors.orangeAccent.withAlpha(30) : (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
                             shape: BoxShape.circle,
                           ),
                           child: IconButton(
-                            icon: const Icon(Icons.report_problem_rounded, color: Colors.orangeAccent),
-                            onPressed: () => showFlightDamageReportsDialog(context, flightId, widget.dark),
+                            icon: Icon(Icons.report_problem_rounded, color: _damageCount > 0 ? Colors.orangeAccent : textS.withAlpha(100)),
+                            onPressed: _damageCount > 0 ? () => showFlightDamageReportsDialog(context, flightId, widget.dark) : null,
                             tooltip: appLanguage.value == 'es' ? 'Daño' : 'Damage',
                           ),
                         ),
@@ -207,16 +224,38 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                       ],
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: hasReport ? Colors.blueAccent.withAlpha(30) : (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: Icon(Icons.assignment_rounded, color: hasReport ? Colors.blueAccent : textS.withAlpha(100)),
-                        onPressed: hasReport ? () => showFlightReportsDialog(context, widget.flight, widget.dark) : null,
-                        tooltip: appLanguage.value == 'es' ? 'Reporte' : 'Report',
-                      ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: hasReport ? Colors.blueAccent.withAlpha(30) : (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            icon: Icon(Icons.assignment_rounded, color: hasReport ? Colors.blueAccent : textS.withAlpha(100)),
+                            onPressed: hasReport ? () => showFlightReportsDialog(context, widget.flight, widget.dark) : null,
+                            tooltip: appLanguage.value == 'es' ? 'Reporte' : 'Report',
+                          ),
+                        ),
+                        if (reportCount > 0)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: bgCard, width: 1.5),
+                              ),
+                              child: Text(
+                                '$reportCount',
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(width: 8),
                     Container(

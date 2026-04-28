@@ -207,8 +207,21 @@ class CoordinatorV2Logic extends ChangeNotifier {
     }
     
     try {
-      final res = await supabase.from('ulds').select().eq('id_flight', idFlight).eq('is_break', true).order('created_at', ascending: true);
+      final res = await supabase.from('ulds').select().eq('id_flight', idFlight).eq('is_break', true);
       ulds = List<Map<String, dynamic>>.from(res);
+      
+      ulds.sort((a, b) {
+        final aUld = (a['uld_number'] ?? '').toString().toUpperCase();
+        final bUld = (b['uld_number'] ?? '').toString().toUpperCase();
+        
+        final aIsBulk = aUld == 'BULK';
+        final bIsBulk = bUld == 'BULK';
+        
+        if (aIsBulk && !bIsBulk) return -1;
+        if (!aIsBulk && bIsBulk) return 1;
+        
+        return aUld.compareTo(bUld);
+      });
     } catch (e) {
       debugPrint('Error fetching ULDs: $e');
       ulds = [];
@@ -322,13 +335,15 @@ class CoordinatorV2Logic extends ChangeNotifier {
       }
 
       final String userFullName = currentUserData.value?['full_name'] ?? 'Unknown User';
-      final String nowIso = DateTime.now().toUtc().toIso8601String();
       
-      await supabase.from('ulds').update({
-        'time_checked': nowIso,
-        'user_checked': userFullName,
-        'discrepancies_summary': finalDiscrepancies,
-      }).eq('id_uld', uldId);
+      final response = await supabase.rpc('mark_uld_ready_v2', params: {
+        'p_uld_id': uldId,
+        'p_flight_id': selectedFlightId,
+        'p_user_fullname': userFullName,
+        'p_discrepancies': finalDiscrepancies,
+      });
+      
+      final String nowIso = response.toString();
 
       final idx = ulds.indexWhere((u) => u['id_uld'].toString() == uldId);
       if (idx != -1) {
@@ -340,14 +355,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
       if (selectedFlightId != null) {
         final fIdx = flights.indexWhere((f) => f['id_flight']?.toString() == selectedFlightId);
         if (fIdx != -1 && flights[fIdx]['start_break'] == null) {
-          try {
-            await supabase.from('flights').update({
-              'start_break': nowIso,
-            }).eq('id_flight', selectedFlightId!);
-            flights[fIdx]['start_break'] = nowIso;
-          } catch (ef) {
-            debugPrint('Error updating start_break for flight: $ef');
-          }
+          flights[fIdx]['start_break'] = nowIso;
         }
       }
 
@@ -477,17 +485,18 @@ class CoordinatorV2Logic extends ChangeNotifier {
       
       for (var split in splits) {
         String awbNum = split['awbs']['awb_number']?.toString() ?? 'Unknown';
-        int expected = int.tryParse(split['awbs']['total_pieces']?.toString() ?? '0') ?? 0;
+        int splitExpected = int.tryParse(split['pieces']?.toString() ?? '0') ?? 0;
         int checked = split['total_checked'] ?? 0;
         
         if (!sums.containsKey(awbNum)) {
           sums[awbNum] = {
-            'expected': expected,
+            'expected': 0,
             'checked': 0,
             'awb_id': split['awb_id'],
             'awb_number': awbNum,
           };
         }
+        sums[awbNum]!['expected'] = (sums[awbNum]!['expected'] as int) + splitExpected;
         sums[awbNum]!['checked'] = (sums[awbNum]!['checked'] as int) + checked;
       }
       

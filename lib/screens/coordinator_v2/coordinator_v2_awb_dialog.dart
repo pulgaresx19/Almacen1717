@@ -234,10 +234,12 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                         logic.setLocation(loc);
                       }, widget.isReadOnly || logic.notFoundSelected)
                     else if (logic.selectedType == 1)
-                      buildDamageSection(widget.dark, bgCard, bgModal, textP, textS, logic.selectedDamages, (damages) {
+                      buildDamageSection(context, widget.dark, bgCard, bgModal, textP, textS, logic.selectedDamages, (damages) {
                         logic.setDamages(damages);
-                      }, logic.localPhotos, () => logic.pickImageLocally(ImageSource.gallery), () => logic.pickImageLocally(ImageSource.camera), (idx) {
+                      }, logic.localPhotos, logic.networkPhotos, () => logic.pickImageLocally(ImageSource.gallery), () => logic.pickImageLocally(ImageSource.camera), (idx) {
                         logic.removePhoto(idx);
+                      }, (idx) {
+                        logic.removeNetworkPhoto(idx);
                       }, widget.isReadOnly || logic.notFoundSelected, logic.piecesDamageCtrl)
                     else if (logic.selectedType == 3)
                       buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl, widget.isReadOnly || logic.notFoundSelected)

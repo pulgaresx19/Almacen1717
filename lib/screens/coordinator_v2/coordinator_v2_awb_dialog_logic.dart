@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,9 +27,23 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
 
   List<Map<String, dynamic>> addedItems = [];
 
+  String? existingDamageReportId;
+  List<String> networkPhotos = [];
+  List<String> photosToDelete = [];
+  bool isLoadingDamage = true;
+
   CoordinatorV2AwbDialogLogic(this.combined, this.awbSplit) {
-    if (awbSplit['data_coordinator'] != null && awbSplit['data_coordinator'] is Map) {
-      final Map<String, dynamic> data = awbSplit['data_coordinator'];
+    dynamic d = awbSplit['data_coordinator'];
+    Map<String, dynamic>? data;
+    if (d is Map) {
+      data = Map<String, dynamic>.from(d);
+    } else if (d is String && d.trim().isNotEmpty && d != 'null') {
+      try {
+        data = Map<String, dynamic>.from(jsonDecode(d));
+      } catch (_) {}
+    }
+
+    if (data != null) {
       if (data['not_found'] == true) {
         notFoundSelected = true;
       }
@@ -58,9 +73,40 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
           }
         }
       });
-      notesCtrl = TextEditingController(text: data['Remarks']?.toString() ?? combined['remarks']?.toString() ?? '');
+      notesCtrl = TextEditingController(text: data['Remarks']?.toString() ?? '');
     } else {
-      notesCtrl = TextEditingController(text: combined['remarks']?.toString() ?? '');
+      notesCtrl = TextEditingController();
+    }
+    
+    _fetchExistingDamage();
+  }
+
+  Future<void> _fetchExistingDamage() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final fId = combined['flight_id'] ?? awbSplit['flight_id'];
+      final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
+      
+      if (fId != null && aId != null) {
+        final res = await supabase.from('damage_reports').select().eq('flight_id', fId).eq('awb_id', aId).maybeSingle();
+        if (res != null) {
+          existingDamageReportId = res['id']?.toString();
+          if (res['damage_type'] is List) {
+            selectedDamages = List<String>.from(res['damage_type']);
+          }
+          if (res['photo_urls'] is List) {
+            networkPhotos = List<String>.from(res['photo_urls']);
+          }
+          if (res['pieces_damage'] != null) {
+            piecesDamageCtrl.text = res['pieces_damage'].toString();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching damage report: $e');
+    } finally {
+      isLoadingDamage = false;
+      notifyListeners();
     }
   }
 
@@ -116,6 +162,13 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
 
   void removePhoto(int idx) {
     localPhotos.removeAt(idx);
+    notifyListeners();
+  }
+
+  void removeNetworkPhoto(int idx) {
+    final url = networkPhotos[idx];
+    photosToDelete.add(url);
+    networkPhotos.removeAt(idx);
     notifyListeners();
   }
 
@@ -268,6 +321,27 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       final supabase = Supabase.instance.client;
       final List<String> uploadedUrls = [];
 
+      // Borrar fotos huérfanas del Storage si se eliminaron de la nube
+      if (photosToDelete.isNotEmpty) {
+        try {
+          final List<String> pathsToDelete = photosToDelete.map((url) {
+            final uri = Uri.parse(url);
+            final segments = uri.pathSegments;
+            final idx = segments.indexOf('damage_reports');
+            if (idx != -1 && idx + 1 < segments.length) {
+              return segments.sublist(idx + 1).join('/');
+            }
+            return '';
+          }).where((p) => p.isNotEmpty).toList();
+          
+          if (pathsToDelete.isNotEmpty) {
+            await supabase.storage.from('damage_reports').remove(pathsToDelete);
+          }
+        } catch (e) {
+          debugPrint('Error deleting old photos: $e');
+        }
+      }
+
       if (localPhotos.isNotEmpty) {
         for (var photo in localPhotos) {
           final bytes = await photo.readAsBytes();
@@ -288,26 +362,35 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       }
 
       final dmgPieces = int.tryParse(piecesDamageCtrl.text) ?? 0;
-      if (selectedDamages.isNotEmpty || uploadedUrls.isNotEmpty || dmgPieces > 0) {
+      final List<String> finalUrls = [...networkPhotos, ...uploadedUrls];
+
+      if (selectedDamages.isNotEmpty || finalUrls.isNotEmpty || dmgPieces > 0) {
          final Map<String, dynamic> reportData = {
            'damage_type': selectedDamages,
-           'photo_urls': uploadedUrls,
+           'photo_urls': finalUrls,
            'pieces_damage': dmgPieces,
          };
          
-         final fId = combined['flight_id'] ?? awbSplit['flight_id'];
-         if (fId != null) reportData['flight_id'] = fId;
-         
-         final uId = combined['uld_id'] ?? awbSplit['uld_id'];
-         if (uId != null) reportData['uld_id'] = uId;
-         
-         final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
-         if (aId != null) reportData['awb_id'] = aId;
-         
-         final usrId = supabase.auth.currentUser?.id;
-         if (usrId != null) reportData['user_id'] = usrId;
+         if (existingDamageReportId != null) {
+            await supabase.from('damage_reports').update(reportData).eq('id', existingDamageReportId!);
+         } else {
+            final fId = combined['flight_id'] ?? awbSplit['flight_id'];
+            if (fId != null) reportData['flight_id'] = fId;
+            
+            final uId = combined['uld_id'] ?? awbSplit['uld_id'];
+            if (uId != null) reportData['uld_id'] = uId;
+            
+            final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
+            if (aId != null) reportData['awb_id'] = aId;
+            
+            final usrId = supabase.auth.currentUser?.id;
+            if (usrId != null) reportData['user_id'] = usrId;
 
-         await supabase.from('damage_reports').insert(reportData);
+            await supabase.from('damage_reports').insert(reportData);
+         }
+      } else if (existingDamageReportId != null && selectedDamages.isEmpty && finalUrls.isEmpty && dmgPieces == 0) {
+         // Si vaciaron todo el reporte existente, lo borramos de la BD
+         await supabase.from('damage_reports').delete().eq('id', existingDamageReportId!);
       }
 
       final String finLocation = selectedLocation == 'Other' ? locationOtherCtrl.text.trim() : (selectedLocation ?? '');

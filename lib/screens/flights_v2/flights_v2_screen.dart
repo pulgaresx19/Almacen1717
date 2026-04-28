@@ -70,7 +70,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Main Header Row (Title, Search, Buttons)
-                if (_selectedFlightDetails == null) ...[
+                if (_selectedFlightDetails == null && !_showAddForm) ...[
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -86,66 +86,40 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (_showAddForm)
-                          Row(
-                            children: [
-                              IconButton(
-                                onPressed: () async {
-                                  if (_addFlightKey.currentState != null) {
-                                    final canPop = await _addFlightKey.currentState!.handleBackRequest();
-                                    if (canPop) {
-                                      setState(() => _showAddForm = false);
-                                    }
-                                  } else {
-                                    setState(() => _showAddForm = false);
-                                  }
-                                },
-                                icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                                tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
-                              ),
-                              const SizedBox(width: 8),
-                              Text(appLanguage.value == 'es' ? 'Añadir Nuevo Vuelo' : 'Add New Flight', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                            ],
-                          )
-                        else
-                          Text(appLanguage.value == 'es' ? 'Vuelos' : 'Flight Documents', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                        Text(appLanguage.value == 'es' ? 'Vuelos' : 'Flight Documents', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
-                        if (_showAddForm)
-                          Text(appLanguage.value == 'es' ? 'Crea y vincula ULDs y AWBs a un Vuelo.' : 'Create and link ULDs and AWBs to a Flight.', style: TextStyle(color: textS, fontSize: 13))
-                        else
-                          Text(appLanguage.value == 'es' ? 'Administración y estado de los vuelos registrados.' : 'Manage and track all incoming flights.', style: TextStyle(color: textS, fontSize: 13)),
+                        Text(appLanguage.value == 'es' ? 'Administración y estado de los vuelos registrados.' : 'Manage and track all incoming flights.', style: TextStyle(color: textS, fontSize: 13)),
                       ],
                     ),
                     const Spacer(),
                     // Search Box
-                    if (!_showAddForm)
-                      Container(
-                        width: 300,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: bgCard,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: borderCard),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          textCapitalization: TextCapitalization.characters,
-                          inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
-                          style: TextStyle(color: textP, fontSize: 13),
-                          onChanged: (v) => setState(() {}), // We can attach logic filter here later
-                          decoration: InputDecoration(
-                            hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
-                            hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
-                            prefixIcon: Icon(Icons.search_rounded, color: iconColor, size: 16),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
+                    Container(
+                      width: 300,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: borderCard),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [TextInputFormatter.withFunction((oldValue, newValue) => TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection))],
+                        style: TextStyle(color: textP, fontSize: 13),
+                        onChanged: (v) => setState(() {}), // We can attach logic filter here later
+                        decoration: InputDecoration(
+                          hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
+                          hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                          prefixIcon: Icon(Icons.search_rounded, color: iconColor, size: 16),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
                       ),
+                    ),
                     const SizedBox(width: 16),
                     
                     // Add Flight Button
-                    if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor')
+                    if (currentUserData.value?['position'] != 'Supervisor')
                       SizedBox(
                         height: 40,
                         child: ElevatedButton.icon(
