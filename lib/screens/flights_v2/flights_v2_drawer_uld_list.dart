@@ -38,6 +38,47 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
     );
   }
 
+  Widget _buildStatusMetric(String label, String value, Color textS) {
+    Color bg = const Color(0xFF334155);
+    Color fg = const Color(0xFFcbd5e1);
+    
+    final s = value.toLowerCase();
+    if (s.contains('waiting')) {
+      bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
+    } else if (s.contains('process') || s.contains('progress')) {
+      bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
+    } else if (s.contains('checked') || s.contains('received')) {
+      bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
+    } else if (s.contains('ready') || s.contains('saved') || s.contains('delivered')) {
+      bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
+    } else if (s.contains('pending')) {
+      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(label, style: TextStyle(color: textS, fontSize: 10)),
+        const SizedBox(height: 2),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildUldCard(int index, Map<String, dynamic> uld, Color textP, Color textS, Color bgCard) {
     final uldId = uld['id_uld']?.toString() ?? '';
     final isSelected = _selectedUldId == uldId;
@@ -127,7 +168,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                     ),
                   ),
                   Expanded(child: Center(child: _buildMetric('Remarks', (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? uld['remarks'].toString() : '-', textP, textS))),
-                  Expanded(child: Center(child: _buildMetric('Status', FlightsV2StatusLogic.getUldStatus(uld), textP, textS))),
+                  Expanded(child: Center(child: _buildStatusMetric('Status', FlightsV2StatusLogic.getUldStatus(uld), textS))),
                   const SizedBox(width: 16),
                   Icon(
                     isSelected ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
@@ -269,7 +310,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                                 ),
                               ),
                               Expanded(child: Center(child: _buildMetric('Remarks', (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null') ? combined['remarks'].toString() : '-', textP, textS))),
-                              Expanded(child: Center(child: _buildMetric('Status', FlightsV2StatusLogic.getAwbStatus(split), textP, textS))),
+                              Expanded(child: Center(child: _buildStatusMetric('Status', FlightsV2StatusLogic.getAwbStatus(split), textS))),
                             ],
                           ),
                         );

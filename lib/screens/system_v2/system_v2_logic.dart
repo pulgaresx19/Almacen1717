@@ -174,7 +174,6 @@ class SystemPanelLogic extends ChangeNotifier {
     final currentFlightIdx = flights.indexWhere((f) => '${f['carrier']}-${f['number']}' == selectedFlightId);
     if (currentFlightIdx != -1) {
       flights[currentFlightIdx]['is_received'] = true;
-      flights[currentFlightIdx]['status'] = 'Received';
       flights[currentFlightIdx]['first_truck'] = firstTruckTime;
       flights[currentFlightIdx]['last_truck'] = lastTruckTime;
       showReceivedOverlay = true;
@@ -374,13 +373,11 @@ class SystemPanelLogic extends ChangeNotifier {
 
         await Supabase.instance.client.from('flights').update({
           'is_received': true,
-          'status': 'Received',
           'first_truck': firstTruckTime,
           'last_truck': lastTruckTime,
         }).eq('id_flight', flights[currentFlightIdx]['id_flight']);
 
         flights[currentFlightIdx]['is_received'] = true;
-        flights[currentFlightIdx]['status'] = 'Received';
         flights[currentFlightIdx]['first_truck'] = firstTruckTime;
         flights[currentFlightIdx]['last_truck'] = lastTruckTime;
         

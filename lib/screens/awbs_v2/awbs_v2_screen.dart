@@ -8,7 +8,9 @@ import '../add_uld_v2/add_uld_v2_screen.dart';
 // unused import removed
 import 'awbs_v2_pdf_exporter.dart';
 import 'awbs_v2_drawer.dart';
+import 'awbs_v2_uld_drawer.dart';
 import '../../services/realtime_service.dart';
+import '../flights_v2/flights_v2_status_logic.dart';
 
 class AwbsV2Screen extends StatefulWidget {
   final bool isActive;
@@ -375,7 +377,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                       final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
                       ulds = ulds.where((u) {
                         final uldSearch = (u['uld_number']?.toString() ?? u['ULD-number']?.toString() ?? '').toLowerCase();
-                        final statusSearch = (u['status']?.toString() ?? 'Received').toLowerCase();
+                        final statusSearch = FlightsV2StatusLogic.getUldStatus(u).toLowerCase();
                         final combinedString = '$uldSearch $statusSearch';
                         return terms.every((term) => combinedString.contains(term));
                       }).toList();
@@ -420,7 +422,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                                     final uldNum = u['uld_number']?.toString() ?? u['ULD-number']?.toString() ?? '-';
                                     int totalPieces = int.tryParse(u['pieces_total']?.toString() ?? '0') ?? 0;
                                     double totalWeight = double.tryParse(u['weight_total']?.toString() ?? '0') ?? 0.0;
-                                    String status = u['status']?.toString() ?? 'Received';
+                                    String status = FlightsV2StatusLogic.getUldStatus(u);
 
                                     final flightId = u['id_flight']?.toString();
                                     String flightDisplay = '-';
@@ -466,6 +468,9 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                                     }
 
                                     return DataRow(
+                                      onSelectChanged: (_) {
+                                        AwbsV2UldDrawer.show(context, u, dark, status, flightDisplay);
+                                      },
                                       cells: [
                                         DataCell(Text('${index + 1}')),
                                         DataCell(Text(uldNum, style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
@@ -473,7 +478,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                                         DataCell(Text(timeReceivedDisplay)),
                                         DataCell(Text(totalPieces.toString())),
                                         DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\.$|\.0$'), '')} kg')),
-                                        DataCell(Text(status, style: TextStyle(color: status == 'Received' ? Colors.blue : Colors.green))),
+                                        DataCell(_buildStatusBadge(status)),
                                       ],
                                     );
                                   }),
@@ -729,11 +734,11 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
     final s = status.toLowerCase();
     if (s.contains('waiting')) {
       bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
-    } else if (s.contains('process') || s.contains('progress') || s.contains('received')) {
+    } else if (s.contains('process') || s.contains('progress')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('checked')) {
+    } else if (s.contains('checked') || s.contains('received')) {
       bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
-    } else if (s.contains('ready') || s.contains('saved')) {
+    } else if (s.contains('ready') || s.contains('saved') || s.contains('delivered')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
     } else if (s.contains('pending')) {
       bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);

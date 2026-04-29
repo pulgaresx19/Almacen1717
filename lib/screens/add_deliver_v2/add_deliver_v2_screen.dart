@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
+import '../flights_v2/flights_v2_status_logic.dart';
 part 'add_deliver_v2_awb_drawer.dart';
 part 'add_deliver_v2_uld_drawer.dart';
 part 'add_deliver_v2_awb_selector.dart';
@@ -54,14 +55,14 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
   final Set<String> _expandedImports = {};
 
   bool _isLoadingAwbs = true;
-  StreamSubscription<List<Map<String, dynamic>>>? _awbSub;
   final Map<String, bool> _overLimitErrors = {};
 
   bool _showUldTab = false;
   List<Map<String, dynamic>> _allUlds = [];
   final List<Map<String, dynamic>> _selectedUlds = [];
   bool _isLoadingUlds = true;
-  StreamSubscription<List<Map<String, dynamic>>>? _uldSub;
+  
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
@@ -69,33 +70,49 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     _typeCtrl.text = 'Walk-in';
     _timeCtrl.text = 'NOW';
     
-    _awbSub = Supabase.instance.client
-        .from('awbs')
-        .select()
-        .order('awb_number', ascending: true)
-        .asStream().listen((data) {
+    _fetchDataSilently();
+    _initRealtime();
+  }
+
+  void _initRealtime() {
+    _realtimeChannel = Supabase.instance.client
+        .channel('public:storage_channel')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'awbs',
+          callback: (payload) => _fetchDataSilently(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'ulds',
+          callback: (payload) => _fetchDataSilently(),
+        )
+        .subscribe();
+  }
+
+  Future<void> _fetchDataSilently() async {
+    try {
+      final awbData = await Supabase.instance.client
+          .from('awbs')
+          .select()
+          .order('awb_number', ascending: true);
+          
+      final uldData = await Supabase.instance.client
+          .from('ulds')
+          .select('*, flights:id_flight(carrier, number, date)')
+          .order('created_at', ascending: false);
+          
       if (mounted) {
         setState(() {
-          _allAwbs = List<Map<String, dynamic>>.from(data);
+          _allAwbs = List<Map<String, dynamic>>.from(awbData);
+          _allUlds = List<Map<String, dynamic>>.from(uldData);
           _isLoadingAwbs = false;
-        });
-      }
-    });
-
-
-
-    _uldSub = Supabase.instance.client
-        .from('ulds')
-        .select('*, flights:id_flight(carrier, number, date)')
-        .order('created_at', ascending: false)
-        .asStream().listen((data) {
-      if (mounted) {
-        setState(() {
-          _allUlds = List<Map<String, dynamic>>.from(data);
           _isLoadingUlds = false;
         });
       }
-    });
+    } catch (_) {}
   }
 
 
@@ -175,8 +192,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
 
   @override
   void dispose() {
-    _awbSub?.cancel();
-    _uldSub?.cancel();
+    _realtimeChannel?.unsubscribe();
     for (var c in _deliveryPcsControllers.values) {
       c.dispose();
     }

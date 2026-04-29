@@ -7,6 +7,7 @@ import '../add_flight_v2/add_flight_v2_screen.dart'; // Ensure correct import ro
 import '../flight_details_v2/flight_details_v2_screen.dart';
 import 'flights_v2_logic.dart';
 import 'flights_v2_pdf_exporter.dart';
+import 'flights_v2_status_logic.dart';
 
 class FlightsV2Screen extends StatefulWidget {
   final bool isActive;
@@ -218,7 +219,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
       flightsToDisplay = flightsToDisplay.where((f) {
         final carrier = (f['carrier'] ?? '').toString().toLowerCase();
         final number = (f['number'] ?? '').toString().toLowerCase();
-        final status = (f['status'] ?? '').toString().toLowerCase();
+        final status = FlightsV2StatusLogic.getFlightStatus(f).toLowerCase();
         
         String dateStr = f['date']?.toString() ?? '';
         String formattedDate = '';
@@ -241,7 +242,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
     }
 
     String getEffectiveDate(Map<String, dynamic> f) {
-      if ((f['status']?.toString() ?? '').toLowerCase() == 'delayed' && f['time_delay'] != null) {
+      if (FlightsV2StatusLogic.getFlightStatus(f).toLowerCase() == 'delayed' && f['time_delay'] != null) {
         return f['time_delay'].toString();
       }
       return f['date']?.toString() ?? '';
@@ -423,7 +424,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               final number = flight['number'] ?? '';
               final cantBreak = flight['cant_break'] ?? 0;
               final cantNoBreak = flight['cant_nobreak'] ?? 0;
-              final status = flight['status']?.toString() ?? 'Waiting';
+              final status = FlightsV2StatusLogic.getFlightStatus(flight);
               final remarks = flight['remarks']?.toString() ?? '-';
               Widget buildFormatTimestamp(String? val, {Color? customColor}) {
                 if (val == null || val.isEmpty || val == '-') return const Text('-');
@@ -618,11 +619,12 @@ if (_selectedFlightIds.isNotEmpty)
       case 'waiting':
         bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1); break;
       case 'received':
-        bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd); break;
+        bg = const Color(0xFF6b21a8).withAlpha(51); fg = const Color(0xFFd8b4fe); break;
       case 'pending':
         bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047); break;
-      case 'ready':
       case 'checked':
+        bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd); break;
+      case 'ready':
       case 'saved':
         bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac); break;
       case 'delayed':

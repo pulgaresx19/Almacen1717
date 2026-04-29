@@ -1,4 +1,4 @@
-﻿part of 'add_deliver_v2_screen.dart';
+part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2UldDrawerExt on AddDeliverV2ScreenState {
   void _showUldDrawer(BuildContext context, Map<String, dynamic> u, bool dark) {
@@ -108,7 +108,7 @@ extension AddDeliverV2UldDrawerExt on AddDeliverV2ScreenState {
                                        Row(
                                          crossAxisAlignment: CrossAxisAlignment.start,
                                          children: [
-                                           Expanded(flex: 2, child: buildInfoBox('Status', u['status']?.toString() ?? 'Waiting', Icons.info_outline)),
+                                           Expanded(flex: 2, child: buildInfoBox('Status', FlightsV2StatusLogic.getUldStatus(u), Icons.info_outline)),
                                            Expanded(flex: 3, child: buildInfoBox('Remarks', u['remarks']?.toString() ?? '-', Icons.notes_rounded)),
                                        ])
                                     ]

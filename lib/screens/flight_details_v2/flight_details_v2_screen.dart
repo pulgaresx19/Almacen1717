@@ -49,10 +49,10 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
     _realtimeChannel!.onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
-      table: 'flight_ulds',
+      table: 'ulds',
       filter: PostgresChangeFilter(
         type: PostgresChangeFilterType.eq,
-        column: 'flight_id',
+        column: 'id_flight',
         value: flightId,
       ),
       callback: (payload) {
@@ -85,6 +85,18 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
       callback: (payload) {
         _fetchDetails();
       },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'flights',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id_flight',
+        value: flightId,
+      ),
+      callback: (payload) {
+        _fetchDetails();
+      },
     ).subscribe();
   }
 
@@ -107,11 +119,11 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
     try {
       final flightRes = await Supabase.instance.client
           .from('flights')
-          .select('final_discrepancy_report')
+          .select('*')
           .eq('id_flight', flightId)
           .maybeSingle();
       if (flightRes != null) {
-        widget.flight['final_discrepancy_report'] = flightRes['final_discrepancy_report'];
+        widget.flight.addAll(flightRes);
       }
 
       final res = await Supabase.instance.client

@@ -1,26 +1,150 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../main.dart' show appLanguage, isDarkMode;
+import '../flight_details_v2/flight_details_v2_formatters.dart';
 import 'add_flight_v2_logic.dart';
-import 'add_flight_v2_widgets.dart';
 
 Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int uldIndex) async {
+  await showDialog(
+    context: context,
+    builder: (ctx) {
+      return _AddAwbDialogComponent(logic: logic, uldIndex: uldIndex);
+    },
+  );
+}
+
+class _AddAwbDialogComponent extends StatefulWidget {
+  final AddFlightV2Logic logic;
+  final int uldIndex;
+
+  const _AddAwbDialogComponent({required this.logic, required this.uldIndex});
+
+  @override
+  State<_AddAwbDialogComponent> createState() => _AddAwbDialogComponentState();
+}
+
+class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
   final awbNumCtrl = TextEditingController();
-  final piecesCtrl = TextEditingController();
-  final weightCtrl = TextEditingController();
-  final totalCtrl = TextEditingController();
-  final houseCtrl = TextEditingController();
-  final remCtrl = TextEditingController();
-  
+  final awbPiecesCtrl = TextEditingController();
+  final awbTotalCtrl = TextEditingController();
+  final awbWeightCtrl = TextEditingController();
+  final awbHouseCtrl = TextEditingController();
+  final awbRemCtrl = TextEditingController();
+
   final totalLocked = ValueNotifier<bool>(false);
   final dbExpected = ValueNotifier<int>(0);
-  final awbErrors = ValueNotifier<Map<String, String>>({});
 
-  awbNumCtrl.addListener(() {
+  String? piecesError;
+  String? awbExistsError;
+  int houseCount = 0;
+  
+  bool awbRequiredError = false;
+  bool piecesRequiredError = false;
+  bool totalRequiredError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    awbNumCtrl.addListener(_onAwbNumChanged);
+    awbPiecesCtrl.addListener(_validatePieces);
+    awbHouseCtrl.addListener(_onHouseChanged);
+    awbTotalCtrl.addListener(_onTotalChanged);
+    totalLocked.addListener(_validatePieces);
+    dbExpected.addListener(_validatePieces);
+  }
+
+  @override
+  void dispose() {
+    awbNumCtrl.dispose();
+    awbPiecesCtrl.dispose();
+    awbTotalCtrl.dispose();
+    awbWeightCtrl.dispose();
+    awbHouseCtrl.dispose();
+    awbRemCtrl.dispose();
+    totalLocked.dispose();
+    dbExpected.dispose();
+    super.dispose();
+  }
+
+  void _onTotalChanged() {
+    if (totalRequiredError && awbTotalCtrl.text.isNotEmpty && mounted) {
+      setState(() => totalRequiredError = false);
+    }
+    _validatePieces();
+  }
+
+  void _onHouseChanged() {
+    final text = awbHouseCtrl.text;
+    final lines = text.split('\n').where((e) => e.trim().isNotEmpty).toList();
+    if (mounted && houseCount != lines.length) {
+      setState(() {
+        houseCount = lines.length;
+      });
+    }
+  }
+
+  void _validatePieces() {
+    if (!mounted) return;
+    setState(() {
+      if (piecesRequiredError && awbPiecesCtrl.text.isNotEmpty) {
+        piecesRequiredError = false;
+      }
+      
+      final text = awbNumCtrl.text.toUpperCase();
+      if (text.length < 13) {
+        piecesError = null;
+        return;
+      }
+
+      final p = int.tryParse(awbPiecesCtrl.text) ?? 0;
+      final t = int.tryParse(awbTotalCtrl.text) ?? 0;
+      
+      final dbExp = dbExpected.value;
+      final localUsed = widget.logic.getLocalUsedPieces(text);
+      final totalAllowed = t - dbExp - localUsed;
+
+      if (p > totalAllowed) {
+        if (totalAllowed <= 0) {
+          piecesError = appLanguage.value == 'es' ? 'Sin piezas restantes' : 'No pieces remaining';
+        } else {
+          piecesError = appLanguage.value == 'es' ? 'Máx. $totalAllowed piezas' : 'Max $totalAllowed pieces';
+        }
+      } else {
+        piecesError = null;
+      }
+    });
+  }
+
+  Future<void> _onAwbNumChanged() async {
     final text = awbNumCtrl.text.toUpperCase();
+    
+    if (awbRequiredError && text.isNotEmpty && mounted) {
+      setState(() => awbRequiredError = false);
+    }
+    
+    // Validate if it already exists in the current ULD
+    final existingAwbs = widget.logic.flightLocalUlds[widget.uldIndex]['awbs'] as List;
+    final exists = existingAwbs.any((a) => a['awb_number'] == text);
+    
+    if (exists && text.isNotEmpty) {
+      if (mounted && awbExistsError == null) {
+        setState(() {
+          awbExistsError = appLanguage.value == 'es' ? 'El AWB ya existe' : 'Duplicate AWB';
+        });
+      }
+    } else {
+      if (mounted && awbExistsError != null) {
+        setState(() {
+          awbExistsError = null;
+        });
+      }
+    }
+
     if (text.length == 13) {
       bool foundLocally = false;
       String foundTotal = '';
-      for (var u in logic.flightLocalUlds) {
+      for (var u in widget.logic.flightLocalUlds) {
         for (var a in (u['awbs'] as List)) {
           if (a['awb_number'] == text) {
             foundLocally = true;
@@ -31,170 +155,312 @@ Future<void> showAddAwbDialog(BuildContext context, AddFlightV2Logic logic, int 
         if (foundLocally) break;
       }
 
-      logic.fetchAwbTotalAsync(text, totalLocked, totalCtrl, dbExpected);
+      await widget.logic.fetchAwbTotalAsync(text, totalLocked, awbTotalCtrl, dbExpected);
 
-      if (foundLocally) {
+      if (foundLocally && mounted) {
         totalLocked.value = true;
-        if (totalCtrl.text != foundTotal) {
-          totalCtrl.text = foundTotal;
+        if (awbTotalCtrl.text != foundTotal) {
+          awbTotalCtrl.text = foundTotal;
         }
       }
+      _validatePieces();
     } else {
-      if (totalLocked.value) {
+      if (totalLocked.value && mounted) {
         totalLocked.value = false;
-        totalCtrl.text = '0';
+        awbTotalCtrl.text = '0';
         dbExpected.value = 0;
+        setState(() {
+          piecesError = null;
+        });
       }
     }
-  });
+  }
 
+  Widget _buildTextField(
+    String label,
+    TextEditingController ctrl, {
+    bool isNum = false,
+    bool disabled = false,
+    Widget? suffix,
+    int? maxLength,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    List<TextInputFormatter>? formatters,
+    bool hasError = false,
+    int? minLines,
+    int? maxLines = 1,
+    TextInputType? keyboardType,
+  }) {
+    final dark = isDarkMode.value;
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b);
+    final borderC = hasError ? Colors.redAccent : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB));
+    final bgC = dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5);
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            suffix ?? const SizedBox.shrink(),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: maxLines == 1 ? 48.0 : null,
+          decoration: BoxDecoration(
+            color: disabled ? (dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(3)) : bgC,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderC),
+          ),
+          child: TextField(
+            controller: ctrl,
+            keyboardType: keyboardType ?? (isNum ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text),
+            textCapitalization: textCapitalization,
+            minLines: minLines,
+            maxLines: maxLines,
+            inputFormatters: [
+              if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
+              if (formatters != null) ...formatters,
+            ],
+            style: TextStyle(color: disabled ? textS : textP, fontWeight: FontWeight.w500, fontSize: 14),
+            enabled: !disabled,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: maxLines == 1 
+                  ? const EdgeInsets.symmetric(horizontal: 16)
+                  : const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-  await showDialog(
-    context: context,
-    builder: (ctx) {
-      return AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
-        title: Text('Add AWB to ${logic.flightLocalUlds[uldIndex]['uldNumber']}', style: const TextStyle(color: Colors.white)),
-        content: SizedBox(
-          width: 380,
-          child: ValueListenableBuilder<Map<String, String>>(
-            valueListenable: awbErrors,
-            builder: (ctx, err, _) {
-              return SingleChildScrollView(
+  @override
+  Widget build(BuildContext context) {
+    final dark = isDarkMode.value;
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+    final bgCard = dark ? const Color(0xFF0f172a) : Colors.white;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        width: 500,
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: borderC, width: 1.5),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 40, offset: const Offset(0, 10)),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB',
+                    style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (awbExistsError != null)
+                        Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(8)),
+                          child: Text(awbExistsError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      if (piecesError != null)
+                        Container(
+                          margin: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(8)),
+                          child: Text(piecesError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      if (piecesError == null && totalLocked.value)
+                        ValueListenableBuilder<int>(
+                          valueListenable: dbExpected,
+                          builder: (ctx, dbExp, _) {
+                            final t = int.tryParse(awbTotalCtrl.text) ?? 0;
+                            final localUsed = widget.logic.getLocalUsedPieces(awbNumCtrl.text.toUpperCase());
+                            final remaining = t - dbExp - localUsed;
+                            if (remaining > 0) {
+                              return Container(
+                                margin: const EdgeInsets.only(right: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(color: const Color(0xFF22c55e).withAlpha(20), borderRadius: BorderRadius.circular(8)),
+                                child: Text(
+                                  appLanguage.value == 'es'
+                                      ? 'Piezas restantes: $remaining'
+                                      : 'Remaining pieces: $remaining',
+                                  style: const TextStyle(color: Color(0xFF22c55e), fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          }
+                        ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b),
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(flex: 5, child: buildTextField('AWB Number', awbNumCtrl, '123-1234 5678', isAwb: true, hasError: err.containsKey('AWB Number'), errorText: err['AWB Number'])),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 3, child: buildTextField('Pieces', piecesCtrl, '0', isNum: true, digitsOnly: true, hasError: err.containsKey('Pieces'), errorText: err['Pieces'])),
-                        const SizedBox(width: 8),
                         Expanded(
-                          flex: 3, 
+                          flex: 5,
+                          child: _buildTextField('AWB Number', awbNumCtrl, formatters: [AwbNumberFormatter()], hasError: awbExistsError != null || awbRequiredError),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: _buildTextField('Pieces', awbPiecesCtrl, isNum: true, maxLength: 6, formatters: [FilteringTextInputFormatter.digitsOnly], hasError: piecesError != null || piecesRequiredError),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
                           child: ValueListenableBuilder<bool>(
                             valueListenable: totalLocked,
-                            builder: (ctx, locked, _) => buildTextField('Total', totalCtrl, '0', isNum: true, digitsOnly: true, disabled: locked, hasError: err.containsKey('Total'), errorText: err['Total']),
+                            builder: (ctx, locked, _) {
+                              return _buildTextField('Total', awbTotalCtrl, isNum: true, maxLength: 6, disabled: locked, formatters: [FilteringTextInputFormatter.digitsOnly], hasError: totalRequiredError);
+                            }
                           )
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 3, child: buildTextField('Weight', weightCtrl, '0.0', isNum: true, allowDecimal: true)),
-                      ]
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: _buildTextField('Weight', awbWeightCtrl, isNum: true, maxLength: 6, formatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))]),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    buildTextField('Remarks', remCtrl, 'Additional remarks...', isSentenceCase: true),
-                    const SizedBox(height: 12),
-                    
-                    // Multiline House Number Field
-                    buildTextField(
-                      'House Number (One per line)',
-                      houseCtrl,
-                      'HAWB...\nHAWB...',
-                      isUpperCase: true,
-                      maxLines: 3,
+                    const SizedBox(height: 16),
+                    _buildTextField('Remarks', awbRemCtrl, textCapitalization: TextCapitalization.sentences, formatters: [SentenceCaseTextFormatter()]),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      'House Number (Press Enter)',
+                      awbHouseCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      keyboardType: TextInputType.multiline,
+                      formatters: [UpperCaseTextFormatter()],
                       minLines: 1,
-                      titleTrailing: ValueListenableBuilder<TextEditingValue>(
-                        valueListenable: houseCtrl,
-                        builder: (context, value, child) {
-                          final count = value.text.split('\n').where((e) => e.trim().isNotEmpty).length;
-                          if (count == 0) return const SizedBox.shrink();
-                          return Container(
-                            width: 22, height: 22,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF3b82f6),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              count.toString(),
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          );
-                        },
-                      ),
+                      maxLines: 3,
+                      suffix: houseCount > 0
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366f1).withAlpha(30),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$houseCount',
+                                style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 11),
+                              ),
+                            )
+                          : null,
                     ),
                   ],
                 ),
-              );
-            }
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel', style: TextStyle(color: Color(0xFF94a3b8)))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366f1)),
-            onPressed: () {
-              awbErrors.value = {};
-              final newAwb = awbNumCtrl.text.trim().toUpperCase();
-              Map<String, String> currentErrors = {};
-              if (newAwb.isEmpty) currentErrors['AWB Number'] = 'Required';
-              if (piecesCtrl.text.trim().isEmpty || piecesCtrl.text.trim() == '0') currentErrors['Pieces'] = 'Required';
-              if (totalCtrl.text.trim().isEmpty || totalCtrl.text.trim() == '0') currentErrors['Total'] = 'Required';
-              if (currentErrors.isNotEmpty) { awbErrors.value = currentErrors; return; }
-              
-              final p = int.tryParse(piecesCtrl.text) ?? 0;
-              final t = int.tryParse(totalCtrl.text) ?? 0;
-              
-              final dbExp = dbExpected.value;
-              final localUsed = logic.getLocalUsedPieces(newAwb);
-              final totalAllowed = t - dbExp - localUsed;
-
-              if (p > totalAllowed) {
-                 if (totalAllowed <= 0) {
-                   currentErrors['Pieces'] = 'No pieces remaining';
-                 } else {
-                   currentErrors['Pieces'] = 'Max $totalAllowed pieces';
-                 }
-                 awbErrors.value = currentErrors;
-                 return;
-               }
-              
-              final existingAwbs = logic.flightLocalUlds[uldIndex]['awbs'] as List;
-              if (existingAwbs.any((a) => a['awb_number'] == newAwb)) {
-                  showDialog(
-                    context: ctx,
-                    builder: (c) => AlertDialog(
-                      backgroundColor: const Color(0xFF1e293b),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      title: const Column(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 48), SizedBox(height: 16), Text('Duplicate AWB', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))]),
-                      content: SizedBox(
-                        width: 260,
-                        height: 70,
-                        child: Column(
-                           mainAxisAlignment: MainAxisAlignment.center,
-                           children: [
-                              Text('The AWB "$newAwb" is already registered under this ULD. Please verify or modify.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFcbd5e1)))
-                           ]
-                        )
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                border: Border(top: BorderSide(color: borderC)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
+                      style: TextStyle(
+                        color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b),
+                        fontWeight: FontWeight.w600,
                       ),
-                      actionsAlignment: MainAxisAlignment.center,
-                      actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1), fontSize: 16, fontWeight: FontWeight.bold)))]
-                    )
-                  );
-                  return;
-              }
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366f1),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      final awb = awbNumCtrl.text.toUpperCase();
+                      final piecesStr = awbPiecesCtrl.text;
+                      final totalStr = awbTotalCtrl.text;
 
-              List<String> parsedHouseNumbers = [];
-              if (houseCtrl.text.trim().isNotEmpty) {
-                 parsedHouseNumbers = houseCtrl.text.split('\n').map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toSet().toList();
-              }
+                      bool hasValidationError = false;
+                      setState(() {
+                        awbRequiredError = awb.isEmpty;
+                        piecesRequiredError = piecesStr.isEmpty || piecesStr == '0';
+                        totalRequiredError = totalStr.isEmpty || totalStr == '0';
+                        hasValidationError = awbRequiredError || piecesRequiredError || totalRequiredError;
+                      });
 
-              logic.onAwbAddedToUld(uldIndex, {
-                'awb_number': newAwb,
-                'pieces': int.tryParse(piecesCtrl.text) ?? 0,
-                'weight': double.tryParse(weightCtrl.text) ?? 0.0,
-                'total': int.tryParse(totalCtrl.text) ?? 1,
-                'house_number': parsedHouseNumbers,
-                'remarks': remCtrl.text,
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('Add AWB', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      );
-    }
-  );
+                      if (hasValidationError) return;
+                      if (piecesError != null || awbExistsError != null) return;
+
+                      List<String> parsedHouseNumbers = [];
+                      if (awbHouseCtrl.text.trim().isNotEmpty) {
+                        parsedHouseNumbers = awbHouseCtrl.text.split('\n').map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toSet().toList();
+                      }
+
+                      widget.logic.onAwbAddedToUld(widget.uldIndex, {
+                        'awb_number': awb,
+                        'pieces': int.tryParse(awbPiecesCtrl.text) ?? 0,
+                        'weight': double.tryParse(awbWeightCtrl.text) ?? 0.0,
+                        'total': int.tryParse(awbTotalCtrl.text) ?? 1,
+                        'house_number': parsedHouseNumbers,
+                        'remarks': awbRemCtrl.text,
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

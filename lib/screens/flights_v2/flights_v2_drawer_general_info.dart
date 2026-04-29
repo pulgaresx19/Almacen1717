@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage;
+import 'flights_v2_status_logic.dart';
 
 class FlightsV2GeneralInfo extends StatefulWidget {
   final Map<String, dynamic> flight;
@@ -44,7 +45,7 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
     _carrierCtrl = TextEditingController(text: widget.flight['carrier']?.toString());
     _numberCtrl = TextEditingController(text: widget.flight['number']?.toString());
     _dateCtrl = TextEditingController(text: widget.flight['date']?.toString());
-    _statusCtrl = TextEditingController(text: widget.flight['status']?.toString() ?? 'Waiting');
+    _statusCtrl = TextEditingController(text: FlightsV2StatusLogic.getFlightStatus(widget.flight));
     _cantBreakCtrl = TextEditingController(text: widget.flight['cant_break']?.toString() ?? '0');
     _cantNoBreakCtrl = TextEditingController(text: widget.flight['cant_nobreak']?.toString() ?? '0');
     _startBreakCtrl = TextEditingController(text: widget.flight['start_break']?.toString());
@@ -53,6 +54,25 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
     _lastTruckCtrl = TextEditingController(text: widget.flight['last_truck']?.toString());
     _remarksCtrl = TextEditingController(text: widget.flight['remarks']?.toString());
     _timeDelayedCtrl = TextEditingController(text: widget.flight['time_delay']?.toString());
+  }
+
+  @override
+  void didUpdateWidget(covariant FlightsV2GeneralInfo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isEditing) {
+      _carrierCtrl.text = widget.flight['carrier']?.toString() ?? '';
+      _numberCtrl.text = widget.flight['number']?.toString() ?? '';
+      _dateCtrl.text = widget.flight['date']?.toString() ?? '';
+      _statusCtrl.text = FlightsV2StatusLogic.getFlightStatus(widget.flight);
+      _cantBreakCtrl.text = widget.flight['cant_break']?.toString() ?? '0';
+      _cantNoBreakCtrl.text = widget.flight['cant_nobreak']?.toString() ?? '0';
+      _startBreakCtrl.text = widget.flight['start_break']?.toString() ?? '';
+      _endBreakCtrl.text = widget.flight['end_break']?.toString() ?? '';
+      _firstTruckCtrl.text = widget.flight['first_truck']?.toString() ?? '';
+      _lastTruckCtrl.text = widget.flight['last_truck']?.toString() ?? '';
+      _remarksCtrl.text = widget.flight['remarks']?.toString() ?? '';
+      _timeDelayedCtrl.text = widget.flight['time_delay']?.toString() ?? '';
+    }
   }
 
   Future<void> _saveChanges() async {
@@ -300,7 +320,7 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
               const SizedBox(width: 8),
               Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Llegada' : 'Arrive Time', _formatTimestamp(widget.flight['date']?.toString(), textP, textS), Icons.schedule, textP, textS, controller: _dateCtrl, type: FieldType.date)),
               const SizedBox(width: 8),
-              Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Estado' : 'Status', widget.flight['status']?.toString() ?? 'Waiting', Icons.info_outline, textP, textS, controller: _statusCtrl, type: FieldType.status)),
+              Expanded(child: _buildModernDetail(appLanguage.value == 'es' ? 'Estado' : 'Status', FlightsV2StatusLogic.getFlightStatus(widget.flight), Icons.info_outline, textP, textS, controller: _statusCtrl, type: FieldType.status)),
               const SizedBox(width: 8),
               Expanded(child: _buildModernDetail('Break ULD', widget.flight['cant_break']?.toString() ?? '0', Icons.inventory_2_outlined, textP, textS, controller: _cantBreakCtrl, type: FieldType.number)),
               const SizedBox(width: 8),

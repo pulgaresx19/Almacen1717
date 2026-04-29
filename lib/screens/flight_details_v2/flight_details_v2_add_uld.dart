@@ -120,6 +120,7 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
   bool _autoWeight = true;
 
   bool _isSubmitting = false;
+  bool _hasAttemptedSave = false;
 
   final List<Map<String, dynamic>> _awbs = [];
 
@@ -500,17 +501,30 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5),
+                        color: _hasAttemptedSave 
+                            ? Colors.redAccent.withAlpha(15) 
+                            : (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderC, style: BorderStyle.solid),
+                        border: Border.all(
+                            color: _hasAttemptedSave ? Colors.redAccent.withAlpha(150) : borderC, 
+                            width: _hasAttemptedSave ? 2 : 1,
+                            style: BorderStyle.solid),
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.assignment_add, color: textS.withAlpha(100), size: 48),
+                          Icon(
+                              _hasAttemptedSave ? Icons.assignment_late_rounded : Icons.assignment_add, 
+                              color: _hasAttemptedSave ? Colors.redAccent.withAlpha(200) : textS.withAlpha(100), 
+                              size: 48),
                           const SizedBox(height: 12),
                           Text(
-                            appLanguage.value == 'es' ? 'No hay AWBs añadidos.' : 'No AWBs added yet.',
-                            style: TextStyle(color: textS),
+                            _hasAttemptedSave 
+                                ? (appLanguage.value == 'es' ? 'No hay AWBs añadidos. (Requerido)' : 'No AWBs added yet. (Required)')
+                                : (appLanguage.value == 'es' ? 'No hay AWBs añadidos.' : 'No AWBs added yet.'),
+                            style: TextStyle(
+                                color: _hasAttemptedSave ? Colors.redAccent : textS, 
+                                fontWeight: _hasAttemptedSave ? FontWeight.bold : FontWeight.normal, 
+                                fontSize: _hasAttemptedSave ? 16 : 14),
                           ),
                         ],
                       ),
@@ -703,6 +717,11 @@ class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
                   onPressed: _isSubmitting ? null : () async {
                     final currentUld = _uldNumberCtrl.text.trim().toUpperCase();
                     if (currentUld.isEmpty) return;
+
+                    if (_awbs.isEmpty) {
+                      setState(() => _hasAttemptedSave = true);
+                      return;
+                    }
 
                     setState(() => _isSubmitting = true);
 

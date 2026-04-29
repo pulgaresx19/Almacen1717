@@ -8,7 +8,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
     }
     
     var filteredUlds = _allUlds.where((uld) {
-      final status = uld['status']?.toString() ?? 'Received';
+      final status = FlightsV2StatusLogic.getUldStatus(uld);
       if (status == 'Delivered' || status == 'Canceled') return false;
       if (uld['is_break'] == true) return false;
       
@@ -22,7 +22,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
 
     filteredUlds.sort((a, b) {
       int getPriority(Map<String, dynamic> u) {
-        final s = u['status']?.toString() ?? 'Received';
+        final s = FlightsV2StatusLogic.getUldStatus(u);
         if (u['in_process'] == true) return 2;
         if (s == 'Received') return 1;
         if (s == 'Waiting') return 3;
@@ -120,7 +120,7 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                       }
 
 
-                      final String rawStatus = uld['status']?.toString() ?? 'Received';
+                      final String rawStatus = FlightsV2StatusLogic.getUldStatus(uld);
                       final bool isInProcess = uld['in_process'] == true;
                       final String displayStatus = isInProcess ? 'In Process' : rawStatus;
                       final bool isSelectable = !isInProcess && rawStatus != 'Waiting';

@@ -510,11 +510,11 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
       bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
     } else if (s.contains('pending') || s.contains('pendiente')) {
       bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
-    } else if (s.contains('in progress') || s.contains('proceso') || s.contains('process') || s.contains('received')) {
+    } else if (s.contains('in progress') || s.contains('proceso') || s.contains('process')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('ready') || s.contains('listo') || s.contains('completed')) {
+    } else if (s.contains('ready') || s.contains('listo') || s.contains('completed') || s.contains('delivered')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
-    } else if (s.contains('checked')){
+    } else if (s.contains('checked') || s.contains('received')){
       bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
     }
 
