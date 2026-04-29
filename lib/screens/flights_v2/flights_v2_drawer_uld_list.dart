@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../main.dart' show appLanguage;
 import '../flight_details_v2/flight_details_v2_add_uld.dart';
+import 'flights_v2_status_logic.dart';
 
 class FlightsV2UldList extends StatefulWidget {
   final List<Map<String, dynamic>> ulds;
@@ -125,8 +126,8 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                       ),
                     ),
                   ),
-                  Expanded(child: Center(child: _buildMetric('Status', uld['status']?.toString() ?? 'Ready', textP, textS))),
-                  Expanded(child: Center(child: _buildMetric('Remark', (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? uld['remarks'].toString() : '-', textP, textS))),
+                  Expanded(child: Center(child: _buildMetric('Remarks', (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? uld['remarks'].toString() : '-', textP, textS))),
+                  Expanded(child: Center(child: _buildMetric('Status', FlightsV2StatusLogic.getUldStatus(uld), textP, textS))),
                   const SizedBox(width: 16),
                   Icon(
                     isSelected ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
@@ -268,6 +269,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                                 ),
                               ),
                               Expanded(child: Center(child: _buildMetric('Remarks', (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null') ? combined['remarks'].toString() : '-', textP, textS))),
+                              Expanded(child: Center(child: _buildMetric('Status', FlightsV2StatusLogic.getAwbStatus(split), textP, textS))),
                             ],
                           ),
                         );

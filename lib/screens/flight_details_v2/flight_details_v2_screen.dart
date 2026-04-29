@@ -31,11 +31,67 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
   List<Map<String, dynamic>> _ulds = [];
   int _damageCount = 0;
   bool _isLoading = true;
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
     super.initState();
     _fetchDetails();
+    _setupRealtime();
+  }
+
+  void _setupRealtime() {
+    final flightId = widget.flight['id_flight']?.toString() ?? '';
+    if (flightId.isEmpty) return;
+
+    _realtimeChannel = Supabase.instance.client.channel('public:flight_details_$flightId');
+    
+    _realtimeChannel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'flight_ulds',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'flight_id',
+        value: flightId,
+      ),
+      callback: (payload) {
+        _fetchDetails();
+      },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'awb_splits',
+      callback: (payload) {
+        final newRecord = payload.newRecord;
+        if (newRecord['id_uld'] != null) {
+          final uldId = newRecord['id_uld'].toString();
+          if (_ulds.any((u) => u['id_uld'].toString() == uldId)) {
+            _fetchDetails();
+          }
+        } else {
+           _fetchDetails();
+        }
+      },
+    ).onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'damage_reports',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'flight_id',
+        value: flightId,
+      ),
+      callback: (payload) {
+        _fetchDetails();
+      },
+    ).subscribe();
+  }
+
+  @override
+  void dispose() {
+    _realtimeChannel?.unsubscribe();
+    super.dispose();
   }
 
   Future<void> _fetchDetails() async {
