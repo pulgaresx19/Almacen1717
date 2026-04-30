@@ -46,33 +46,56 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
       return true;
     }).toList();
     
-    int getRemaining(Map<String, dynamic> awb) {
+    Map<String, int> getAwbCounts(Map<String, dynamic> awb) {
       int receivedPieces = 0;
-      if (awb['pieces_received'] != null) {
-        receivedPieces = int.tryParse(awb['pieces_received'].toString()) ?? 0;
-      } else if (awb['data-coordinator'] != null) {
-        List dcList = [];
-        if (awb['data-coordinator'] is List) {
-          dcList = awb['data-coordinator'] as List;
-        } else if (awb['data-coordinator'] is Map && (awb['data-coordinator'] as Map).isNotEmpty) {
-          dcList = [awb['data-coordinator']];
+      
+      if (awb['awb_splits'] != null && (awb['awb_splits'] as List).isNotEmpty) {
+        for (var split in (awb['awb_splits'] as List)) {
+          bool isReceived = false;
+          if (split['ulds'] != null && split['ulds']['time_received'] != null) {
+            isReceived = true;
+          } else if (split['uld_id'] == null) {
+            String s = awb['status']?.toString() ?? '';
+            if (s != 'Pending' && s != 'Waiting') isReceived = true;
+          }
+          
+          if (isReceived) {
+            if (split['not_found'] == true) {
+              // 0 pieces
+            } else if (split['total_checked'] != null && (int.tryParse(split['total_checked'].toString()) ?? 0) > 0) {
+              receivedPieces += int.tryParse(split['total_checked'].toString()) ?? 0;
+            } else {
+              receivedPieces += int.tryParse(split['pieces']?.toString() ?? '0') ?? 0;
+            }
+          }
         }
-        for (var item in dcList) {
-           if (item is Map) {
-              if (item.containsKey('breakdown') && item['breakdown'] is Map) {
-                 Map breakdown = item['breakdown'];
-                 if (breakdown['AGI Skid'] is List) {
-                    for (var val in breakdown['AGI Skid']) {
-                       receivedPieces += int.tryParse(val.toString()) ?? 0;
-                    }
-                 }
-                 for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
-                    receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
-                 }
-              } else {
-                 receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-              }
-           }
+      } else {
+        if (awb['pieces_received'] != null) {
+          receivedPieces = int.tryParse(awb['pieces_received'].toString()) ?? 0;
+        } else if (awb['data-coordinator'] != null) {
+          List dcList = [];
+          if (awb['data-coordinator'] is List) {
+            dcList = awb['data-coordinator'] as List;
+          } else if (awb['data-coordinator'] is Map && (awb['data-coordinator'] as Map).isNotEmpty) {
+            dcList = [awb['data-coordinator']];
+          }
+          for (var item in dcList) {
+             if (item is Map) {
+                if (item.containsKey('breakdown') && item['breakdown'] is Map) {
+                   Map breakdown = item['breakdown'];
+                   if (breakdown['AGI Skid'] is List) {
+                      for (var val in breakdown['AGI Skid']) {
+                         receivedPieces += int.tryParse(val.toString()) ?? 0;
+                      }
+                   }
+                   for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
+                      receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
+                   }
+                } else {
+                   receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
+                }
+             }
+          }
         }
       }
 
@@ -93,12 +116,19 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
 
       int inProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
       int remainingPieces = receivedPieces - deliveredPieces - inProcess;
-      return remainingPieces < 0 ? 0 : remainingPieces;
+      if (remainingPieces < 0) remainingPieces = 0;
+      
+      return {
+        'received': receivedPieces,
+        'delivered': deliveredPieces,
+        'inProcess': inProcess,
+        'remaining': remainingPieces,
+      };
     }
 
     filteredAwbs.sort((a, b) {
-      int rA = getRemaining(a);
-      int rB = getRemaining(b);
+      int rA = getAwbCounts(a)['remaining']!;
+      int rB = getAwbCounts(b)['remaining']!;
       if (rA == 0 && rB > 0) return 1;
       if (rA > 0 && rB == 0) return -1;
       return 0;
@@ -171,54 +201,11 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                         }
                       }
 
-                      int receivedPieces = 0;
-                      if (awb['pieces_received'] != null) {
-                        receivedPieces = int.tryParse(awb['pieces_received'].toString()) ?? 0;
-                      } else if (awb['data-coordinator'] != null) {
-                        List dcList = [];
-                        if (awb['data-coordinator'] is List) {
-                          dcList = awb['data-coordinator'] as List;
-                        } else if (awb['data-coordinator'] is Map && (awb['data-coordinator'] as Map).isNotEmpty) {
-                          dcList = [awb['data-coordinator']];
-                        }
-                        
-                        for (var item in dcList) {
-                           if (item is Map) {
-                              if (item.containsKey('breakdown') && item['breakdown'] is Map) {
-                                 Map breakdown = item['breakdown'];
-                                 if (breakdown['AGI Skid'] is List) {
-                                    for (var val in breakdown['AGI Skid']) {
-                                       receivedPieces += int.tryParse(val.toString()) ?? 0;
-                                    }
-                                 }
-                                 for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
-                                    receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
-                                 }
-                              } else {
-                                 receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-                              }
-                           }
-                        }
-                      }
-
-                      int deliveredPieces = 0;
-                      if (awb['pieces_delivered'] != null) {
-                        deliveredPieces = int.tryParse(awb['pieces_delivered'].toString()) ?? 0;
-                      } else if (awb['data-deliver'] != null) {
-                        if (awb['data-deliver'] is List) {
-                          for (var item in awb['data-deliver']) {
-                            if (item is Map && item.containsKey('found')) {
-                              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
-                            }
-                          }
-                        } else if (awb['data-deliver'] is Map) {
-                          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
-                        }
-                      }
-
-                      int inProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
-                      int remainingPieces = receivedPieces - deliveredPieces - inProcess;
-                      if (remainingPieces < 0) remainingPieces = 0;
+                      final counts = getAwbCounts(awb);
+                      int receivedPieces = counts['received']!;
+                      int deliveredPieces = counts['delivered']!;
+                      int inProcess = counts['inProcess']!;
+                      int remainingPieces = counts['remaining']!;
                       
                       final int totalValInt = int.tryParse(awb['total_pieces']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
                       

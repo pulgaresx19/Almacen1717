@@ -476,7 +476,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
     try {
       final response = await supabase
           .from('awb_splits')
-          .select('*, awbs!inner(awb_number, total_pieces)')
+          .select('*, awbs!inner(awb_number, total_pieces), ulds(is_break)')
           .eq('flight_id', selectedFlightId!);
 
       final List<dynamic> splits = response;
@@ -484,6 +484,11 @@ class CoordinatorV2Logic extends ChangeNotifier {
       Map<String, Map<String, dynamic>> sums = {};
       
       for (var split in splits) {
+        // Skip NO BREAK ULDs since they are not manually verified by pieces
+        if (split['ulds'] != null && split['ulds']['is_break'] == false) {
+          continue;
+        }
+
         String awbNum = split['awbs']['awb_number']?.toString() ?? 'Unknown';
         int splitExpected = int.tryParse(split['pieces']?.toString() ?? '0') ?? 0;
         int checked = split['total_checked'] ?? 0;

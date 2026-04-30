@@ -283,10 +283,12 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
                           IconButton(
                             icon: Icon(
                               Icons.assignment_add, 
-                              color: _coordinatorCounts.isNotEmpty ? const Color(0xFF6366f1) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), 
+                              color: _awbPiecesCtrl.text.trim().isEmpty 
+                                  ? (dark ? const Color(0xFF475569) : const Color(0xFF9CA3AF))
+                                  : (_coordinatorCounts.isNotEmpty ? const Color(0xFF6366f1) : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563))), 
                               size: 18
                             ),
-                            onPressed: () => showCoordinatorDataDialog(
+                            onPressed: _awbPiecesCtrl.text.trim().isEmpty ? null : () => showCoordinatorDataDialog(
                               context: context,
                               dark: dark,
                               textP: textP,

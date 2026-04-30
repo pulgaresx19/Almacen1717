@@ -96,7 +96,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     try {
       final awbData = await Supabase.instance.client
           .from('awbs')
-          .select()
+          .select('*, awb_splits(*, ulds(time_received))')
           .order('awb_number', ascending: true);
           
       final uldData = await Supabase.instance.client
