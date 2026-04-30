@@ -447,6 +447,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         final updateData = <String, dynamic>{
           'data_coordinator': dataCoordinator,
           'total_checked': checkedPieces,
+          'not_found': notFoundSelected,
         };
         if (finLocation.isNotEmpty) {
           updateData['required_location'] = finLocation;

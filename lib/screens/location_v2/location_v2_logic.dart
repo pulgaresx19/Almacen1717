@@ -205,7 +205,8 @@ class LocationV2Logic extends ChangeNotifier {
             final id = uld['id_uld'];
             if (id != null) {
               final awbsRes = await supabase.from('awb_splits').select('*, awbs(*)').eq('uld_id', id);
-              tempAwbs.addAll(List<Map<String, dynamic>>.from(awbsRes));
+              final validAwbs = List<Map<String, dynamic>>.from(awbsRes).where((item) => item['not_found'] != true).toList();
+              tempAwbs.addAll(validAwbs);
             }
           }
           allFlightAwbs = tempAwbs;
@@ -234,7 +235,9 @@ class LocationV2Logic extends ChangeNotifier {
           .select('*, awbs(*)')
           .eq('uld_id', idUld)
           .order('created_at', ascending: false);
-      uldAwbs = List<Map<String, dynamic>>.from(res);
+      
+      final rawList = List<Map<String, dynamic>>.from(res);
+      uldAwbs = rawList.where((item) => item['not_found'] != true).toList();
     } catch (e) {
       debugPrint('Error fetching AWBs for ULD: $e');
       uldAwbs = [];

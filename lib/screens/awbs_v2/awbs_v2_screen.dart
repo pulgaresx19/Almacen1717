@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import '../add_awb_v2/add_awb_v2_screen.dart';
 import '../add_uld_v2/add_uld_v2_screen.dart';
 // removed intl
 // unused import removed
-import 'awbs_v2_pdf_exporter.dart';
 import 'awbs_v2_drawer.dart';
 import 'awbs_v2_uld_drawer.dart';
 import '../../services/realtime_service.dart';
@@ -26,7 +24,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
   final _searchController = TextEditingController();
   final GlobalKey<AddAwbV2ScreenState> _addAwbKey = GlobalKey<AddAwbV2ScreenState>();
   final GlobalKey<AddUldV2ScreenState> _addUldKey = GlobalKey<AddUldV2ScreenState>();
-  final Set<String> _selectedAwbIds = {};
   bool _showAddForm = false;
   bool _showAddUldForm = false;
   bool _showAddItemsForm = false;
@@ -51,27 +48,9 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
     }
   }
 
-  String _computeAwbStatus(Map<String, dynamic> u) {
-    int deliveredPieces = 0;
-    if (u['data-deliver'] != null) {
-      if (u['data-deliver'] is List) {
-        for (var item in u['data-deliver']) {
-          if (item is Map && item.containsKey('found')) {
-            deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
-          }
-        }
-      } else if (u['data-deliver'] is Map) {
-        deliveredPieces = int.tryParse(u['data-deliver']['found']?.toString() ?? '0') ?? 0;
-      }
-    }
-    
-    final int totalValInt = int.tryParse(u['total']?.toString() ?? '0') ?? 0;
-    if (deliveredPieces == totalValInt && totalValInt > 0) {
-       return 'Ready';
-    } else if (deliveredPieces > 0) {
-       return 'In Process';
-    }
-    return 'Waiting';
+  String _getAwbStatusStr(Map<String, dynamic> u) {
+    String status = u['status']?.toString() ?? '';
+    return status.isNotEmpty ? status : 'Waiting';
   }
 
   @override
@@ -520,13 +499,35 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                     );
                   }
 
-                  var awbs = dataList;
+                  var awbs = List<Map<String, dynamic>>.from(dataList);
+                  
+                  awbs.sort((a, b) {
+                    final sA = _getAwbStatusStr(a).toLowerCase();
+                    final sB = _getAwbStatusStr(b).toLowerCase();
+                    
+                    int getWeight(String s) {
+                      if (s.contains('process')) return 1;
+                      if (s.contains('received')) return 2;
+                      if (s.contains('waiting')) return 3;
+                      if (s.contains('delivered') || s.contains('ready')) return 4;
+                      return 5;
+                    }
+                    
+                    final wA = getWeight(sA);
+                    final wB = getWeight(sB);
+                    
+                    if (wA != wB) return wA.compareTo(wB);
+                    
+                    final numA = a['awb_number']?.toString() ?? '';
+                    final numB = b['awb_number']?.toString() ?? '';
+                    return numA.compareTo(numB);
+                  });
                   
                   if (_searchController.text.isNotEmpty) {
                     final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
                     awbs = awbs.where((u) {
                       final awbSearch = u['awb_number']?.toString().toLowerCase() ?? '';
-                      final statusSearch = _computeAwbStatus(u).toLowerCase();
+                      final statusSearch = _getAwbStatusStr(u).toLowerCase();
                       
                       final combinedString = '$awbSearch $statusSearch';
                       
@@ -570,22 +571,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           const DataColumn(label: Text('Total')),
                           const DataColumn(label: Text('Weight')),
                           const DataColumn(label: Text('Status')),
-                          DataColumn(
-                            label: Checkbox(
-                              visualDensity: VisualDensity.compact,
-                              value: _selectedAwbIds.length == awbs.length && awbs.isNotEmpty,
-                              onChanged: (val) {
-                                  setState(() {
-                                    if (val == true) {
-                                      _selectedAwbIds.addAll(awbs.map((e) => e['id'].toString()));
-                                    } else {
-                                      _selectedAwbIds.clear();
-                                    }
-                                  });
-                              },
-                              activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)),
-                            ),
-                          ),
                         ],
                         rows: List.generate(awbs.length, (index) {
                           final u = awbs[index];
@@ -603,17 +588,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           int totalPieces = int.tryParse(u['total_pieces']?.toString() ?? '0') ?? 0;
                           double totalWeight = double.tryParse(u['total_weight']?.toString() ?? '0') ?? 0.0;
 
-                          String status = u['status']?.toString() ?? '';
-                          if (status.isEmpty) {
-                            status = 'Waiting';
-                            if (deliveredPieces >= expectedPieces && expectedPieces > 0) {
-                               status = 'Delivered';
-                            } else if (deliveredPieces > 0) {
-                               status = 'In Process';
-                            } else if (receivedPieces > 0) {
-                               status = 'Received';
-                            }
-                          }
+                          String status = _getAwbStatusStr(u);
                           return DataRow(
                             onSelectChanged: (_) => AwbsV2Drawer.show(context, u, dark, 0, expectedPieces, status),
                             cells: [
@@ -627,22 +602,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                               DataCell(Text(totalPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3b82f6)))), // Total Pieces (Blue)
                               DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(_buildStatusBadge(status)),
-                                DataCell(
-                                  Checkbox(
-                                    visualDensity: VisualDensity.compact,
-                                    value: _selectedAwbIds.contains(u['id']?.toString()),
-                                    onChanged: (val) {
-                                      setState(() {
-                                        if (val == true) {
-                                          _selectedAwbIds.add(u['id'].toString());
-                                        } else {
-                                          _selectedAwbIds.remove(u['id'].toString());
-                                        }
-                                      });
-                                    },
-                                    activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)),
-                                  ),
-                                ),
                             ],
                           );
                         }),
@@ -657,96 +616,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                   ),
                 ),
               ),
-              if (_selectedAwbIds.isNotEmpty)
-                Positioned(
-                  bottom: 24,
-                  left: 24,
-                  right: 24,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: dark ? const Color(0xFF1e293b) : Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 8))],
-                        border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF6366f1).withAlpha(30),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '${_selectedAwbIds.length} Selected',
-                              style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-                          const SizedBox(width: 16),
-                          IconButton(
-                            onPressed: () async {
-                                  final res = await Supabase.instance.client.from('awbs').select().inFilter('id', _selectedAwbIds.toList());
-                                final selected = List<Map<String, dynamic>>.from(res);
-                                if (selected.isNotEmpty) {
-                                  AwbsV2PdfExporter.printAwbs(selected);
-                                }
-                            }, 
-                            icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), 
-                            tooltip: 'Print Selected', 
-                            style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: () async {
-                                  final res = await Supabase.instance.client.from('awbs').select().inFilter('id', _selectedAwbIds.toList());
-                                final selected = List<Map<String, dynamic>>.from(res);
-                                if (selected.isNotEmpty) {
-                                  AwbsV2PdfExporter.downloadPdf(selected);
-                                }
-                            }, 
-                            icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), 
-                            tooltip: 'Download PDF', 
-                            style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (c) => AlertDialog(
-                                    title: const Text('Delete AWBs'),
-                                    content: Text('Are you sure you want to delete ${_selectedAwbIds.length} AWB(s)?'),
-                                    actions: [
-                                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-                                        onPressed: () => Navigator.pop(c, true),
-                                        child: const Text('Delete'),
-                                      )
-                                    ],
-                                  )
-                                );
-                                if (confirm == true) {
-                                  for (var id in _selectedAwbIds) {
-                                    await Supabase.instance.client.from('awbs').delete().eq('id', id);
-                                  }
-                                  setState(() => _selectedAwbIds.clear());
-                                }
-                            }, 
-                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), 
-                            tooltip: 'Delete Selected', 
-                            style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
             ],
           ),
         ),

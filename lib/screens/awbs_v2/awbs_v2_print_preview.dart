@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'awbs_v2_pdf_exporter.dart';
 
 void showPrintPreviewDialog(BuildContext context, Map<String, dynamic> awb) {
   showDialog(
@@ -83,13 +84,25 @@ void showPrintPreviewDialog(BuildContext context, Map<String, dynamic> awb) {
                         Row(
                            children: [
                               ElevatedButton.icon(
-                                 onPressed: () {}, 
+                                 onPressed: () => AwbsV2PdfExporter.printAwbs([awb]), 
                                  icon: const Icon(Icons.print, size: 16),
-                                 label: const Text('Simulate Print'),
+                                 label: const Text('Print'),
                                  style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.indigo, 
                                     foregroundColor: Colors.white,
                                     elevation: 0,
+                                 )
+                              ),
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                 onPressed: () => AwbsV2PdfExporter.downloadPdf([awb]), 
+                                 icon: const Icon(Icons.picture_as_pdf, size: 16),
+                                 label: const Text('Download PDF'),
+                                 style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white, 
+                                    foregroundColor: Colors.indigo,
+                                    elevation: 0,
+                                    side: const BorderSide(color: Colors.indigo),
                                  )
                               ),
                               const SizedBox(width: 16),

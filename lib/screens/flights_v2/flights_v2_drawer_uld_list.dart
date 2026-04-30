@@ -48,9 +48,11 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
       bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
     } else if (s.contains('process') || s.contains('progress')) {
       bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('checked') || s.contains('received')) {
+    } else if (s.contains('checked')) {
+      bg = const Color(0xFF0284c7).withAlpha(51); fg = const Color(0xFF7dd3fc);
+    } else if (s.contains('received')) {
       bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
-    } else if (s.contains('ready') || s.contains('saved') || s.contains('delivered')) {
+    } else if (s.contains('ready') || s.contains('saved') || s.contains('delivered') || s.contains('stored')) {
       bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
     } else if (s.contains('pending')) {
       bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);

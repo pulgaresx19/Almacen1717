@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'awbs_v2_print_preview.dart';
 
 class AwbsV2Drawer {
   static void show(BuildContext context, Map<String, dynamic> u, bool dark, int receivedPieces, int expectedPieces, String status) {
@@ -426,9 +427,20 @@ class AwbsV2Drawer {
                                 Text(u['awb_number']?.toString() ?? u['AWB-number']?.toString() ?? 'N/A', style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            IconButton(
-                              icon: Icon(Icons.close_rounded, color: textP),
-                              onPressed: () => Navigator.pop(ctx),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)),
+                                  tooltip: 'Print / Download PDF',
+                                  style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15)),
+                                  onPressed: () => showPrintPreviewDialog(context, u),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: Icon(Icons.close_rounded, color: textP),
+                                  onPressed: () => Navigator.pop(ctx),
+                                ),
+                              ],
                             ),
                           ],
                         ),
