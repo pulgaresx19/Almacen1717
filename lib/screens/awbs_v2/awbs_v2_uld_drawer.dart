@@ -5,7 +5,7 @@ class AwbsV2UldDrawer {
   static void show(BuildContext context, Map<String, dynamic> u, bool dark, String status, String flightDisplay) {
     final Future<List<Map<String, dynamic>>> splitsFuture = Supabase.instance.client
         .from('awb_splits')
-        .select('*, awbs(awb_number)')
+        .select('*, awbs(awb_number, total_pieces, total_espected)')
         .eq('uld_id', u['id_uld'])
         .order('created_at', ascending: false)
         .then((res) => List<Map<String, dynamic>>.from(res));
@@ -50,8 +50,18 @@ class AwbsV2UldDrawer {
                 children: splits.map((s) {
                   final awbData = s['awbs'] ?? {};
                   final String awbNumber = awbData['awb_number']?.toString() ?? 'Unknown AWB';
+                  final int totalExpected = int.tryParse(awbData['total_pieces']?.toString() ?? awbData['total_espected']?.toString() ?? '0') ?? 0;
                   final int pieces = int.tryParse(s['pieces']?.toString() ?? '0') ?? 0;
                   final double weight = double.tryParse(s['weight']?.toString() ?? '0') ?? 0.0;
+                  
+                  final String itemRemarks = s['remarks']?.toString() ?? '';
+                  List<String> houses = [];
+                  final hRaw = s['house_number'];
+                  if (hRaw is List) {
+                    houses = hRaw.map((e) => e.toString()).toList();
+                  } else if (hRaw is String && hRaw.isNotEmpty) {
+                    houses = hRaw.split(RegExp(r'[,\n]')).map((str) => str.trim()).where((str) => str.isNotEmpty).toList();
+                  }
                   
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -69,16 +79,106 @@ class AwbsV2UldDrawer {
                           child: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF6366f1)),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 15)),
-                              const SizedBox(height: 2),
-                              Text('$pieces pcs • $weight kg', style: TextStyle(color: textS, fontSize: 12)),
-                            ],
-                          ),
+                        SizedBox(
+                          width: 120,
+                          child: Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14)),
                         ),
+                        const SizedBox(width: 16),
+                        SizedBox(
+                          width: 85,
+                          child: Text('$pieces / $totalExpected pcs', style: TextStyle(color: textS, fontSize: 13)),
+                        ),
+                        const SizedBox(width: 16),
+                        SizedBox(
+                          width: 65,
+                          child: Text('$weight kg', style: TextStyle(color: textS, fontSize: 13)),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: itemRemarks.isNotEmpty
+                            ? Row(
+                                children: [
+                                  Icon(Icons.notes_rounded, size: 14, color: textS.withAlpha(150)),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      itemRemarks,
+                                      style: TextStyle(color: textS, fontSize: 12, fontStyle: FontStyle.italic),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                        ),
+                        if (houses.isNotEmpty) ...[
+                          const SizedBox(width: 16),
+                          InkWell(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                                  title: Text('House Numbers', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                                  content: SizedBox(
+                                    width: 300,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: houses.asMap().entries.map((eh) {
+                                        final hi = eh.key;
+                                        final h = eh.value;
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 8.0),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 24,
+                                                height: 24,
+                                                alignment: Alignment.center,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF3b82f6).withAlpha(30),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Text(
+                                                  '${hi + 1}',
+                                                  style: const TextStyle(color: Color(0xFF60a5fa), fontSize: 11, fontWeight: FontWeight.bold),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Text(h, style: TextStyle(color: textS, fontSize: 14)),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3b82f6).withAlpha(30),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.house_siding_rounded, size: 12, color: Color(0xFF60a5fa)),
+                                  const SizedBox(width: 4),
+                                  Text('${houses.length}', style: const TextStyle(fontSize: 11, color: Color(0xFF60a5fa), fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ]
                       ],
                     ),
                   );

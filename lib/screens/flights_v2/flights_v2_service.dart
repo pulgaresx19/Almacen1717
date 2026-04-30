@@ -62,4 +62,15 @@ class FlightsV2Service {
       rethrow;
     }
   }
+
+  Future<void> deleteUld(String uldId) async {
+    try {
+      await Supabase.instance.client.rpc('delete_uld_v2', params: {
+        'p_uld_id': uldId,
+      });
+    } catch (e) {
+      debugPrint('Error deleting ULD: $e');
+      rethrow;
+    }
+  }
 }

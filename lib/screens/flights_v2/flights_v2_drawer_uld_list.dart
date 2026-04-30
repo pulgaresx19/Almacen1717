@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../main.dart' show appLanguage;
 import '../flight_details_v2/flight_details_v2_add_uld.dart';
 import 'flights_v2_status_logic.dart';
+import 'flights_v2_service.dart';
 
 class FlightsV2UldList extends StatefulWidget {
   final List<Map<String, dynamic>> ulds;
@@ -323,24 +324,95 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
       Positioned(
         top: 0,
         right: 0,
-        child: InkWell(
-          onTap: () async {
-            final bool? result = await showAddUldComponent(context, widget.flight, widget.dark, widget.ulds, uld);
-            if (result == true && widget.onRefresh != null) {
-              widget.onRefresh!();
-            }
-          },
-          borderRadius: const BorderRadius.only(topRight: Radius.circular(12), bottomLeft: Radius.circular(12)),
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: widget.dark ? const Color(0xFF6366f1).withAlpha(40) : const Color(0xFF4F46E5).withAlpha(20),
-              borderRadius: const BorderRadius.only(topRight: Radius.circular(12), bottomLeft: Radius.circular(12)),
+        child: Row(
+          children: [
+            if (FlightsV2StatusLogic.getUldStatus(uld).toLowerCase().contains('waiting'))
+              InkWell(
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+                      title: Text(appLanguage.value == 'es' ? 'Eliminar ULD' : 'Delete ULD', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
+                      content: Text(
+                        appLanguage.value == 'es' 
+                            ? '¿Estás seguro de que deseas eliminar este ULD y todas sus guías asociadas? Esta acción no se puede deshacer.'
+                            : 'Are you sure you want to delete this ULD and all its associated AWBs? This action cannot be undone.',
+                        style: TextStyle(color: textS),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8))),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text(appLanguage.value == 'es' ? 'Eliminar' : 'Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    if (!mounted) return;
+                    try {
+                      showDialog(
+                        context: context, 
+                        barrierDismissible: false,
+                        builder: (_) => const Center(child: CircularProgressIndicator()),
+                      );
+                      await FlightsV2Service().deleteUld(uldId);
+                      if (mounted) {
+                        Navigator.pop(context); // Close loading
+                        if (widget.onRefresh != null) widget.onRefresh!();
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        Navigator.pop(context); // Close loading
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent));
+                      }
+                    }
+                  }
+                },
+                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(12)),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: widget.dark ? Colors.redAccent.withAlpha(40) : Colors.redAccent.withAlpha(20),
+                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(12)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.delete_outline_rounded, color: widget.dark ? const Color(0xFFfca5a5) : Colors.red, size: 13),
+                ),
+              ),
+            InkWell(
+              onTap: () async {
+                final bool? result = await showAddUldComponent(context, widget.flight, widget.dark, widget.ulds, uld);
+                if (result == true && widget.onRefresh != null) {
+                  widget.onRefresh!();
+                }
+              },
+              borderRadius: BorderRadius.only(
+                topRight: const Radius.circular(12),
+                bottomLeft: FlightsV2StatusLogic.getUldStatus(uld).toLowerCase().contains('waiting') ? Radius.zero : const Radius.circular(12),
+              ),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: widget.dark ? const Color(0xFF6366f1).withAlpha(40) : const Color(0xFF4F46E5).withAlpha(20),
+                  borderRadius: BorderRadius.only(
+                    topRight: const Radius.circular(12),
+                    bottomLeft: FlightsV2StatusLogic.getUldStatus(uld).toLowerCase().contains('waiting') ? Radius.zero : const Radius.circular(12),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.edit_outlined, color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), size: 13),
+              ),
             ),
-            alignment: Alignment.center,
-            child: Icon(Icons.edit_outlined, color: widget.dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), size: 13),
-          ),
+          ],
         ),
       ),
     ],

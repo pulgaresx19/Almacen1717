@@ -58,6 +58,7 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
     if (totalRequiredError && awbTotalCtrl.text.isNotEmpty && mounted) {
       setState(() => totalRequiredError = false);
     }
+    _validatePieces();
   }
 
   void _onHouseChanged() {
@@ -76,9 +77,24 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
         piecesRequiredError = false;
       }
       
-      if (dbTotalPieces == null) return;
-      
       final entered = int.tryParse(awbPiecesCtrl.text) ?? 0;
+      final t = int.tryParse(awbTotalCtrl.text) ?? 0;
+
+      if (dbTotalPieces == null) {
+        // It's a new AWB (or not found in DB). Validate against the entered total (t)
+        if (t > 0 && entered > t) {
+          piecesError = appLanguage.value == 'es' ? 'Máx. $t piezas' : 'Max $t pieces';
+        } else {
+          piecesError = null;
+        }
+        return;
+      }
+      
+      if (t == 0) {
+        piecesError = null;
+        return;
+      }
+      
       final remaining = dbTotalPieces! - (dbTotalExpected ?? 0);
       if (remaining <= 0) {
         piecesError = appLanguage.value == 'es' ? 'Sin piezas restantes' : 'No pieces remaining';
@@ -120,16 +136,25 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
             .select('total_pieces, total_espected')
             .eq('awb_number', text)
             .maybeSingle();
-        if (res != null && mounted) {
-          setState(() {
-            dbTotalPieces = res['total_pieces'] as int?;
-            dbTotalExpected = res['total_espected'] as int?;
-            if (dbTotalPieces != null) {
-              isTotalLocked = true;
-              awbTotalCtrl.text = dbTotalPieces.toString();
-              _validatePieces();
-            }
-          });
+        if (mounted) {
+          if (res != null) {
+            setState(() {
+              dbTotalPieces = res['total_pieces'] as int?;
+              dbTotalExpected = res['total_espected'] as int?;
+              if (dbTotalPieces != null) {
+                isTotalLocked = true;
+                awbTotalCtrl.text = dbTotalPieces.toString();
+                _validatePieces();
+              }
+            });
+          } else {
+            setState(() {
+              isTotalLocked = false;
+              dbTotalPieces = null;
+              dbTotalExpected = null;
+              piecesError = null;
+            });
+          }
         }
       } catch (_) {}
     } else {

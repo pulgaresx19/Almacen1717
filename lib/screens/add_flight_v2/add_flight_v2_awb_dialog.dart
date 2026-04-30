@@ -100,6 +100,11 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
       final p = int.tryParse(awbPiecesCtrl.text) ?? 0;
       final t = int.tryParse(awbTotalCtrl.text) ?? 0;
       
+      if (t == 0) {
+        piecesError = null;
+        return;
+      }
+
       final dbExp = dbExpected.value;
       final localUsed = widget.logic.getLocalUsedPieces(text);
       final totalAllowed = t - dbExp - localUsed;

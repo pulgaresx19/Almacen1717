@@ -6,7 +6,7 @@ import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier
 import '../add_flight_v2/add_flight_v2_screen.dart'; // Ensure correct import route to V2
 import '../flight_details_v2/flight_details_v2_screen.dart';
 import 'flights_v2_logic.dart';
-import 'flights_v2_pdf_exporter.dart';
+
 import 'flights_v2_status_logic.dart';
 
 class FlightsV2Screen extends StatefulWidget {
@@ -22,7 +22,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
   bool _showAddForm = false;
   Map<String, dynamic>? _selectedFlightDetails;
   final GlobalKey<AddFlightV2ScreenState> _addFlightKey = GlobalKey<AddFlightV2ScreenState>();
-  final Set<String> _selectedFlightIds = {};
+
   final Set<String> _collapsedDates = {};
   
   late FlightsV2Logic logic;
@@ -340,22 +340,6 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               DataColumn(label: Text(appLanguage.value == 'es' ? 'Último Cam.' : 'Last Truck')),
               DataColumn(label: SizedBox(width: 200, child: Text(appLanguage.value == 'es' ? 'Remarks' : 'Remarks'))),
               DataColumn(label: Text(appLanguage.value == 'es' ? 'Estado' : 'Status')),
-              DataColumn(
-                label: Checkbox(
-                  visualDensity: VisualDensity.compact,
-                  value: _selectedFlightIds.length == flightsToDisplay.length && flightsToDisplay.isNotEmpty,
-                  onChanged: (val) {
-                    setState(() {
-                      if (val == true) {
-                        _selectedFlightIds.addAll(flightsToDisplay.map((e) => e['id_flight'].toString()));
-                      } else {
-                        _selectedFlightIds.clear();
-                      }
-                    });
-                  },
-                  activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)),
-                ),
-              ),
             ],
             rows: List.generate(groupedList.length, (index) {
               final item = groupedList[index];
@@ -372,7 +356,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                       }
                     });
                   },
-                  cells: List.generate(12, (cellIdx) {
+                  cells: List.generate(11, (cellIdx) {
                     if (cellIdx == 0) {
                       final count = dateCounts[item] ?? 0;
                       return DataCell(
@@ -486,22 +470,6 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
                     )
                   ),
                   DataCell(_buildStatusBadge(status)),
-                  DataCell(
-                    Checkbox(
-                      visualDensity: VisualDensity.compact,
-                      value: _selectedFlightIds.contains(flight['id_flight']?.toString()),
-                      onChanged: (val) {
-                        setState(() {
-                          if (val == true) {
-                            _selectedFlightIds.add(flight['id_flight'].toString());
-                          } else {
-                            _selectedFlightIds.remove(flight['id_flight'].toString());
-                          }
-                        });
-                      },
-                      activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)),
-                    ),
-                  ),
                 ],
               );
             }),
@@ -513,100 +481,6 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
   },
 ),
 ),
-if (_selectedFlightIds.isNotEmpty)
-  Positioned(
-            bottom: 20,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: dark ? const Color(0xFF1e293b) : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: const [
-                    BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
-                  ],
-                  border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6366f1).withAlpha(30),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text(
-                        '${_selectedFlightIds.length} Selected',
-                        style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      onPressed: () {
-                         final selectedData = logic.flightsList.where((f) => _selectedFlightIds.contains(f['id_flight'].toString())).toList();
-                         FlightPdfExporter.printFlights(selectedData);
-                      },
-                      icon: const Icon(Icons.print_rounded, color: Color(0xFF818cf8), size: 18),
-                      style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(20)),
-                      tooltip: 'Print Selected',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () {
-                         final selectedData = logic.flightsList.where((f) => _selectedFlightIds.contains(f['id_flight'].toString())).toList();
-                         FlightPdfExporter.downloadPdf(selectedData);
-                      },
-                      icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF818cf8), size: 18),
-                      style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(20)),
-                      tooltip: 'Download PDF',
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () async {
-                         final confirm = await showDialog<bool>(
-                           context: context,
-                           builder: (c) => AlertDialog(
-                             backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
-                             title: Text(appLanguage.value == 'es' ? 'Eliminar Vuelos' : 'Delete Flights', style: TextStyle(color: dark ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
-                             content: Text(appLanguage.value == 'es' 
-                               ? '¿Estás seguro de eliminar los ${_selectedFlightIds.length} vuelos seleccionados? Esta acción es permanente.' 
-                               : 'Are you sure you want to delete ${_selectedFlightIds.length} selected flights? This action is permanent.',
-                               style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563))),
-                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                             actions: [
-                               TextButton(
-                                 onPressed: () => Navigator.pop(c, false),
-                                 child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Colors.grey)),
-                               ),
-                               ElevatedButton(
-                                 onPressed: () => Navigator.pop(c, true),
-                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                 child: Text(appLanguage.value == 'es' ? 'Eliminar' : 'Delete'),
-                               ),
-                             ],
-                           ),
-                         );
-
-                         if (confirm == true) {
-                           final toDelete = _selectedFlightIds.toList();
-                           setState(() {
-                             _selectedFlightIds.clear();
-                           });
-                           await logic.deleteFlights(toDelete);
-                         }
-                      },
-                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
-                      style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(20)),
-                      tooltip: 'Delete Selected',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }

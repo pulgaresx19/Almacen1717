@@ -379,7 +379,7 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                         final awb = filtered[index];
                         final awbObj = awb['awbs'] ?? {};
                         final awbNumber = awbObj['awb_number']?.toString() ?? awb['awb_number']?.toString() ?? '-';
-                        final pcs = awb['pieces']?.toString() ?? '-';
+                        final pcs = awb['total_checked']?.toString() ?? awb['pieces']?.toString() ?? '-';
                         final wt = awb['weight']?.toString() ?? '-';
                         
                         final locData = awb['data_location'];
@@ -412,16 +412,24 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 15)),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '$pcs pcs  •  $wt kg',
-                                      style: TextStyle(color: textS, fontSize: 13),
-                                    ),
-                                  ],
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 120,
+                                        child: Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14)),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 80,
+                                        child: Text('$pcs pcs', style: TextStyle(color: textS, fontSize: 13)),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text('$wt kg', style: TextStyle(color: textS, fontSize: 13)),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 if (isLocated)
                                   Container(

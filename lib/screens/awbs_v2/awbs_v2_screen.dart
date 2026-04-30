@@ -11,6 +11,7 @@ import 'awbs_v2_drawer.dart';
 import 'awbs_v2_uld_drawer.dart';
 import '../../services/realtime_service.dart';
 import '../flights_v2/flights_v2_status_logic.dart';
+import 'awbs_v2_add_items_screen.dart';
 
 class AwbsV2Screen extends StatefulWidget {
   final bool isActive;
@@ -28,6 +29,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
   final Set<String> _selectedAwbIds = {};
   bool _showAddForm = false;
   bool _showAddUldForm = false;
+  bool _showAddItemsForm = false;
   bool _showUldTab = false;
 
   @override
@@ -157,7 +159,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                     ] else if (_showAddUldForm) ...[
                       const SizedBox(height: 4),
                       Text(appLanguage.value == 'es' ? 'Registra un ULD en la nueva base de datos.' : 'Register a ULD in the new database.', style: TextStyle(color: textS, fontSize: 13)),
-                    ] else ...[
+                    ] else if (!_showAddItemsForm) ...[
                       Row(
                         children: [
                           GestureDetector(
@@ -204,7 +206,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 ),
                 const Spacer(),
                 
-                if (!_showAddForm && !_showAddUldForm) ...[
+                if (!_showAddForm && !_showAddUldForm && !_showAddItemsForm) ...[
                   // Search Box
                   Container(
                     width: 300,
@@ -263,6 +265,23 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                     SizedBox(
                       height: 40,
                       child: ElevatedButton.icon(
+                        onPressed: () => setState(() => _showAddItemsForm = true),
+                        icon: const Icon(Icons.add_to_photos_rounded, size: 16),
+                        label: Text(appLanguage.value == 'es' ? 'Añadir Ítem' : 'Add Item', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton.icon(
                         onPressed: () => setState(() => _showAddForm = true),
                         icon: const Icon(Icons.add_rounded, size: 16),
                         label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
@@ -298,9 +317,19 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 ],
               ],
             ),
-            const SizedBox(height: 30),
+            SizedBox(height: _showAddItemsForm ? 12 : 30),
             
-            if (_showAddForm)
+            if (_showAddItemsForm)
+              Expanded(
+                child: AwbsV2AddItemsScreen(
+                  onPop: () {
+                    setState(() {
+                      _showAddItemsForm = false;
+                    });
+                  },
+                ),
+              )
+            else if (_showAddForm)
               Expanded(
                 child: AddAwbV2Screen(
                   key: _addAwbKey,
