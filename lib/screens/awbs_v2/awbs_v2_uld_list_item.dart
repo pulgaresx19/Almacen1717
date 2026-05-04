@@ -9,6 +9,8 @@ class AwbsV2UldListItem extends StatefulWidget {
   final bool dark;
   final Color textP;
   final Color borderCard;
+  final List<Map<String, dynamic>> globalAwbs;
+  final List<Map<String, dynamic>> globalUlds;
   final VoidCallback onDelete;
   final VoidCallback onUpdate;
 
@@ -19,6 +21,8 @@ class AwbsV2UldListItem extends StatefulWidget {
     required this.dark,
     required this.textP,
     required this.borderCard,
+    required this.globalAwbs,
+    required this.globalUlds,
     required this.onDelete,
     required this.onUpdate,
   });
@@ -253,7 +257,14 @@ class _AwbsV2UldListItemState extends State<AwbsV2UldListItem> {
                       ),
                       onPressed: () async {
                         final existingAwbs = awbsList.map((e) => Map<String, dynamic>.from(e)).toList();
-                        final res = await showAddAwbDialog(context, widget.dark, existingAwbs, widget.item['uld_number']);
+                        final res = await showAddAwbDialog(
+                          context, 
+                          widget.dark, 
+                          existingAwbs, 
+                          widget.item['uld_number'],
+                          widget.globalAwbs,
+                          widget.globalUlds,
+                        );
                         if (res != null) {
                           setState(() {
                             awbsList.add({

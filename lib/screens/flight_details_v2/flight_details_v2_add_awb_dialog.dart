@@ -6,11 +6,23 @@ import '../../main.dart' show appLanguage;
 import 'flight_details_v2_formatters.dart';
 
 Future<Map<String, dynamic>?> showAddAwbDialog(
-    BuildContext context, bool dark, List<Map<String, dynamic>> existingAwbs, String uldNumber) async {
+    BuildContext context, 
+    bool dark, 
+    List<Map<String, dynamic>> existingAwbs, 
+    String uldNumber, [
+    List<Map<String, dynamic>>? globalAwbs,
+    List<Map<String, dynamic>>? globalUlds,
+]) async {
   return showDialog<Map<String, dynamic>>(
     context: context,
     builder: (ctx) {
-      return _AddAwbDialogComponent(dark: dark, existingAwbs: existingAwbs, uldNumber: uldNumber);
+      return _AddAwbDialogComponent(
+        dark: dark, 
+        existingAwbs: existingAwbs, 
+        uldNumber: uldNumber,
+        globalAwbs: globalAwbs ?? [],
+        globalUlds: globalUlds ?? [],
+      );
     },
   );
 }
@@ -19,8 +31,16 @@ class _AddAwbDialogComponent extends StatefulWidget {
   final bool dark;
   final List<Map<String, dynamic>> existingAwbs;
   final String uldNumber;
+  final List<Map<String, dynamic>> globalAwbs;
+  final List<Map<String, dynamic>> globalUlds;
 
-  const _AddAwbDialogComponent({required this.dark, required this.existingAwbs, required this.uldNumber});
+  const _AddAwbDialogComponent({
+    required this.dark, 
+    required this.existingAwbs, 
+    required this.uldNumber,
+    required this.globalAwbs,
+    required this.globalUlds,
+  });
 
   @override
   State<_AddAwbDialogComponent> createState() => _AddAwbDialogComponentState();
@@ -36,6 +56,7 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
 
   int? dbTotalPieces;
   int? dbTotalExpected;
+  int localPiecesSum = 0;
   bool isTotalLocked = false;
   String? piecesError;
   String? awbExistsError;
@@ -95,7 +116,7 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
         return;
       }
       
-      final remaining = dbTotalPieces! - (dbTotalExpected ?? 0);
+      final remaining = dbTotalPieces! - (dbTotalExpected ?? 0) - localPiecesSum;
       if (remaining <= 0) {
         piecesError = appLanguage.value == 'es' ? 'Sin piezas restantes' : 'No pieces remaining';
       } else if (entered > remaining) {
@@ -131,39 +152,67 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
 
     if (text.length == 13) {
       try {
+        int tempLocalSum = 0;
+        int? localTotalOverride;
+        
+        // Calculate local parts
+        for (var a in widget.globalAwbs) {
+          if (a['awb_number'] == text) {
+            final t = int.tryParse(a['total_pieces'].toString());
+            if (t != null && t > 0) localTotalOverride = t;
+            tempLocalSum += int.tryParse(a['pieces'].toString()) ?? 0;
+          }
+        }
+        for (var u in widget.globalUlds) {
+          final nested = u['awbs'] as List? ?? [];
+          for (var a in nested) {
+            if (a['awb_number'] == text) {
+              final t = int.tryParse(a['total_pieces'].toString());
+              if (t != null && t > 0) localTotalOverride = t;
+              tempLocalSum += int.tryParse(a['pieces'].toString()) ?? 0;
+            }
+          }
+        }
+
         final res = await Supabase.instance.client
             .from('awbs')
             .select('total_pieces, total_espected')
             .eq('awb_number', text)
             .maybeSingle();
+            
         if (mounted) {
-          if (res != null) {
-            setState(() {
+          setState(() {
+            localPiecesSum = tempLocalSum;
+            if (res != null) {
               dbTotalPieces = res['total_pieces'] as int?;
               dbTotalExpected = res['total_espected'] as int?;
-              if (dbTotalPieces != null) {
-                isTotalLocked = true;
-                awbTotalCtrl.text = dbTotalPieces.toString();
-                _validatePieces();
-              }
-            });
-          } else {
-            setState(() {
-              isTotalLocked = false;
+            } else if (localTotalOverride != null) {
+              // Not in DB but exists locally
+              dbTotalPieces = localTotalOverride;
+              dbTotalExpected = 0;
+            } else {
               dbTotalPieces = null;
               dbTotalExpected = null;
-              piecesError = null;
-            });
-          }
+            }
+            
+            if (dbTotalPieces != null) {
+              isTotalLocked = true;
+              awbTotalCtrl.text = dbTotalPieces.toString();
+            } else {
+              isTotalLocked = false;
+            }
+            _validatePieces();
+          });
         }
       } catch (_) {}
     } else {
-      if (isTotalLocked && mounted) {
+      if ((isTotalLocked || localPiecesSum > 0) && mounted) {
         setState(() {
           isTotalLocked = false;
           awbTotalCtrl.clear();
           dbTotalPieces = null;
           dbTotalExpected = null;
+          localPiecesSum = 0;
           piecesError = null;
         });
       }
@@ -291,8 +340,8 @@ class _AddAwbDialogComponentState extends State<_AddAwbDialogComponent> {
                           decoration: BoxDecoration(color: const Color(0xFF22c55e).withAlpha(20), borderRadius: BorderRadius.circular(8)),
                           child: Text(
                             appLanguage.value == 'es'
-                                ? 'Piezas restantes: ${dbTotalPieces! - (dbTotalExpected ?? 0)}'
-                                : 'Remaining pieces: ${dbTotalPieces! - (dbTotalExpected ?? 0)}',
+                                ? 'Piezas restantes: ${dbTotalPieces! - (dbTotalExpected ?? 0) - localPiecesSum}'
+                                : 'Remaining pieces: ${dbTotalPieces! - (dbTotalExpected ?? 0) - localPiecesSum}',
                             style: const TextStyle(color: Color(0xFF22c55e), fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),

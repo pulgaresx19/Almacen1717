@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../main.dart' show isDarkMode;
+import '../../main.dart' show appLanguage, isDarkMode;
 import 'awbs_v2_formatters.dart';
 
 class AwbsV2AddUldForm extends StatefulWidget {
+  final List<Map<String, dynamic>> globalUlds;
   final Function(Map<String, dynamic>) onAdd;
-  const AwbsV2AddUldForm({super.key, required this.onAdd});
+  const AwbsV2AddUldForm({super.key, required this.globalUlds, required this.onAdd});
 
   @override
   State<AwbsV2AddUldForm> createState() => _AwbsV2AddUldFormState();
@@ -18,6 +19,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
   final _uldRemarkCtrl = TextEditingController();
 
   bool _uldNumberError = false;
+  String? _uldNumberErrorStr;
   bool _uldPiecesError = false;
   bool _autoPieces = true;
   bool _autoWeight = true;
@@ -32,8 +34,20 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
   }
 
   void _handleAdd() {
+    final text = _uldNumberCtrl.text.trim().toUpperCase();
+    bool exists = widget.globalUlds.any((u) => u['uld_number'].toString().toUpperCase() == text);
+
     setState(() {
-      _uldNumberError = _uldNumberCtrl.text.trim().isEmpty;
+      if (text.isEmpty) {
+        _uldNumberError = true;
+        _uldNumberErrorStr = null;
+      } else if (exists) {
+        _uldNumberError = true;
+        _uldNumberErrorStr = appLanguage.value == 'es' ? 'Ya existe' : 'Already exists';
+      } else {
+        _uldNumberError = false;
+        _uldNumberErrorStr = null;
+      }
       _uldPiecesError = !_autoPieces && _uldPiecesCtrl.text.trim().isEmpty;
     });
 
@@ -56,6 +70,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
     _uldRemarkCtrl.clear();
     setState(() {
       _uldNumberError = false;
+      _uldNumberErrorStr = null;
       _uldPiecesError = false;
     });
   }
@@ -76,7 +91,8 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, bool readOnly = false, Widget? trailingLabel, Function(String)? onChanged}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, String? errorText, bool readOnly = false, Widget? trailingLabel, Function(String)? onChanged}) {
+    final bool isError = hasError || errorText != null;
     return Padding(
       padding: const EdgeInsets.only(right: 12, bottom: 12),
       child: Column(
@@ -85,7 +101,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: TextStyle(color: hasError ? const Color(0xFFef4444) : (isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(label, style: TextStyle(color: isError ? const Color(0xFFef4444) : (isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w600)),
               trailingLabel ?? const SizedBox.shrink(),
             ],
           ),
@@ -105,18 +121,18 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
                 counterText: '',
                 hintText: readOnly ? 'Auto' : null,
                 hintStyle: TextStyle(color: isDarkMode.value ? Colors.white54 : Colors.black54, fontSize: 13),
-                fillColor: hasError ? const Color(0xFFef4444).withAlpha(10) : (!readOnly ? (isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)) : (isDarkMode.value ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB))),
+                fillColor: isError ? const Color(0xFFef4444).withAlpha(10) : (!readOnly ? (isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)) : (isDarkMode.value ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB))),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: hasError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: hasError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: hasError ? const BorderSide(color: Colors.redAccent, width: 2) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent, width: 2) : BorderSide.none,
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
@@ -126,6 +142,11 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
               },
             ),
           ),
+          if (errorText != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 2),
+              child: Text(errorText, style: const TextStyle(color: Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
+            )
         ],
       ),
     );
@@ -147,7 +168,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  SizedBox(width: 140, child: _buildTextField('ULD Number', _uldNumberCtrl, maxLength: 10, inputFormatters: [UpperCaseTextFormatter()], hasError: _uldNumberError, onChanged: (_) { if (_uldNumberError) setState(() => _uldNumberError = false); })),
+                  SizedBox(width: 140, child: _buildTextField('ULD Number', _uldNumberCtrl, maxLength: 10, inputFormatters: [UpperCaseTextFormatter()], hasError: _uldNumberError, errorText: _uldNumberErrorStr, onChanged: (_) { if (_uldNumberError) setState(() { _uldNumberError = false; _uldNumberErrorStr = null; }); })),
                   SizedBox(width: 95, child: _buildTextField('Pieces', _uldPiecesCtrl, isNumber: true, readOnly: _autoPieces, 
                     trailingLabel: _buildAutoCheckbox(_autoPieces, (val) {
                       setState(() {

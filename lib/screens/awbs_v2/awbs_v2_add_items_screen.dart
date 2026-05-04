@@ -20,14 +20,83 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
   final List<Map<String, dynamic>> _addedAwbs = [];
   final List<Map<String, dynamic>> _addedUlds = [];
   bool _isSavingAll = false;
+  bool _showEmptyError = false;
 
   Future<void> _saveAllItems() async {
     if (_addedAwbs.isEmpty && _addedUlds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(appLanguage.value == 'es' ? 'No hay registros para guardar.' : 'No records to save.'),
-        backgroundColor: Colors.orange,
-      ));
+      setState(() => _showEmptyError = true);
       return;
+    }
+
+    for (var u in _addedUlds) {
+      final nested = u['awbs'] as List? ?? [];
+      if (nested.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (ctx) {
+            final dark = isDarkMode.value;
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Container(
+                width: 320,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                decoration: BoxDecoration(
+                  color: dark ? const Color(0xFF1e293b) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: dark ? Colors.white12 : Colors.black12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withAlpha(20),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      appLanguage.value == 'es' ? 'Acción Requerida' : 'Action Required',
+                      style: TextStyle(color: dark ? Colors.white : Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      appLanguage.value == 'es' 
+                        ? 'Faltan AWBs para el ULD ${u['uld_number']}. Añade al menos uno.' 
+                        : 'AWBs are missing for ULD ${u['uld_number']}. Add at least one.',
+                      style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          appLanguage.value == 'es' ? 'ENTENDIDO' : 'UNDERSTOOD',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+        return;
+      }
     }
 
     setState(() => _isSavingAll = true);
@@ -245,9 +314,12 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                     // AWB Section
                     Expanded(
                       child: AwbsV2AddAwbForm(
+                        globalAwbs: _addedAwbs,
+                        globalUlds: _addedUlds,
                         onAdd: (item) {
                           setState(() {
                             _addedAwbs.add(item);
+                            _showEmptyError = false;
                           });
                         },
                       ),
@@ -259,9 +331,11 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                     // ULD Section
                     Expanded(
                       child: AwbsV2AddUldForm(
+                        globalUlds: _addedUlds,
                         onAdd: (item) {
                           setState(() {
                             _addedUlds.add(item);
+                            _showEmptyError = false;
                           });
                         },
                       ),
@@ -286,7 +360,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                       decoration: BoxDecoration(
                         color: bgCard,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderCard),
+                        border: Border.all(color: (_showEmptyError && _addedAwbs.isEmpty) ? Colors.redAccent : borderCard),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -429,7 +503,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                       decoration: BoxDecoration(
                         color: bgCard,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderCard),
+                        border: Border.all(color: (_showEmptyError && _addedUlds.isEmpty) ? Colors.redAccent : borderCard),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -463,6 +537,8 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                                     dark: dark,
                                     textP: textP,
                                     borderCard: borderCard,
+                                    globalAwbs: _addedAwbs,
+                                    globalUlds: _addedUlds,
                                     onDelete: () {
                                       setState(() {
                                         _addedUlds.removeAt(index);

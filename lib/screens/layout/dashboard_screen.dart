@@ -16,6 +16,7 @@ import '../awbs_v2/awbs_v2_screen.dart';
 import '../delivers_v2/delivers_v2_screen.dart';
 import '../location_v2/location_v2_screen.dart';
 import '../driver_v2/driver_v2_screen.dart';
+import '../no_break_area_v2/no_break_area_v2_screen.dart';
 import '../../services/realtime_service.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -413,6 +414,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'System (BF)',
                                   10,
                                 ),
+                              if (can('area_nobreak'))
+                                _buildNavItem(
+                                  Icons.grid_view_rounded,
+                                  appLanguage.value == 'es' ? 'Área (No Break)' : 'Area (No Break)',
+                                  11,
+                                ),
 
 
 
@@ -789,7 +796,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox.shrink(), // Formerly V1 LocationModule
         const SizedBox.shrink(), // Formerly V1 DriverModule
         const SystemBfV2Screen(),
-        const SizedBox.shrink(), // Formerly V1 AreaNobreakModule
+        NoBreakAreaV2Screen(isActive: _selectedIndex == 11),
         FlightsV2Screen(isActive: _selectedIndex == 12),
         const SizedBox.shrink(), // Formerly UldsV2Screen
         const SystemV2Screen(),
