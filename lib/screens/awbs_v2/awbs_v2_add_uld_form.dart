@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../main.dart' show isDarkMode;
-import '../add_awb_v2/add_awb_v2_formatters.dart';
+import 'awbs_v2_formatters.dart';
 
 class AwbsV2AddUldForm extends StatefulWidget {
   final Function(Map<String, dynamic>) onAdd;
@@ -19,6 +19,8 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
 
   bool _uldNumberError = false;
   bool _uldPiecesError = false;
+  bool _autoPieces = true;
+  bool _autoWeight = true;
 
   @override
   void dispose() {
@@ -32,7 +34,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
   void _handleAdd() {
     setState(() {
       _uldNumberError = _uldNumberCtrl.text.trim().isEmpty;
-      _uldPiecesError = _uldPiecesCtrl.text.trim().isEmpty;
+      _uldPiecesError = !_autoPieces && _uldPiecesCtrl.text.trim().isEmpty;
     });
 
     if (_uldNumberError || _uldPiecesError) return;
@@ -40,14 +42,17 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
     widget.onAdd({
       'type': 'uld',
       'uld_number': _uldNumberCtrl.text.trim(),
-      'pieces': _uldPiecesCtrl.text.trim(),
+      'pieces': _autoPieces ? 'Auto' : _uldPiecesCtrl.text.trim(),
       'total_pieces': '',
-      'weight': _uldWeightCtrl.text.trim(),
+      'weight': _autoWeight ? 'Auto' : _uldWeightCtrl.text.trim(),
       'remarks': _uldRemarkCtrl.text.trim(),
+      'auto_pieces': _autoPieces,
+      'auto_weight': _autoWeight,
+      'awbs': <Map<String, dynamic>>[],
     });
     _uldNumberCtrl.clear();
-    _uldPiecesCtrl.clear();
-    _uldWeightCtrl.clear();
+    if (!_autoPieces) _uldPiecesCtrl.clear();
+    if (!_autoWeight) _uldWeightCtrl.clear();
     _uldRemarkCtrl.clear();
     setState(() {
       _uldNumberError = false;
@@ -55,27 +60,52 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
     });
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, Function(String)? onChanged}) {
+  Widget _buildAutoCheckbox(bool value, Function(bool) onChanged) {
+    return SizedBox(
+      height: 16,
+      width: 16,
+      child: Checkbox(
+        value: value,
+        activeColor: const Color(0xFF6366f1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        side: BorderSide(color: isDarkMode.value ? Colors.white54 : Colors.black54, width: 1.5),
+        onChanged: (val) {
+          if (val != null) onChanged(val);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, bool readOnly = false, Widget? trailingLabel, Function(String)? onChanged}) {
     return Padding(
       padding: const EdgeInsets.only(right: 12, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w600)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: TextStyle(color: hasError ? const Color(0xFFef4444) : (isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w600)),
+              trailingLabel ?? const SizedBox.shrink(),
+            ],
+          ),
           const SizedBox(height: 6),
           SizedBox(
             height: 40,
             child: TextFormField(
               controller: ctrl,
+              readOnly: readOnly,
               keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
               maxLines: maxLines,
               maxLength: maxLength,
               inputFormatters: inputFormatters,
-              style: TextStyle(color: isDarkMode.value ? Colors.white : Colors.black, fontSize: 13),
+              style: TextStyle(color: isDarkMode.value ? (readOnly ? Colors.white54 : Colors.white) : (readOnly ? Colors.black54 : Colors.black), fontSize: 13),
               decoration: InputDecoration(
                 filled: true,
                 counterText: '',
-                fillColor: isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                hintText: readOnly ? 'Auto' : null,
+                hintStyle: TextStyle(color: isDarkMode.value ? Colors.white54 : Colors.black54, fontSize: 13),
+                fillColor: hasError ? const Color(0xFFef4444).withAlpha(10) : (!readOnly ? (isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)) : (isDarkMode.value ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB))),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: hasError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
@@ -118,8 +148,25 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   SizedBox(width: 140, child: _buildTextField('ULD Number', _uldNumberCtrl, maxLength: 10, inputFormatters: [UpperCaseTextFormatter()], hasError: _uldNumberError, onChanged: (_) { if (_uldNumberError) setState(() => _uldNumberError = false); })),
-                  SizedBox(width: 95, child: _buildTextField('Pieces', _uldPiecesCtrl, isNumber: true, inputFormatters: [FilteringTextInputFormatter.digitsOnly], hasError: _uldPiecesError, onChanged: (_) { if (_uldPiecesError) setState(() => _uldPiecesError = false); })),
-                  SizedBox(width: 95, child: _buildTextField('Weight', _uldWeightCtrl, isNumber: true, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))])),
+                  SizedBox(width: 95, child: _buildTextField('Pieces', _uldPiecesCtrl, isNumber: true, readOnly: _autoPieces, 
+                    trailingLabel: _buildAutoCheckbox(_autoPieces, (val) {
+                      setState(() {
+                        _autoPieces = val;
+                        if (_autoPieces) {
+                          _uldPiecesError = false;
+                          _uldPiecesCtrl.clear();
+                        }
+                      });
+                    }),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly], hasError: _uldPiecesError, onChanged: (_) { if (_uldPiecesError) setState(() => _uldPiecesError = false); })),
+                  SizedBox(width: 95, child: _buildTextField('Weight', _uldWeightCtrl, isNumber: true, readOnly: _autoWeight, 
+                    trailingLabel: _buildAutoCheckbox(_autoWeight, (val) {
+                      setState(() {
+                        _autoWeight = val;
+                        if (_autoWeight) _uldWeightCtrl.clear();
+                      });
+                    }),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))])),
                   Expanded(child: _buildTextField('Remarks', _uldRemarkCtrl)),
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -130,8 +177,8 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
                       borderRadius: BorderRadius.circular(8)
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.add_rounded, color: _uldNumberCtrl.text.isNotEmpty ? Colors.white : (dark ? Colors.white54 : Colors.black38), size: 20),
-                      onPressed: _uldNumberCtrl.text.isNotEmpty ? _handleAdd : null,
+                      icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                      onPressed: _handleAdd,
                     ),
                   ),
                 ],

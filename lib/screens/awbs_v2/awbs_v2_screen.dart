@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
-import '../add_awb_v2/add_awb_v2_screen.dart';
-import '../add_uld_v2/add_uld_v2_screen.dart';
 // removed intl
 // unused import removed
 import 'awbs_v2_drawer.dart';
@@ -22,10 +20,6 @@ class AwbsV2Screen extends StatefulWidget {
 class _AwbsV2ScreenState extends State<AwbsV2Screen> {
   final ScrollController _horizontalScrollController = ScrollController();
   final _searchController = TextEditingController();
-  final GlobalKey<AddAwbV2ScreenState> _addAwbKey = GlobalKey<AddAwbV2ScreenState>();
-  final GlobalKey<AddUldV2ScreenState> _addUldKey = GlobalKey<AddUldV2ScreenState>();
-  bool _showAddForm = false;
-  bool _showAddUldForm = false;
   bool _showAddItemsForm = false;
   bool _showUldTab = false;
 
@@ -37,15 +31,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
   @override
   void didUpdateWidget(AwbsV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!widget.isActive && oldWidget.isActive) {
-      if (_showAddForm && _addAwbKey.currentState != null) {
-        if (!_addAwbKey.currentState!.hasDataSync) {
-          setState(() {
-            _showAddForm = false;
-          });
-        }
-      }
-    }
   }
 
   String _getAwbStatusStr(Map<String, dynamic> u) {
@@ -90,55 +75,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_showAddForm)
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () async {
-                              if (_addAwbKey.currentState != null) {
-                                final canPop = await _addAwbKey.currentState!.handleBackRequest();
-                                if (canPop) {
-                                  setState(() => _showAddForm = false);
-                                }
-                              } else {
-                                setState(() => _showAddForm = false);
-                              }
-                            },
-                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
-                          ),
-                          const SizedBox(width: 8),
-                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo Aerobill' : 'Add New Air Waybill', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                        ],
-                      )
-                    else if (_showAddUldForm)
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () async {
-                              if (_addUldKey.currentState != null) {
-                                final canPop = await _addUldKey.currentState!.handleBackRequest();
-                                if (canPop) {
-                                  setState(() => _showAddUldForm = false);
-                                }
-                              } else {
-                                setState(() => _showAddUldForm = false);
-                              }
-                            },
-                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
-                          ),
-                          const SizedBox(width: 8),
-                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo ULD' : 'Add New ULD', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    if (_showAddForm) ...[
-                      const SizedBox(height: 4),
-                      Text(appLanguage.value == 'es' ? 'Crea y registra detalles de los aerobills.' : 'Create and register Air Waybill details.', style: TextStyle(color: textS, fontSize: 13)),
-                    ] else if (_showAddUldForm) ...[
-                      const SizedBox(height: 4),
-                      Text(appLanguage.value == 'es' ? 'Registra un ULD en la nueva base de datos.' : 'Register a ULD in the new database.', style: TextStyle(color: textS, fontSize: 13)),
-                    ] else if (!_showAddItemsForm) ...[
+                    if (!_showAddItemsForm) ...[
                       Row(
                         children: [
                           GestureDetector(
@@ -185,7 +122,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 ),
                 const Spacer(),
                 
-                if (!_showAddForm && !_showAddUldForm && !_showAddItemsForm) ...[
+                if (!_showAddItemsForm) ...[
                   // Search Box
                   Container(
                     width: 300,
@@ -257,40 +194,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 40,
-                      child: ElevatedButton.icon(
-                        onPressed: () => setState(() => _showAddForm = true),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: Text(appLanguage.value == 'es' ? 'Añadir AWB' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366f1),
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shadowColor: const Color(0xFF6366f1).withAlpha(100),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SizedBox(
-                      height: 40,
-                      child: ElevatedButton.icon(
-                        onPressed: () => setState(() => _showAddUldForm = true),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366f1),
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shadowColor: const Color(0xFF6366f1).withAlpha(100),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        ),
-                      ),
-                    ),
                   ],
                   const SizedBox(width: 8),
                 ],
@@ -304,29 +207,6 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                   onPop: () {
                     setState(() {
                       _showAddItemsForm = false;
-                    });
-                  },
-                ),
-              )
-            else if (_showAddForm)
-              Expanded(
-                child: AddAwbV2Screen(
-                  key: _addAwbKey,
-                  onPop: (didAdd) {
-                    setState(() {
-                      _showAddForm = false;
-                    });
-                  },
-                ),
-              )
-            else if (_showAddUldForm)
-              Expanded(
-                child: AddUldV2Screen(
-                  key: _addUldKey,
-                  isInline: true,
-                  onPop: (didAdd) {
-                    setState(() {
-                      _showAddUldForm = false;
                     });
                   },
                 ),

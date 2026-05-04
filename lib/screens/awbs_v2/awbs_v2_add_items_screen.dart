@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../add_awb_v2/add_awb_v2_logic.dart';
+
+import 'awbs_v2_dialogs.dart';
 import 'awbs_v2_add_awb_form.dart';
 import 'awbs_v2_add_uld_form.dart';
+import 'awbs_v2_uld_list_item.dart';
 
 class AwbsV2AddItemsScreen extends StatefulWidget {
   final VoidCallback onPop;
@@ -45,49 +47,141 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
         } catch (_) {}
       }
 
-      if (_addedUlds.isNotEmpty) {
-        final uldsPayload = _addedUlds.map((uld) => {
-          'uld_number': uld['uld_number'],
-          'pieces_total': uld['pieces'].toString().isEmpty ? null : int.tryParse(uld['pieces'].toString()),
-          'weight_total': uld['weight'].toString().isEmpty ? null : double.tryParse(uld['weight'].toString()),
-          'remarks': uld['remarks'].toString().isEmpty ? null : uld['remarks'],
-          'status': 'Received',
-          'is_break': false,
-        }).toList();
-        await Supabase.instance.client.from('ulds').insert(uldsPayload);
+      Map<String, dynamic> formatCoordinator(Map<dynamic, dynamic>? counts, int expectedPieces) {
+        if (counts == null || counts.isEmpty) return {};
+        final coordRecord = <String, dynamic>{};
+        int totalChecked = 0;
+        void addValues(String key, String label) {
+          if (counts[key] != null) {
+            final list = counts[key].toString().split(RegExp(r'[,\s-]+')).where((e) => int.tryParse(e) != null && int.parse(e) > 0).toList();
+            for (int i = 0; i < list.length; i++) {
+              final val = int.parse(list[i]);
+              coordRecord['${i + 1}. $label'] = val;
+              totalChecked += val;
+            }
+          }
+        }
+        addValues('AGI Skid', 'AGI skid');
+        addValues('Pre Skid', 'Pre skid');
+        addValues('Crate', 'Crate');
+        addValues('Box', 'Box');
+        addValues('Other', 'Other');
+        if (coordRecord.isNotEmpty) {
+          coordRecord['processed_at'] = DateTime.now().toUtc().toIso8601String();
+          coordRecord['processed_by'] = userName;
+          if (expectedPieces > 0 && totalChecked != expectedPieces) {
+            coordRecord['discrepancy_type'] = totalChecked > expectedPieces ? 'OVER' : 'SHORT';
+            coordRecord['discrepancy_amount'] = (totalChecked - expectedPieces).abs();
+            coordRecord['discrepancy_checked'] = totalChecked;
+            coordRecord['discrepancy_expected'] = expectedPieces;
+          }
+        }
+        return coordRecord;
       }
 
+      List<Map<String, dynamic>> formatLocations(Map<dynamic, dynamic>? locs) {
+        if (locs == null || locs.isEmpty) return [];
+        final items = <Map<String, dynamic>>[];
+        locs.forEach((k, v) {
+          if (v.toString().trim().isNotEmpty) {
+            items.add({
+              'location': v.toString().trim(),
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+              'updated_by': userName,
+            });
+          }
+        });
+        return items;
+      }
+
+      final payload = <String, dynamic>{};
+
       if (_addedAwbs.isNotEmpty) {
-        List<Map<String, dynamic>> localAwbs = _addedAwbs.map((a) {
-           return {
-              'awbNumber': a['awb_number'],
-              'pieces': int.tryParse(a['pieces'].toString()) ?? 1,
-              'total': int.tryParse(a['total_pieces'].toString()) ?? 1,
+        payload['awbs'] = _addedAwbs.map((a) {
+          final expected = int.tryParse(a['pieces'].toString()) ?? 1;
+          return {
+            'awb_number': a['awb_number'],
+            'pieces': expected,
+            'total_pieces': int.tryParse(a['total_pieces'].toString()) ?? 1,
+            'weight': double.tryParse(a['weight'].toString()) ?? 0.0,
+            'remarks': a['remarks'].toString().isEmpty ? null : a['remarks'],
+            'data_coordinator': formatCoordinator(a['data_coordinator'] as Map?, expected),
+            'data_location': formatLocations(a['data_location'] as Map?),
+          };
+        }).toList();
+      }
+
+      if (_addedUlds.isNotEmpty) {
+        payload['ulds'] = _addedUlds.map((u) {
+          final nestedAwbs = (u['awbs'] as List? ?? []).map((a) {
+            final expected = int.tryParse(a['pieces'].toString()) ?? 1;
+            return {
+              'awb_number': a['awb_number'],
+              'pieces': expected,
+              'total_pieces': int.tryParse(a['total_pieces'].toString()) ?? 1,
               'weight': double.tryParse(a['weight'].toString()) ?? 0.0,
               'remarks': a['remarks'].toString().isEmpty ? null : a['remarks'],
-              'house': a['house_number'].toString().split('\n').map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toList(),
-              'coordinatorCounts': a['data_coordinator'],
-              'itemLocations': a['data_location'],
-              'flight_id': null,
-              'refCarrier': 'WRHS',
-              'refNumber': 'LOCAL',
-              'refUld': 'MANUAL',
-           };
+              'data_coordinator': formatCoordinator(a['data_coordinator'] as Map?, expected),
+              'data_location': formatLocations(a['data_location'] as Map?),
+            };
+          }).toList();
+
+          return {
+            'uld_number': u['uld_number'],
+            'pieces': int.tryParse(u['pieces'].toString()) ?? 0,
+            'weight': double.tryParse(u['weight'].toString()) ?? 0.0,
+            'remarks': u['remarks'].toString().isEmpty ? null : u['remarks'],
+            'awbs': nestedAwbs,
+          };
         }).toList();
-        
-        await AddAwbV2Logic.saveAllAwbs(localAwbs: localAwbs, userName: userName);
+      }
+
+      if (payload.isNotEmpty) {
+        await Supabase.instance.client.rpc('save_manual_inventory_items', params: {'payload': payload});
       }
 
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-           content: Text(appLanguage.value == 'es' ? 'Registros guardados con éxito.' : 'Records saved successfully.'), 
-           backgroundColor: Colors.green
-         ));
          setState(() {
             _addedAwbs.clear();
             _addedUlds.clear();
          });
-         widget.onPop();
+
+         bool dialogOpen = true;
+         showGeneralDialog(
+           context: context,
+           barrierDismissible: false,
+           barrierColor: Colors.black54,
+           transitionDuration: const Duration(milliseconds: 350),
+           pageBuilder: (context, anim1, anim2) {
+             final dark = isDarkMode.value;
+             return Center(
+               child: Material(
+                 color: Colors.transparent,
+                 child: Container(
+                   width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                   decoration: BoxDecoration(color: dark ? const Color(0xFF1e293b) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                   child: Column(
+                     mainAxisSize: MainAxisSize.min,
+                     children: [
+                       Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                       const SizedBox(height: 24),
+                       Text(appLanguage.value == 'es' ? '¡Registros Guardados!' : 'Records Saved!', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                       const SizedBox(height: 8),
+                       Text(appLanguage.value == 'es' ? 'El inventario se ha guardado exitosamente.' : 'The inventory was saved successfully.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+                     ],
+                   ),
+                 ),
+               ),
+             );
+           },
+           transitionBuilder: (context, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+         ).then((_) => dialogOpen = false);
+
+         await Future.delayed(const Duration(milliseconds: 2000));
+         if (mounted) {
+           if (dialogOpen) Navigator.of(context).pop();
+           widget.onPop();
+         }
       }
     } catch (e) {
       if (mounted) {
@@ -138,28 +232,6 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                     Text(
                       appLanguage.value == 'es' ? 'Añadir Nuevo Ítem' : 'Add New Item',
                       style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const Spacer(),
-                    SizedBox(
-                      height: 40,
-                      child: ElevatedButton.icon(
-                        onPressed: _isSavingAll ? null : _saveAllItems,
-                        icon: _isSavingAll 
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Icon(Icons.save_rounded, size: 18),
-                        label: Text(
-                          appLanguage.value == 'es' ? 'Guardar Registros' : 'Save Records',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10b981), // Emerald green for save action
-                          foregroundColor: Colors.white,
-                          elevation: 4,
-                          shadowColor: const Color(0xFF10b981).withAlpha(100),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -244,21 +316,102 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                                   final item = _addedAwbs[index];
                                   return Container(
                                     margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                     decoration: BoxDecoration(
                                       color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
                                       borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: borderCard),
                                     ),
-                                    child: ListTile(
-                                      title: Text(item['awb_number'], style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14)),
-                                      subtitle: Text(
-                                        'Piezas: ${item['pieces'].isEmpty ? '0' : item['pieces']} / ${item['total_pieces'].isEmpty ? '0' : item['total_pieces']} | Peso: ${item['weight'].isEmpty ? '0' : item['weight']} | House: ${item['house_number'].isEmpty ? 'N/A' : item['house_number']}',
-                                        style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 12),
-                                      ),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                        onPressed: () => setState(() => _addedAwbs.removeAt(index)),
-                                        splashRadius: 20,
-                                      ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 28, height: 28, alignment: Alignment.center,
+                                          decoration: BoxDecoration(color: const Color(0xFF6366f1).withAlpha(40), shape: BoxShape.circle),
+                                          child: Text('${index + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Text('AWB Number', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 10, fontWeight: FontWeight.bold)),
+                                          Text(item['awb_number'], style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14)),
+                                        ])),
+                                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Text('Pieces', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 10, fontWeight: FontWeight.bold)),
+                                          Text('${item['pieces'].toString().isEmpty ? '0' : item['pieces']}', style: TextStyle(color: textP, fontSize: 13)),
+                                        ])),
+                                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Text('Total', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 10, fontWeight: FontWeight.bold)),
+                                          Text('${item['total_pieces'].toString().isEmpty ? '0' : item['total_pieces']}', style: TextStyle(color: textP, fontSize: 13)),
+                                        ])),
+                                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Text('Weight', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 10, fontWeight: FontWeight.bold)),
+                                          Text('${item['weight'].toString().isEmpty ? '0' : item['weight']}', style: TextStyle(color: textP, fontSize: 13)),
+                                        ])),
+                                        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                          Text('Remark', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 10, fontWeight: FontWeight.bold)),
+                                          Text(item['remarks'].toString().isEmpty ? '-' : item['remarks'], style: TextStyle(color: textP, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        ])),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: Icon(Icons.other_houses_outlined, color: item['house_number'] != null && item['house_number'].toString().trim().isNotEmpty ? const Color(0xFFf59e0b) : (dark ? Colors.white24 : Colors.black26), size: 18),
+                                              onPressed: () {
+                                                if (item['house_number'] != null && item['house_number'].toString().trim().isNotEmpty) {
+                                                   List<String> houses = item['house_number'].toString().split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+                                                   showCustomListDialog(context, 'House Numbers', houses);
+                                                }
+                                              },
+                                              tooltip: 'House Numbers',
+                                              splashRadius: 20,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            IconButton(
+                                              icon: Icon(Icons.assignment_rounded, color: item['data_coordinator'] != null && (item['data_coordinator'] as Map).isNotEmpty ? const Color(0xFF6366f1) : (dark ? Colors.white24 : Colors.black26), size: 18),
+                                              onPressed: () {
+                                                if (item['data_coordinator'] != null && (item['data_coordinator'] as Map).isNotEmpty) {
+                                                   showCoordinatorDataPreviewDialog(context, {
+                                                      'pieces': item['pieces'], 
+                                                      'coordinatorCounts': item['data_coordinator'],
+                                                   });
+                                                }
+                                              },
+                                              tooltip: 'Data Coordinator',
+                                              splashRadius: 20,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            IconButton(
+                                              icon: Icon(Icons.location_on_rounded, color: item['data_location'] != null && (item['data_location'] as Map).isNotEmpty ? const Color(0xFF10b981) : (dark ? Colors.white24 : Colors.black26), size: 18),
+                                              onPressed: () {
+                                                if (item['data_location'] != null && (item['data_location'] as Map).isNotEmpty) {
+                                                   showItemLocationPreviewDialog(context, {
+                                                      'pieces': item['pieces'],
+                                                      'coordinatorCounts': item['data_coordinator'],
+                                                      'itemLocations': item['data_location'],
+                                                   });
+                                                }
+                                              },
+                                              tooltip: 'Data Location',
+                                              splashRadius: 20,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Container(width: 1, height: 24, color: borderCard),
+                                            const SizedBox(width: 12),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                              onPressed: () => setState(() => _addedAwbs.removeAt(index)),
+                                              splashRadius: 20,
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
                                   );
                                 },
@@ -304,24 +457,20 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                                 itemCount: _addedUlds.length,
                                 itemBuilder: (context, index) {
                                   final item = _addedUlds[index];
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    decoration: BoxDecoration(
-                                      color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ListTile(
-                                      title: Text(item['uld_number'], style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14)),
-                                      subtitle: Text(
-                                        'Piezas: ${item['pieces'].isEmpty ? '0' : item['pieces']} / ${item['total_pieces'].isEmpty ? '0' : item['total_pieces']} | Peso: ${item['weight'].isEmpty ? '0' : item['weight']}',
-                                        style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563), fontSize: 12),
-                                      ),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                                        onPressed: () => setState(() => _addedUlds.removeAt(index)),
-                                        splashRadius: 20,
-                                      ),
-                                    ),
+                                  return AwbsV2UldListItem(
+                                    item: item,
+                                    index: index,
+                                    dark: dark,
+                                    textP: textP,
+                                    borderCard: borderCard,
+                                    onDelete: () {
+                                      setState(() {
+                                        _addedUlds.removeAt(index);
+                                      });
+                                    },
+                                    onUpdate: () {
+                                      setState(() {});
+                                    },
                                   );
                                 },
                               ),
@@ -331,6 +480,30 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isSavingAll ? null : _saveAllItems,
+                  icon: _isSavingAll 
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.check_rounded, size: 20),
+                  label: Text(
+                    appLanguage.value == 'es' ? 'Guardar Registros' : 'Save Records',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366f1),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
               ),
             ),
           ],
