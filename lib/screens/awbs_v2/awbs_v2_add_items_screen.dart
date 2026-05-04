@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../add_awb_v2/add_awb_v2_logic.dart';
 import 'awbs_v2_add_awb_form.dart';
 import 'awbs_v2_add_uld_form.dart';
 
@@ -15,6 +17,89 @@ class AwbsV2AddItemsScreen extends StatefulWidget {
 class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
   final List<Map<String, dynamic>> _addedAwbs = [];
   final List<Map<String, dynamic>> _addedUlds = [];
+  bool _isSavingAll = false;
+
+  Future<void> _saveAllItems() async {
+    if (_addedAwbs.isEmpty && _addedUlds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(appLanguage.value == 'es' ? 'No hay registros para guardar.' : 'No records to save.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+
+    setState(() => _isSavingAll = true);
+
+    try {
+      final session = Supabase.instance.client.auth.currentSession;
+      String userName = session?.user.email ?? 'Unknown';
+      if (session != null) {
+        if (session.user.userMetadata?['full_name'] != null) {
+          userName = session.user.userMetadata!['full_name'].toString();
+        }
+        try {
+          final profile = await Supabase.instance.client.from('users').select('full_name').eq('id', session.user.id).maybeSingle();
+          if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+            userName = profile['full_name'].toString().trim();
+          }
+        } catch (_) {}
+      }
+
+      if (_addedUlds.isNotEmpty) {
+        final uldsPayload = _addedUlds.map((uld) => {
+          'uld_number': uld['uld_number'],
+          'pieces_total': uld['pieces'].toString().isEmpty ? null : int.tryParse(uld['pieces'].toString()),
+          'weight_total': uld['weight'].toString().isEmpty ? null : double.tryParse(uld['weight'].toString()),
+          'remarks': uld['remarks'].toString().isEmpty ? null : uld['remarks'],
+          'status': 'Received',
+          'is_break': false,
+        }).toList();
+        await Supabase.instance.client.from('ulds').insert(uldsPayload);
+      }
+
+      if (_addedAwbs.isNotEmpty) {
+        List<Map<String, dynamic>> localAwbs = _addedAwbs.map((a) {
+           return {
+              'awbNumber': a['awb_number'],
+              'pieces': int.tryParse(a['pieces'].toString()) ?? 1,
+              'total': int.tryParse(a['total_pieces'].toString()) ?? 1,
+              'weight': double.tryParse(a['weight'].toString()) ?? 0.0,
+              'remarks': a['remarks'].toString().isEmpty ? null : a['remarks'],
+              'house': a['house_number'].toString().split('\n').map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toList(),
+              'coordinatorCounts': a['data_coordinator'],
+              'itemLocations': a['data_location'],
+              'flight_id': null,
+              'refCarrier': 'WRHS',
+              'refNumber': 'LOCAL',
+              'refUld': 'MANUAL',
+           };
+        }).toList();
+        
+        await AddAwbV2Logic.saveAllAwbs(localAwbs: localAwbs, userName: userName);
+      }
+
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+           content: Text(appLanguage.value == 'es' ? 'Registros guardados con éxito.' : 'Records saved successfully.'), 
+           backgroundColor: Colors.green
+         ));
+         setState(() {
+            _addedAwbs.clear();
+            _addedUlds.clear();
+         });
+         widget.onPop();
+      }
+    } catch (e) {
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+           content: Text('Error: $e'), 
+           backgroundColor: Colors.redAccent
+         ));
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingAll = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,10 +143,10 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                     SizedBox(
                       height: 40,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Implement Save All logic
-                        },
-                        icon: const Icon(Icons.save_rounded, size: 18),
+                        onPressed: _isSavingAll ? null : _saveAllItems,
+                        icon: _isSavingAll 
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.save_rounded, size: 18),
                         label: Text(
                           appLanguage.value == 'es' ? 'Guardar Registros' : 'Save Records',
                           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),

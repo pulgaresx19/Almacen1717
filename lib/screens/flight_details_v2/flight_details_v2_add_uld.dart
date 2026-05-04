@@ -23,7 +23,7 @@ Future<bool?> showAddUldComponent(
       return Center(
         child: Material(
           color: Colors.transparent,
-          child: _AddUldComponentInternal(
+          child: AddUldComponentInternal(
             flight: flight,
             dark: dark,
             existingUlds: existingUlds,
@@ -91,13 +91,14 @@ Future<void> _showSaveSuccessDialog(BuildContext context, bool dark) async {
   }
 }
 
-class _AddUldComponentInternal extends StatefulWidget {
+class AddUldComponentInternal extends StatefulWidget {
   final Map<String, dynamic> flight;
   final bool dark;
   final List<dynamic> existingUlds;
   final Map<String, dynamic>? uld;
 
-  const _AddUldComponentInternal({
+  const AddUldComponentInternal({
+    super.key,
     required this.flight,
     required this.dark,
     required this.existingUlds,
@@ -105,10 +106,10 @@ class _AddUldComponentInternal extends StatefulWidget {
   });
 
   @override
-  State<_AddUldComponentInternal> createState() => _AddUldComponentInternalState();
+  State<AddUldComponentInternal> createState() => _AddUldComponentInternalState();
 }
 
-class _AddUldComponentInternalState extends State<_AddUldComponentInternal> {
+class _AddUldComponentInternalState extends State<AddUldComponentInternal> {
   final _uldNumberCtrl = TextEditingController();
   final _piecesCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();

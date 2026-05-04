@@ -6,7 +6,7 @@ import 'location_v2_history_modal.dart';
 
 class LocationV2AwbAssignModal extends StatefulWidget {
   final Map<String, dynamic> awb;
-  final Function(String location, bool isConfirmed) onSave;
+  final Function(List<String> locations, bool isConfirmed) onSave;
   final LocationV2Logic logic;
 
   const LocationV2AwbAssignModal({
@@ -23,6 +23,8 @@ class LocationV2AwbAssignModal extends StatefulWidget {
 class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
   final TextEditingController _locationController = TextEditingController();
   final FocusNode _locationFocus = FocusNode();
+  bool _isMultipleMode = false;
+  final List<String> _pendingLocations = [];
 
   @override
   void initState() {
@@ -44,10 +46,17 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
 
   void _save({bool isConfirmed = false, String? exactLocation}) {
     final loc = exactLocation ?? _locationController.text.trim().toUpperCase();
-    if (loc.isNotEmpty) {
-      widget.onSave(loc, isConfirmed);
-      Navigator.pop(context); // close modal
+    if (loc.isNotEmpty && !_pendingLocations.contains(loc)) {
+      _pendingLocations.add(loc);
     }
+    
+    if (_pendingLocations.isEmpty) {
+      _locationFocus.requestFocus();
+      return;
+    }
+
+    widget.onSave(_pendingLocations, isConfirmed);
+    Navigator.pop(context); // close modal
   }
 
   @override
@@ -115,6 +124,25 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                     style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
+                Text(appLanguage.value == 'es' ? 'Múltiple' : 'Multiple', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 4),
+                SizedBox(
+                  height: 20,
+                  child: Switch(
+                    value: _isMultipleMode,
+                    onChanged: (v) {
+                      setState(() {
+                        _isMultipleMode = v;
+                      });
+                      if (v) {
+                        _locationFocus.requestFocus();
+                      }
+                    },
+                    activeThumbColor: const Color(0xFF10b981),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                if (parsedLocations.isNotEmpty) const SizedBox(width: 8),
                 if (parsedLocations.isNotEmpty)
                   IconButton(
                     padding: EdgeInsets.zero,
@@ -314,9 +342,45 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                     },
                   ),
                 ),
-                onSubmitted: (_) => _save(),
+                onSubmitted: (_) {
+                  if (_isMultipleMode) {
+                    final loc = _locationController.text.trim().toUpperCase();
+                    if (loc.isNotEmpty && !_pendingLocations.contains(loc)) {
+                      setState(() {
+                        _pendingLocations.add(loc);
+                        _locationController.clear();
+                      });
+                    } else if (loc.isNotEmpty) {
+                      setState(() {
+                        _locationController.clear();
+                      });
+                    }
+                    _locationFocus.requestFocus();
+                  } else {
+                    _save();
+                  }
+                },
               ),
             ),
+            if (_isMultipleMode && _pendingLocations.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _pendingLocations.map((loc) => Chip(
+                  label: Text(loc, style: TextStyle(color: textP, fontSize: 12, fontWeight: FontWeight.bold)),
+                  backgroundColor: const Color(0xFF10b981).withAlpha(20),
+                  deleteIcon: const Icon(Icons.cancel, size: 16, color: Color(0xFF10b981)),
+                  onDeleted: () {
+                    setState(() {
+                      _pendingLocations.remove(loc);
+                    });
+                  },
+                  side: BorderSide(color: const Color(0xFF10b981).withAlpha(50)),
+                  padding: EdgeInsets.zero,
+                )).toList(),
+              ),
+            ],
             const SizedBox(height: 24),
 
             // Actions
@@ -332,7 +396,15 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: _save,
+                  onPressed: () {
+                    if (_isMultipleMode) {
+                      final loc = _locationController.text.trim().toUpperCase();
+                      if (loc.isNotEmpty && !_pendingLocations.contains(loc)) {
+                        _pendingLocations.add(loc);
+                      }
+                    }
+                    _save();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF10b981),
                     foregroundColor: Colors.white,
@@ -340,7 +412,9 @@ class _LocationV2AwbAssignModalState extends State<LocationV2AwbAssignModal> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: Text(
-                    appLanguage.value == 'es' ? 'Guardar' : 'Save',
+                    appLanguage.value == 'es' 
+                        ? (_isMultipleMode && _pendingLocations.isNotEmpty ? 'Guardar ${_pendingLocations.length} Locs' : 'Guardar') 
+                        : (_isMultipleMode && _pendingLocations.isNotEmpty ? 'Save ${_pendingLocations.length} Locs' : 'Save'),
                     style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
                 ),

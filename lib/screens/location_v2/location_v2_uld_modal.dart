@@ -88,7 +88,7 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
       builder: (ctx) => LocationV2AwbAssignModal(
         awb: awb,
         logic: widget.logic,
-        onSave: (location, isConfirmed) async {
+        onSave: (locations, isConfirmed) async {
           List<Map<String, dynamic>> parsedLocations = [];
           if (awb['data_location'] != null) {
             if (awb['data_location'] is List) {
@@ -125,11 +125,16 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
             } catch (_) {}
           }
 
-          parsedLocations.add({
-            'location': location,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-            'updated_by': byName,
-          });
+          for (var location in locations) {
+            bool exists = parsedLocations.any((p) => p['location'].toString().toUpperCase() == location);
+            if (!exists) {
+              parsedLocations.add({
+                'location': location,
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+                'updated_by': byName,
+              });
+            }
+          }
 
           try {
             await widget.logic.supabase.from('awb_splits').update({

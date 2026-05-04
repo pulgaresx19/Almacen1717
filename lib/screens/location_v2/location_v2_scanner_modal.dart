@@ -51,6 +51,9 @@ class LocationV2ScannerModal {
     final hasReqLoc = reqLoc != null && reqLoc.isNotEmpty;
 
     final TextEditingController locationCtrl = TextEditingController();
+    final FocusNode locationFocusNode = FocusNode();
+    bool isMultipleMode = false;
+    List<String> pendingLocations = [];
     
     // Parse existing locations
     List<Map<String, dynamic>> parsedLocations = [];
@@ -88,10 +91,15 @@ class LocationV2ScannerModal {
             if (isSaving) return;
 
             final locText = locationCtrl.text.trim().toUpperCase();
-            if (locText.isEmpty) {
+            if (locText.isNotEmpty && !pendingLocations.contains(locText)) {
+              pendingLocations.add(locText);
+            }
+
+            if (pendingLocations.isEmpty) {
               setDialogState(() {
                 locationError = appLanguage.value == 'es' ? 'Requerido' : 'Required';
               });
+              locationFocusNode.requestFocus();
               return;
             }
 
@@ -115,16 +123,21 @@ class LocationV2ScannerModal {
                 } catch (_) {}
               }
 
-              // Append new location to parsedLocations
-              parsedLocations.add({
-                'location': locText,
-                'updated_at': DateTime.now().toUtc().toIso8601String(),
-                'updated_by': byName,
-              });
-
+              // Append new locations to parsedLocations
               bool isConfirmed = split['is_location_confirmed'] == true;
-              if (hasReqLoc && locText.toUpperCase() == reqLoc.toUpperCase()) {
-                isConfirmed = true;
+
+              for (var pendingLoc in pendingLocations) {
+                bool exists = parsedLocations.any((p) => p['location'].toString().toUpperCase() == pendingLoc);
+                if (!exists) {
+                  parsedLocations.add({
+                    'location': pendingLoc,
+                    'updated_at': DateTime.now().toUtc().toIso8601String(),
+                    'updated_by': byName,
+                  });
+                }
+                if (hasReqLoc && pendingLoc == reqLoc.toUpperCase()) {
+                  isConfirmed = true;
+                }
               }
 
               await supabase.from('awb_splits').update({
@@ -243,6 +256,27 @@ class LocationV2ScannerModal {
                     style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
+                if (!isReadOnly) ...[
+                  Text(appLanguage.value == 'es' ? 'Múltiple' : 'Multiple', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    height: 20,
+                    child: Switch(
+                      value: isMultipleMode,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          isMultipleMode = v;
+                        });
+                        if (v) {
+                          locationFocusNode.requestFocus();
+                        }
+                      },
+                      activeThumbColor: const Color(0xFF10b981),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  if (parsedLocations.isNotEmpty) const SizedBox(width: 8),
+                ],
                 if (!isReadOnly && parsedLocations.isNotEmpty)
                   IconButton(
                     padding: EdgeInsets.zero,
@@ -397,6 +431,7 @@ class LocationV2ScannerModal {
                     const SizedBox(height: 8),
                     TextField(
                       controller: locationCtrl,
+                      focusNode: locationFocusNode,
                       style: TextStyle(color: textP, fontSize: 14),
                       textCapitalization: TextCapitalization.characters,
                       inputFormatters: [
@@ -413,7 +448,25 @@ class LocationV2ScannerModal {
                           setDialogState(() => locationError = null);
                         }
                       },
-                      onSubmitted: (_) => handleSave(),
+                      onSubmitted: (_) {
+                        if (isMultipleMode) {
+                          final locText = locationCtrl.text.trim().toUpperCase();
+                          if (locText.isNotEmpty && !pendingLocations.contains(locText)) {
+                            setDialogState(() {
+                              pendingLocations.add(locText);
+                              locationCtrl.clear();
+                              locationError = null;
+                            });
+                          } else if (locText.isNotEmpty) {
+                            setDialogState(() {
+                              locationCtrl.clear();
+                            });
+                          }
+                          locationFocusNode.requestFocus();
+                        } else {
+                          handleSave();
+                        }
+                      },
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: dark ? Colors.white.withAlpha(10) : Colors.white,
@@ -457,6 +510,25 @@ class LocationV2ScannerModal {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       ),
                     ),
+                    if (isMultipleMode && pendingLocations.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: pendingLocations.map((loc) => Chip(
+                          label: Text(loc, style: TextStyle(color: textP, fontSize: 12, fontWeight: FontWeight.bold)),
+                          backgroundColor: const Color(0xFF10b981).withAlpha(20),
+                          deleteIcon: const Icon(Icons.cancel, size: 16, color: Color(0xFF10b981)),
+                          onDeleted: () {
+                            setDialogState(() {
+                              pendingLocations.remove(loc);
+                            });
+                          },
+                          side: BorderSide(color: const Color(0xFF10b981).withAlpha(50)),
+                          padding: EdgeInsets.zero,
+                        )).toList(),
+                      ),
+                    ],
                   ],
                   if (isReadOnly && parsedLocations.isNotEmpty) ...[
                     const SizedBox(height: 20),
@@ -551,7 +623,9 @@ class LocationV2ScannerModal {
                   onPressed: isSaving ? null : () => handleSave(),
                   child: isSaving
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(appLanguage.value == 'es' ? 'Guardar' : 'Save'),
+                      : Text(appLanguage.value == 'es' 
+                          ? (isMultipleMode && pendingLocations.isNotEmpty ? 'Guardar ${pendingLocations.length} Locs' : 'Guardar') 
+                          : (isMultipleMode && pendingLocations.isNotEmpty ? 'Save ${pendingLocations.length} Locs' : 'Save')),
                 ),
               ]
             ],

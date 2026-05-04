@@ -230,7 +230,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                     const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
-            double rWidth = constraints.maxWidth - 775; if (rWidth < 180) rWidth = 180;
+            double rWidth = constraints.maxWidth - 662; if (rWidth < 180) rWidth = 180;
             return Wrap(
               spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
               children: [
@@ -245,11 +245,6 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                 SizedBox(width: 130, child: buildTextField('Date Arrived', logic.dateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDate(context), suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70), hasError: logic.fieldErrors.containsKey('Date Arrived'), errorText: logic.fieldErrors['Date Arrived'])),
                 SizedBox(width: 120, child: buildTextField('Time Arrived', logic.timeCtrl, '__:__ --', readOnly: true, onTap: () => logic.selectTime(context), suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
                 SizedBox(width: rWidth, child: buildTextField('Remarks', logic.remarksCtrl, 'Additional remarks...', isSentenceCase: true)),
-                SizedBox(width: 100, child: buildDropdown('Status', dark, logic)),
-                if (logic.status == 'Delayed') ...[
-                   SizedBox(width: 130, child: buildTextField('Delayed Date', logic.delayedDateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDelayedDate(context), suffixIcon: const Icon(Icons.event_busy, size: 16, color: Color(0xFFfdba74)))),
-                   SizedBox(width: 120, child: buildTextField('Delayed Time', logic.delayedTimeCtrl, '__:__ --', readOnly: true, onTap: () => logic.selectDelayedTime(context), suffixIcon: const Icon(Icons.timer_off, size: 16, color: Color(0xFFfdba74)))),
-                ],
               ]
             );
           }

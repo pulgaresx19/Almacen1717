@@ -161,25 +161,23 @@ class _FlightsV2GeneralInfoState extends State<FlightsV2GeneralInfo> {
     final fillC = isError ? Colors.redAccent.withAlpha(20) : (widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5));
 
     if (type == FieldType.status) {
+      List<String> allowedOptions = ['Ready', 'Delayed', 'Canceled'];
+      String currentVal = ctrl.text.isNotEmpty ? ctrl.text : 'Waiting';
+      if (!allowedOptions.contains(currentVal)) {
+        allowedOptions.insert(0, currentVal);
+      }
+
       return Container(
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(color: fillC, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderC)),
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
-            value: ['Waiting', 'Received', 'Pending', 'Checked', 'Ready', 'Delayed', 'Canceled'].contains(ctrl.text) ? ctrl.text : 'Waiting',
+            value: currentVal,
             dropdownColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
             isExpanded: true,
             style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600),
-            items: const [
-              DropdownMenuItem(value: 'Waiting', child: Text('Waiting')),
-              DropdownMenuItem(value: 'Received', child: Text('Received')),
-              DropdownMenuItem(value: 'Pending', child: Text('Pending')),
-              DropdownMenuItem(value: 'Checked', child: Text('Checked')),
-              DropdownMenuItem(value: 'Ready', child: Text('Ready')),
-              DropdownMenuItem(value: 'Delayed', child: Text('Delayed')),
-              DropdownMenuItem(value: 'Canceled', child: Text('Canceled')),
-            ],
+            items: allowedOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
             onChanged: (v) {
               if (v != null) setState(() => ctrl.text = v);
             },
