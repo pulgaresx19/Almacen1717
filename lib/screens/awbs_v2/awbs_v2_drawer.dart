@@ -84,20 +84,49 @@ class AwbsV2Drawer {
 
                       final uldData = s['ulds'] ?? {};
                       final flightData = s['flights'] ?? {};
-                      final String uldNum = uldData['uld_number']?.toString() ?? s['uld_id']?.toString() ?? 'Loose/Unknown';
-                      final String carrier = flightData['carrier']?.toString() ?? '';
-                      final String fNumber = flightData['number']?.toString() ?? s['flight_id']?.toString() ?? 'Unknown Flight';
+                      
+                      final String? uldIdRaw = s['uld_id']?.toString();
+                      final bool hasUld = uldData.isNotEmpty || (uldIdRaw != null && uldIdRaw.isNotEmpty && uldIdRaw != 'null');
+                      final String uldNum = hasUld ? (uldData['uld_number']?.toString() ?? uldIdRaw ?? 'Unknown ULD') : 'Manual';
+
+                      final String? flightIdRaw = s['flight_id']?.toString();
+                      final bool hasFlight = flightData.isNotEmpty || (flightIdRaw != null && flightIdRaw.isNotEmpty && flightIdRaw != 'null');
+                      
                       final String flightDate = flightData['date']?.toString() ?? '-';
-                      String shortDate = '';
-                      if (flightDate != '-') {
-                        try {
-                          final dt = DateTime.parse(flightDate).toLocal();
-                          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                          shortDate = ' (${months[dt.month - 1]} ${dt.day})';
-                        } catch (_) {}
+                      String flightNum;
+                      if (!hasFlight) {
+                        flightNum = 'Manual';
+                      } else {
+                        final String carrier = flightData['carrier']?.toString() ?? '';
+                        final String fNumber = flightData['number']?.toString() ?? flightIdRaw ?? 'Unknown Flight';
+                        String shortDate = '';
+                        if (flightDate != '-') {
+                          try {
+                            final dt = DateTime.parse(flightDate).toLocal();
+                            final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            shortDate = ' (${months[dt.month - 1]} ${dt.day})';
+                          } catch (_) {}
+                        }
+                        flightNum = '$carrier $fNumber'.trim() + shortDate;
                       }
-                      final String flightNum = '$carrier $fNumber'.trim() + shortDate;
-                      final bool isBreak = uldData['is_break'] == true;
+
+                      Color badgeColor;
+                      Color badgeBgColor;
+                      Color badgeBorderColor;
+                      String badgeText;
+
+                      if (!hasUld) {
+                        badgeText = 'MANUAL';
+                        badgeColor = const Color(0xFFf59e0b);
+                        badgeBgColor = badgeColor.withAlpha(30);
+                        badgeBorderColor = badgeColor.withAlpha(50);
+                      } else {
+                        final bool isBreak = uldData['is_break'] == true;
+                        badgeText = isBreak ? 'BREAK' : 'NO BREAK';
+                        badgeColor = isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444);
+                        badgeBgColor = badgeColor.withAlpha(30);
+                        badgeBorderColor = badgeColor.withAlpha(50);
+                      }
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -139,11 +168,11 @@ class AwbsV2Drawer {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: isBreak ? const Color(0xFF10b981).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
+                                        color: badgeBgColor,
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: isBreak ? const Color(0xFF10b981).withAlpha(50) : const Color(0xFFef4444).withAlpha(50)),
+                                        border: Border.all(color: badgeBorderColor),
                                       ),
-                                      child: Text(isBreak ? 'BREAK' : 'NO BREAK', style: TextStyle(color: isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.bold)),
+                                      child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
                                     ),
                                     const SizedBox(width: 8),
                                     Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: textS),
@@ -402,6 +431,154 @@ class AwbsV2Drawer {
               );
             }
 
+            List deliveryHistory = [];
+            final dynamic delData = u['deliveries_history'] ?? u['data-deliver'];
+            if (delData != null) {
+              if (delData is List) {
+                deliveryHistory = delData;
+              } else if (delData is Map && delData.isNotEmpty) {
+                deliveryHistory = [delData];
+              }
+            }
+
+            Widget buildDeliveryHistory() {
+              if (deliveryHistory.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                  child: Text('No deliveries have been recorded yet.', style: TextStyle(color: textS, fontStyle: FontStyle.italic)),
+                );
+              }
+
+              return Column(
+                children: deliveryHistory.map((del) {
+                  if (del is! Map) return const SizedBox.shrink();
+                  
+                  bool isRejected = (del.containsKey('rejection_details') && del['rejection_details'] != null) || (del.containsKey('rejection') && del['rejection'] != null);
+                  Map rej = isRejected ? ((del['rejection_details'] ?? del['rejection']) as Map) : {};
+                  
+                  final String company = del['company']?.toString().toUpperCase() ?? '-';
+                  final String driver = del['driver_name']?.toString().toUpperCase() ?? del['driver']?.toString().toUpperCase() ?? '-';
+                  final String pickupId = del['id_pickup']?.toString() ?? del['pickup_id']?.toString() ?? '-';
+                  final int pieces = int.tryParse(del['pieces']?.toString() ?? del['delivery']?.toString() ?? del['total']?.toString() ?? '0') ?? 0;
+                  final int total = int.tryParse(del['total']?.toString() ?? '0') ?? 0;
+                  final String timeStr = formatChicagoTime(del['time']?.toString());
+                  final String deliveredBy = del['delivered_by']?.toString() ?? del['received_by']?.toString() ?? 'Unknown User';
+                  final String door = del['door']?.toString() ?? '-';
+                  final String typeDel = del['type_delivery']?.toString() ?? '-';
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: bgCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isRejected ? const Color(0xFFef4444).withAlpha(100) : const Color(0xFF10b981).withAlpha(100), width: 2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isRejected ? const Color(0xFFef4444).withAlpha(20) : const Color(0xFF10b981).withAlpha(20),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                            border: Border(bottom: BorderSide(color: isRejected ? const Color(0xFFef4444).withAlpha(50) : const Color(0xFF10b981).withAlpha(50))),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(isRejected ? Icons.warning_amber_rounded : Icons.check_circle, color: isRejected ? const Color(0xFFef4444) : const Color(0xFF10b981), size: 18),
+                              const SizedBox(width: 8),
+                              Text(isRejected ? 'DELIVERY WITH REJECTION' : 'SUCCESSFUL DELIVERY', style: TextStyle(color: isRejected ? const Color(0xFFef4444) : const Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              Text(timeStr, style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Delivered to', style: TextStyle(color: textS, fontSize: 11)),
+                                    const SizedBox(height: 2),
+                                    Text(driver, style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 4),
+                                    Text('Company: $company', style: TextStyle(color: textS, fontSize: 12)),
+                                    const SizedBox(height: 8),
+                                    Text('Pickup ID: $pickupId', style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Pieces Delivered', style: TextStyle(color: textS, fontSize: 11)),
+                                    const SizedBox(height: 2),
+                                    Text(total > 0 ? '$pieces / $total' : '$pieces pcs', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w900)),
+                                    const SizedBox(height: 4),
+                                    Text('Delivered by: $deliveredBy', style: TextStyle(color: textS, fontSize: 12)),
+                                    const SizedBox(height: 8),
+                                    Text('Door: $door  •  $typeDel', style: TextStyle(color: textP, fontSize: 12, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isRejected)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFef4444).withAlpha(10),
+                              border: Border(top: BorderSide(color: const Color(0xFFef4444).withAlpha(50))),
+                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Rejected', style: TextStyle(color: const Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
+                                      Text('${rej['qty'] ?? 0} pcs', style: const TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Location', style: TextStyle(color: const Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
+                                      Text(rej['location']?.toString() ?? '-', style: const TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Reason', style: TextStyle(color: const Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
+                                      Text(rej['reason']?.toString() ?? '-', style: const TextStyle(color: Color(0xFFef4444), fontSize: 12, fontStyle: FontStyle.italic)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            }
+
             return Align(
               alignment: Alignment.centerRight,
               child: Material(
@@ -452,6 +629,10 @@ class AwbsV2Drawer {
                             Text('ULD Traceability Flow', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
                             buildTraceability(),
+                            const SizedBox(height: 24),
+                            Text('Delivery History', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 12),
+                            buildDeliveryHistory(),
                             const SizedBox(height: 24),
                           ],
                         ),

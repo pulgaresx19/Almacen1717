@@ -82,22 +82,49 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
 
                       final uldData = s['ulds'] ?? {};
                       final flightData = s['flights'] ?? {};
-                      // Some splits might not have a direct user relation depending on schema
-                      final String uldNum = uldData['uld_number']?.toString() ?? s['uld_id']?.toString() ?? 'Loose/Unknown';
-                      final String carrier = flightData['carrier']?.toString() ?? '';
-                      final String fNumber = flightData['number']?.toString() ?? s['flight_id']?.toString() ?? 'Unknown Flight';
-                      final String flightDate = flightData['date']?.toString() ?? '-';
-                      String shortDate = '';
-                      if (flightDate != '-') {
-                        try {
-                          final dt = DateTime.parse(flightDate).toLocal();
-                          final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                          shortDate = ' (${months[dt.month - 1]} ${dt.day})';
-                        } catch (_) {}
-                      }
-                      final String flightNum = '$carrier $fNumber'.trim() + shortDate;
-                      final bool isBreak = uldData['is_break'] == true;
+                      
+                      final String? uldIdRaw = s['uld_id']?.toString();
+                      final bool hasUld = uldData.isNotEmpty || (uldIdRaw != null && uldIdRaw.isNotEmpty && uldIdRaw != 'null');
+                      final String uldNum = hasUld ? (uldData['uld_number']?.toString() ?? uldIdRaw ?? 'Unknown ULD') : 'Manual';
 
+                      final String? flightIdRaw = s['flight_id']?.toString();
+                      final bool hasFlight = flightData.isNotEmpty || (flightIdRaw != null && flightIdRaw.isNotEmpty && flightIdRaw != 'null');
+                      
+                      final String flightDate = flightData['date']?.toString() ?? '-';
+                      String flightNum;
+                      if (!hasFlight) {
+                        flightNum = 'Manual';
+                      } else {
+                        final String carrier = flightData['carrier']?.toString() ?? '';
+                        final String fNumber = flightData['number']?.toString() ?? flightIdRaw ?? 'Unknown Flight';
+                        String shortDate = '';
+                        if (flightDate != '-') {
+                          try {
+                            final dt = DateTime.parse(flightDate).toLocal();
+                            final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            shortDate = ' (${months[dt.month - 1]} ${dt.day})';
+                          } catch (_) {}
+                        }
+                        flightNum = '$carrier $fNumber'.trim() + shortDate;
+                      }
+
+                      Color badgeColor;
+                      Color badgeBgColor;
+                      Color badgeBorderColor;
+                      String badgeText;
+
+                      if (!hasUld) {
+                        badgeText = 'MANUAL';
+                        badgeColor = const Color(0xFFf59e0b);
+                        badgeBgColor = badgeColor.withAlpha(30);
+                        badgeBorderColor = badgeColor.withAlpha(50);
+                      } else {
+                        final bool isBreak = uldData['is_break'] == true;
+                        badgeText = isBreak ? 'BREAK' : 'NO BREAK';
+                        badgeColor = isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444);
+                        badgeBgColor = badgeColor.withAlpha(30);
+                        badgeBorderColor = badgeColor.withAlpha(50);
+                      }
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -140,11 +167,11 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: isBreak ? const Color(0xFF10b981).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
+                                        color: badgeBgColor,
                                         borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: isBreak ? const Color(0xFF10b981).withAlpha(50) : const Color(0xFFef4444).withAlpha(50)),
+                                        border: Border.all(color: badgeBorderColor),
                                       ),
-                                      child: Text(isBreak ? 'BREAK' : 'NO BREAK', style: TextStyle(color: isBreak ? const Color(0xFF10b981) : const Color(0xFFef4444), fontSize: 10, fontWeight: FontWeight.bold)),
+                                      child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
                                     ),
                                     const SizedBox(width: 8),
                                     Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: textS),
@@ -455,9 +482,9 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Received:', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Delivered:', style: TextStyle(color: textS)), Text(deliveredPieces.toString(), style: const TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold))]),
-                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('In Process:', style: TextStyle(color: textS)), Text(inProcessPieces.toString(), style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold))]),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Delivered:', style: TextStyle(color: textS)), Text(deliveredPieces.toString(), style: const TextStyle(color: Color(0xFF10b981), fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Remaining:', style: TextStyle(color: textP, fontWeight: FontWeight.bold)), Text(remainingPieces.toString(), style: const TextStyle(color: Color(0xFF6366f1), fontSize: 18, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, thickness: 2)),

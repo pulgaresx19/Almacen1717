@@ -506,16 +506,22 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
     Color fg = const Color(0xFFcbd5e1);
     
     final s = status.toLowerCase();
-    if (s.contains('waiting')) {
-      bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1);
+    if (s == 'waiting' || s.contains('waiting')) {
+      bg = const Color(0xFF334155); fg = const Color(0xFFcbd5e1); // Slate
+    } else if (s == 'receiving') {
+      bg = const Color(0xFF9333ea).withAlpha(40); fg = const Color(0xFFd8b4fe); // Light Purple
+    } else if (s == 'received') {
+      bg = const Color(0xFF7e22ce).withAlpha(90); fg = const Color(0xFFe9d5ff); // Strong Purple
+    } else if (s == 'checking') {
+      bg = const Color(0xFF2563eb).withAlpha(40); fg = const Color(0xFF93c5fd); // Light Blue
+    } else if (s == 'checked') {
+      bg = const Color(0xFF1d4ed8).withAlpha(90); fg = const Color(0xFFbfdbfe); // Strong Blue
+    } else if (s.contains('process') || s.contains('progress') || s.contains('proceso')) {
+      bg = const Color(0xFFd97706).withAlpha(51); fg = const Color(0xFFfde68a); // Amber/Orange
+    } else if (s.contains('delivered') || s.contains('ready') || s.contains('saved') || s.contains('listo') || s.contains('completed')) {
+      bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac); // Green
     } else if (s.contains('pending') || s.contains('pendiente')) {
-      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
-    } else if (s.contains('in progress') || s.contains('proceso') || s.contains('process')) {
-      bg = const Color(0xFF1e3a8a).withAlpha(51); fg = const Color(0xFF93c5fd);
-    } else if (s.contains('ready') || s.contains('listo') || s.contains('completed') || s.contains('delivered')) {
-      bg = const Color(0xFF166534).withAlpha(51); fg = const Color(0xFF86efac);
-    } else if (s.contains('checked') || s.contains('received')){
-      bg = const Color(0xFF4c1d95).withAlpha(51); fg = const Color(0xFFc4b5fd);
+      bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047); // Yellow
     }
 
     return Container(

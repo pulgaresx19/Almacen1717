@@ -126,12 +126,47 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
       };
     }
 
+    String getAwbStatus(Map<String, dynamic> awb, Map<String, int> counts) {
+      String status = awb['status']?.toString() ?? '';
+      if (status.isNotEmpty) return status;
+      int receivedPieces = counts['received']!;
+      int deliveredPieces = counts['delivered']!;
+      final int totalValInt = int.tryParse(awb['total_pieces']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
+      if (deliveredPieces >= totalValInt && totalValInt > 0) return 'Delivered';
+      if (deliveredPieces > 0) return 'In Process';
+      if (receivedPieces > 0) return 'Received';
+      return 'Waiting';
+    }
+
+    int getStatusPriority(String status) {
+      status = status.toLowerCase();
+      if (status == 'in process') return 1;
+      if (status == 'received') return 2;
+      if (status == 'waiting' || status == 'pending') return 3;
+      return 4;
+    }
+
     filteredAwbs.sort((a, b) {
-      int rA = getAwbCounts(a)['remaining']!;
-      int rB = getAwbCounts(b)['remaining']!;
+      final countsA = getAwbCounts(a);
+      final countsB = getAwbCounts(b);
+      
+      int rA = countsA['remaining']!;
+      int rB = countsB['remaining']!;
+      
       if (rA == 0 && rB > 0) return 1;
       if (rA > 0 && rB == 0) return -1;
-      return 0;
+      
+      String statusA = getAwbStatus(a, countsA);
+      String statusB = getAwbStatus(b, countsB);
+      
+      int pA = getStatusPriority(statusA);
+      int pB = getStatusPriority(statusB);
+      
+      if (pA != pB) return pA.compareTo(pB);
+      
+      String numA = (a['awb_number']?.toString() ?? a['AWB-number']?.toString() ?? '').toLowerCase();
+      String numB = (b['awb_number']?.toString() ?? b['AWB-number']?.toString() ?? '').toLowerCase();
+      return numA.compareTo(numB);
     });
     
     final isImport = _typeCtrl.text == 'Import';

@@ -312,6 +312,13 @@ class SystemPanelLogic extends ChangeNotifier {
       }).eq('id_uld', uld['id_uld']).catchError((e) => debugPrint('time_received Update Err: $e'));
 
       final bool isBreak = uld['is_break'] == true || uld['is_break']?.toString().toLowerCase() == 'true';
+      
+      Supabase.instance.client.rpc('rpc_receive_uld', params: {
+        'p_uld_id': uld['id_uld'],
+        'p_is_received': true,
+        'p_is_break': isBreak,
+      }).catchError((e) => debugPrint('Err RPC rpc_receive_uld: $e'));
+
       final sysTable = panelId == 1 ? 'system1' : 'system2';
       Supabase.instance.client.from(sysTable).update({
         'ULD_number$panelId': uld['uld_number'],
@@ -333,6 +340,14 @@ class SystemPanelLogic extends ChangeNotifier {
         'time_received': null,
         'user_received': null,
       }).eq('id_uld', uld['id_uld']).catchError((e) => debugPrint('time_received Reset Err: $e'));
+
+      final bool isBreak = uld['is_break'] == true || uld['is_break']?.toString().toLowerCase() == 'true';
+      
+      Supabase.instance.client.rpc('rpc_receive_uld', params: {
+        'p_uld_id': uld['id_uld'],
+        'p_is_received': false,
+        'p_is_break': isBreak,
+      }).catchError((e) => debugPrint('Err RPC rpc_receive_uld: $e'));
 
       final sysTable = panelId == 1 ? 'system1' : 'system2';
       Supabase.instance.client.from(sysTable).update({
