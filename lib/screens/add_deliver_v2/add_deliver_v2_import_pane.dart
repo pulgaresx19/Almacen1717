@@ -399,8 +399,8 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                          child: Column(
                            crossAxisAlignment: CrossAxisAlignment.start,
                            children: [
-                             Text('Is Break?', style: TextStyle(color: textS, fontSize: 10, fontWeight: FontWeight.bold)),
-                             const SizedBox(height: 4),
+                             Text('Is Break?', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+                             const SizedBox(height: 6),
                              Container(
                                height: 48,
                                decoration: BoxDecoration(

@@ -369,9 +369,47 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.list_alt_rounded, color: textP, size: 20),
-                            const SizedBox(width: 8),
-                            Text('Select Items (list_deliver)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                 GestureDetector(
+                                  onTap: () {
+                                    if (_showUldTab) {
+                                      setState(() {
+                                        _showUldTab = false;
+                                        _searchAwbCtrl.clear();
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                       color: !_showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
+                                       borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text('AWB Numbers', style: TextStyle(color: !_showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () {
+                                    if (!_showUldTab) {
+                                      setState(() {
+                                        _showUldTab = true;
+                                        _searchAwbCtrl.clear();
+                                      });
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                       color: _showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
+                                       borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text('No Break ULDs', style: TextStyle(color: _showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ]
+                            ),
                             const Spacer(),
                             Container(
                                width: 300,
@@ -424,56 +462,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          appLanguage.value == 'es' 
-                            ? 'Seleccione uno o mÃƒÆ’Ã‚Â¡s AWBs o ULDs para aÃƒÆ’Ã‚Â±adirlos al listado de pickup.' 
-                            : 'Select one or more AWBs or ULDs to add them to the pickup list.',
-                          style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 13),
-                        ),
                         const SizedBox(height: 16),
-                           Row(
-                             children: [
-                                GestureDetector(
-                                 onTap: () {
-                                   if (_showUldTab) {
-                                     setState(() {
-                                       _showUldTab = false;
-                                       _searchAwbCtrl.clear();
-                                     });
-                                   }
-                                 },
-                                 child: Container(
-                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                   decoration: BoxDecoration(
-                                      color: !_showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                   ),
-                                   child: Text('AWB Numbers', style: TextStyle(color: !_showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
-                                 ),
-                               ),
-                               const SizedBox(width: 8),
-                               GestureDetector(
-                                 onTap: () {
-                                   if (!_showUldTab) {
-                                     setState(() {
-                                       _showUldTab = true;
-                                       _searchAwbCtrl.clear();
-                                     });
-                                   }
-                                 },
-                                 child: Container(
-                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                   decoration: BoxDecoration(
-                                      color: _showUldTab ? const Color(0xFF6366f1) : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(20),
-                                   ),
-                                   child: Text('No Break ULDs', style: TextStyle(color: _showUldTab ? Colors.white : textS, fontWeight: FontWeight.bold)),
-                                 ),
-                               ),
-                             ]
-                           ),
-                           const SizedBox(height: 16),
                         Expanded(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,

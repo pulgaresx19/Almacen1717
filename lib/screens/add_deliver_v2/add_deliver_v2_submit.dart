@@ -234,13 +234,30 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       final timeDeliverDate = DateTime(nowForDate.year, nowForDate.month, nowForDate.day, hours, minutes);
 
       final listPickup = _typeCtrl.text == 'Import' 
-          ? _importAwbs.map((e) => {
-              'awb_number': e['awbNumber']?.toString() ?? '',
-              'found': e['pieces']?.toString() ?? '0',
-              'weight': e['weight']?.toString() ?? '0',
-              'remarks': e['remarks']?.toString() ?? '',
-              'total_pieces': e['total']?.toString() ?? e['pieces']?.toString() ?? '0'
-            }).toList() 
+          ? _importAwbs.map((e) {
+              final isUld = e['type'] == 'ULD';
+              if (isUld) {
+                return {
+                  'type': 'ULD',
+                  'uld_number': e['awbNumber']?.toString() ?? '',
+                  'found': e['pieces']?.toString() ?? '0',
+                  'total_pieces': e['total']?.toString() ?? e['pieces']?.toString() ?? '0',
+                  'weight': e['weight']?.toString() ?? '0',
+                  'remarks': e['remarks']?.toString() ?? '',
+                  'is_break': e['isBreak'] == true,
+                };
+              } else {
+                return {
+                  'type': 'AWB',
+                  'awb_number': e['awbNumber']?.toString() ?? '',
+                  'found': e['pieces']?.toString() ?? '0',
+                  'total_pieces': e['total']?.toString() ?? e['pieces']?.toString() ?? '0',
+                  'weight': e['weight']?.toString() ?? '0',
+                  'house_no': e['house']?.toString() ?? '',
+                  'remarks': e['remarks']?.toString() ?? '',
+                };
+              }
+            }).toList()
           : [
               ..._selectedAwbs.map((e) {
                 final awbNum = e['awb_number']?.toString() ?? e['AWB-number']?.toString() ?? '';
