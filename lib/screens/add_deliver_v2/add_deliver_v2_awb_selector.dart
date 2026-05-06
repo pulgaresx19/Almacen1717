@@ -47,57 +47,8 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
     }).toList();
     
     Map<String, int> getAwbCounts(Map<String, dynamic> awb) {
-      int receivedPieces = 0;
-      
-      if (awb['awb_splits'] != null && (awb['awb_splits'] as List).isNotEmpty) {
-        for (var split in (awb['awb_splits'] as List)) {
-          bool isReceived = false;
-          if (split['ulds'] != null && split['ulds']['time_received'] != null) {
-            isReceived = true;
-          } else if (split['uld_id'] == null) {
-            String s = awb['status']?.toString() ?? '';
-            if (s != 'Pending' && s != 'Waiting') isReceived = true;
-          }
-          
-          if (isReceived) {
-            if (split['not_found'] == true) {
-              // 0 pieces
-            } else if (split['total_checked'] != null && (int.tryParse(split['total_checked'].toString()) ?? 0) > 0) {
-              receivedPieces += int.tryParse(split['total_checked'].toString()) ?? 0;
-            } else {
-              receivedPieces += int.tryParse(split['pieces']?.toString() ?? '0') ?? 0;
-            }
-          }
-        }
-      } else {
-        if (awb['pieces_received'] != null) {
-          receivedPieces = int.tryParse(awb['pieces_received'].toString()) ?? 0;
-        } else if (awb['data-coordinator'] != null) {
-          List dcList = [];
-          if (awb['data-coordinator'] is List) {
-            dcList = awb['data-coordinator'] as List;
-          } else if (awb['data-coordinator'] is Map && (awb['data-coordinator'] as Map).isNotEmpty) {
-            dcList = [awb['data-coordinator']];
-          }
-          for (var item in dcList) {
-             if (item is Map) {
-                if (item.containsKey('breakdown') && item['breakdown'] is Map) {
-                   Map breakdown = item['breakdown'];
-                   if (breakdown['AGI Skid'] is List) {
-                      for (var val in breakdown['AGI Skid']) {
-                         receivedPieces += int.tryParse(val.toString()) ?? 0;
-                      }
-                   }
-                   for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
-                      receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
-                   }
-                } else {
-                   receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-                }
-             }
-          }
-        }
-      }
+      int arrivedPieces = int.tryParse(awb['pieces_arrived']?.toString() ?? '0') ?? 0;
+      int receivedPieces = int.tryParse(awb['pieces_received']?.toString() ?? '0') ?? 0;
 
       int deliveredPieces = 0;
       if (awb['pieces_delivered'] != null) {
@@ -115,10 +66,11 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
       }
 
       int inProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
-      int remainingPieces = receivedPieces - deliveredPieces - inProcess;
+      int remainingPieces = arrivedPieces - deliveredPieces - inProcess;
       if (remainingPieces < 0) remainingPieces = 0;
       
       return {
+        'arrived': arrivedPieces,
         'received': receivedPieces,
         'delivered': deliveredPieces,
         'inProcess': inProcess,
@@ -139,11 +91,15 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
     }
 
     int getStatusPriority(String status) {
-      status = status.toLowerCase();
-      if (status == 'in process') return 1;
-      if (status == 'received') return 2;
-      if (status == 'waiting' || status == 'pending') return 3;
-      return 4;
+      final s = status.toLowerCase();
+      if (s.contains('deliver') || s.contains('ready') || s.contains('saved')) return 1;
+      if (s.contains('process') || s.contains('progress')) return 2;
+      if (s == 'checked') return 3;
+      if (s == 'checking') return 4;
+      if (s == 'received') return 5;
+      if (s == 'receiving') return 6;
+      if (s.contains('waiting') || s.contains('pending')) return 7;
+      return 8;
     }
 
     filteredAwbs.sort((a, b) {
@@ -258,18 +214,128 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
 
                       return DataRow(
                         selected: !isImport && isSelected,
-                        onSelectChanged: (isImport || remainingPieces == 0) ? null : (val) {
-                          setState(() {
-                            if (val == true) {
+                        onSelectChanged: (isImport || remainingPieces == 0 || status.toLowerCase() == 'waiting' || status.toLowerCase() == 'pending') ? null : (val) {
+                          if (val == true) {
+                            List<Map<String, dynamic>> noBreakUlds = [];
+                            int noBreakPieces = 0;
+                            
+                            if (awb['awb_splits'] != null) {
+                              for (var split in awb['awb_splits']) {
+                                if (split['ulds'] != null && (split['ulds']['is_break'] == false || split['ulds']['is_break'] == 0 || split['ulds']['is_break'] == 'false')) {
+                                  if (split['ulds']['time_received'] != null) {
+                                    int p = 0;
+                                    if (split['total_checked'] != null && (int.tryParse(split['total_checked'].toString()) ?? 0) > 0) {
+                                      p = int.tryParse(split['total_checked'].toString()) ?? 0;
+                                    } else {
+                                      p = int.tryParse(split['pieces']?.toString() ?? '0') ?? 0;
+                                    }
+                                    if (p > 0) {
+                                      noBreakPieces += p;
+                                      if (!noBreakUlds.any((u) => u['id_uld'] == (split['uld_id'] ?? split['id_uld']))) {
+                                        final fullUld = _allUlds.firstWhere(
+                                          (u) => u['id_uld'] == (split['uld_id'] ?? split['id_uld']), 
+                                          orElse: () => Map<String, dynamic>.from(split['ulds'])
+                                        );
+                                        noBreakUlds.add(fullUld);
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            
+                            if (noBreakPieces > 0) {
+                              int loosePieces = remainingPieces - noBreakPieces;
+                              if (loosePieces < 0) loosePieces = 0;
+                              
+                              String title = 'NO BREAK ULD Detected';
+                              String msg = '';
+                              if (loosePieces == 0) {
+                                msg = 'This AWB is fully consolidated inside NO BREAK ULDs. To process the delivery, the ULDs will be added automatically instead of the loose pieces.';
+                              } else {
+                                msg = 'This AWB has $noBreakPieces pieces inside NO BREAK ULDs and $loosePieces loose pieces. The NO BREAK ULDs will be added to the delivery list, and this AWB will remain enabled for the $loosePieces loose pieces only.';
+                              }
+                              
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  child: Container(
+                                    width: 320,
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.amber.withAlpha(200), width: 2),
+                                      boxShadow: [
+                                        BoxShadow(color: Colors.amber.withAlpha(80), blurRadius: 20, spreadRadius: 2),
+                                      ]
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(color: Colors.amber.withAlpha(20), shape: BoxShape.circle),
+                                          child: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 48),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(title, textAlign: TextAlign.center, style: TextStyle(color: dark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold, fontSize: 18)),
+                                        const SizedBox(height: 12),
+                                        Text(msg, textAlign: TextAlign.center, style: TextStyle(color: dark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.4)),
+                                        const SizedBox(height: 24),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx),
+                                              child: Text('Cancel', style: TextStyle(color: dark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600)),
+                                            ),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.amber,
+                                                foregroundColor: Colors.black87,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                              ),
+                                              onPressed: () {
+                                                Navigator.pop(ctx);
+                                                setState(() {
+                                                  for (var u in noBreakUlds) {
+                                                    if (!_selectedUlds.any((sel) => sel['id_uld'] == u['id_uld'])) {
+                                                      _selectedUlds.add(u);
+                                                    }
+                                                  }
+                                                  if (loosePieces > 0) {
+                                                    _selectedAwbs.add(awb);
+                                                  }
+                                                });
+                                              },
+                                              child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+
+                            setState(() {
                               _selectedAwbs.add(awb);
-                            } else {
+                            });
+                          } else {
+                            setState(() {
                               _selectedAwbs.removeWhere((item) => (item['awb_number']?.toString() ?? item['AWB-number']?.toString()) == awbNumber);
                               _deliveryPcsControllers[awbNumber]?.dispose();
                               _deliveryPcsControllers.remove(awbNumber);
                               _deliveryRemarkControllers[awbNumber]?.dispose();
                               _deliveryRemarkControllers.remove(awbNumber);
-                            }
-                          });
+                            });
+                          }
                         },
                         cells: [
                           DataCell(Text('${index + 1}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontWeight: FontWeight.w600))),

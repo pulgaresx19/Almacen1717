@@ -53,10 +53,10 @@ class SystemPanelLogic extends ChangeNotifier {
 
     _flightSub = Supabase.instance.client
         .from('flights')
-        .select()
+        .stream(primaryKey: const ['id_flight'])
         .order('date', ascending: false)
         .limit(300)
-        .asStream().listen(
+        .listen(
       (data) {
         final validList = <Map<String, dynamic>>[];
         for (var f in data) {
@@ -192,9 +192,9 @@ class SystemPanelLogic extends ChangeNotifier {
 
     _uldSub = Supabase.instance.client
         .from('ulds')
-        .select()
+        .stream(primaryKey: const ['id_uld'])
         .eq('id_flight', flight['id_flight'])
-        .asStream().listen(
+        .listen(
       (data) {
         _processUldsData(data); // Matches perfectly using id_flight
       },

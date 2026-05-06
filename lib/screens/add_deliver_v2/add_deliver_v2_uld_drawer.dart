@@ -272,7 +272,26 @@ extension AddDeliverV2UldDrawerExt on AddDeliverV2ScreenState {
                                        Row(
                                          crossAxisAlignment: CrossAxisAlignment.start,
                                          children: [
-                                           Expanded(flex: 2, child: buildInfoBox('Status', FlightsV2StatusLogic.getUldStatus(u), Icons.info_outline)),
+                                            Expanded(
+                                              flex: 2, 
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Icon(Icons.info_outline, color: textS, size: 14),
+                                                        const SizedBox(width: 4),
+                                                        Expanded(child: Text('Status', style: TextStyle(color: textS, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    _buildStatusBadge(FlightsV2StatusLogic.getUldStatus(u)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
                                            Expanded(flex: 3, child: buildInfoBox('Remarks', u['remarks']?.toString() ?? '-', Icons.notes_rounded)),
                                        ])
                                     ]

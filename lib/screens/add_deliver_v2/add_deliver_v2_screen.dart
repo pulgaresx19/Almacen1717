@@ -52,6 +52,16 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
   final _importHouseCtrl = TextEditingController();
   final _importRemarksCtrl = TextEditingController();
   bool _importTotalLocked = false;
+  bool _isImportUld = false;
+  bool _importIsBreak = false;
+  bool _importAwbError = false;
+  bool _importPiecesError = false;
+  bool _importTotalError = false;
+  bool _importUldExistsError = false;
+  bool _importExceedsRemainingError = false;
+  bool _importTotalLessThanPiecesError = false;
+  bool _importExistsInListError = false;
+  int? _importAwbRemainingPieces;
   final Set<String> _expandedImports = {};
 
   bool _isLoadingAwbs = true;
@@ -96,7 +106,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     try {
       final awbData = await Supabase.instance.client
           .from('awbs')
-          .select('*, awb_splits(*, ulds(time_received))')
+          .select('*, awb_splits(*, ulds(uld_number, is_break, time_received))')
           .order('awb_number', ascending: true);
           
       final uldData = await Supabase.instance.client
@@ -422,7 +432,6 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                           style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 13),
                         ),
                         const SizedBox(height: 16),
-                        if (_typeCtrl.text != 'Import') ...[
                            Row(
                              children: [
                                 GestureDetector(
@@ -465,16 +474,13 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                              ]
                            ),
                            const SizedBox(height: 16),
-                        ],
                         Expanded(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Expanded(
                                 flex: 6,
-                                child: _typeCtrl.text == 'Import' 
-                                      ? _buildAwbSelector(dark) 
-                                      : (_showUldTab ? _buildUldSelector(dark) : _buildAwbSelector(dark)),
+                                child: _showUldTab ? _buildUldSelector(dark) : _buildAwbSelector(dark),
                               ),
                               const SizedBox(width: 16),
                               Expanded(

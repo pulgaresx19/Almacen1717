@@ -2,7 +2,7 @@
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
-  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData? icon, {String hint = '', int? maxLen, bool uppercase = false, bool capitalizeWords = false, bool capitalizeFirst = false, Widget? suffixIcon, int? maxLines = 1, int? minLines, Function(String)? onChanged, bool readOnly = false}) {
+  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData? icon, {String hint = '', int? maxLen, bool uppercase = false, bool capitalizeWords = false, bool capitalizeFirst = false, Widget? suffixIcon, int? maxLines = 1, int? minLines, Function(String)? onChanged, bool readOnly = false, bool forceError = false}) {
     List<TextInputFormatter> formatters = [];
     if (maxLen != null) formatters.add(LengthLimitingTextInputFormatter(maxLen));
     if (uppercase) formatters.add(TextInputFormatter.withFunction((oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase())));
@@ -120,7 +120,7 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
       }));
     }
 
-    bool isError = _missingField == label;
+    bool isError = _missingField == label || forceError;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,7 +139,7 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
               : (label == 'Pieces' || label == 'Total' || label == 'Weight' 
                   ? TextInputType.number 
                   : (maxLines == null || maxLines > 1 ? TextInputType.multiline : TextInputType.text)),
-          style: TextStyle(color: readOnly ? (dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)) : (dark ? Colors.white : const Color(0xFF111827)), fontSize: 13),
+          style: TextStyle(color: isError ? Colors.redAccent : (readOnly ? (dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)) : (dark ? Colors.white : const Color(0xFF111827))), fontSize: 13),
           inputFormatters: formatters.isNotEmpty ? formatters : null,
           textCapitalization: uppercase ? TextCapitalization.characters : TextCapitalization.none,
           maxLines: maxLines,
@@ -159,14 +159,6 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
             ),
           ),
         ),
-        if (isError)
-          Padding(
-            padding: const EdgeInsets.only(top: 4, left: 4),
-            child: Text(
-              appLanguage.value == 'es' ? 'Requerido' : 'Required',
-              style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-          ),
       ],
     );
   }
@@ -288,34 +280,7 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                 
                 int remainingPieces = 0;
                 if (isAwb) {
-                   int receivedPieces = 0;
-                   if (data['pieces_received'] != null) {
-                      receivedPieces = int.tryParse(data['pieces_received'].toString()) ?? 0;
-                   } else if (data['data-coordinator'] != null) {
-                      List dcList = [];
-                      if (data['data-coordinator'] is List) {
-                        dcList = data['data-coordinator'] as List;
-                      } else if (data['data-coordinator'] is Map && (data['data-coordinator'] as Map).isNotEmpty) {
-                        dcList = [data['data-coordinator']];
-                      }
-                      for (var item in dcList) {
-                         if (item is Map) {
-                            if (item.containsKey('breakdown') && item['breakdown'] is Map) {
-                               Map breakdown = item['breakdown'];
-                               if (breakdown['AGI Skid'] is List) {
-                                  for (var val in breakdown['AGI Skid']) {
-                                     receivedPieces += int.tryParse(val.toString()) ?? 0;
-                                  }
-                               }
-                               for (String k in ['Pre Skid', 'Crate', 'Box', 'Other']) {
-                                  receivedPieces += int.tryParse(breakdown[k]?.toString() ?? '0') ?? 0;
-                               }
-                            } else {
-                               receivedPieces += int.tryParse(item['pieces']?.toString() ?? '0') ?? 0;
-                            }
-                         }
-                      }
-                   }
+                   int arrivedPieces = int.tryParse(data['pieces_arrived']?.toString() ?? '0') ?? 0;
 
                    int deliveredPieces = 0;
                    if (data['pieces_delivered'] != null) {
@@ -333,7 +298,25 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
                    }
 
                    int inProcessPieces = int.tryParse(data['pieces_in_process']?.toString() ?? '0') ?? 0;
-                   remainingPieces = receivedPieces - deliveredPieces - inProcessPieces;
+                   
+                   int coveredByUlds = 0;
+                   if (data['awb_splits'] != null) {
+                     for (var split in data['awb_splits']) {
+                       if (split['ulds'] != null) {
+                         if (_selectedUlds.any((u) => u['id_uld'] == (split['uld_id'] ?? split['id_uld']))) {
+                           int p = 0;
+                           if (split['total_checked'] != null && (int.tryParse(split['total_checked'].toString()) ?? 0) > 0) {
+                             p = int.tryParse(split['total_checked'].toString()) ?? 0;
+                           } else {
+                             p = int.tryParse(split['pieces']?.toString() ?? '0') ?? 0;
+                           }
+                           coveredByUlds += p;
+                         }
+                       }
+                     }
+                   }
+
+                   remainingPieces = arrivedPieces - deliveredPieces - inProcessPieces - coveredByUlds;
                    if (remainingPieces < 0) remainingPieces = 0;
                 } else {
                    if (data['pieces_total'] != null) {
@@ -349,7 +332,14 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
 
                 if (!_deliveryPcsControllers.containsKey(itemNumber)) {
                   _deliveryPcsControllers[itemNumber] = TextEditingController(text: remainingPieces.toString());
+                } else {
+                  final int currentVal = int.tryParse(_deliveryPcsControllers[itemNumber]!.text) ?? 0;
+                  if (currentVal > remainingPieces) {
+                    _deliveryPcsControllers[itemNumber]!.text = remainingPieces.toString();
+                    _overLimitErrors[itemNumber] = false;
+                  }
                 }
+                
                 if (!_deliveryRemarkControllers.containsKey(itemNumber)) {
                   _deliveryRemarkControllers[itemNumber] = TextEditingController();
                 }

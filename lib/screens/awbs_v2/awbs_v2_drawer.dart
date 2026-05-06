@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'awbs_v2_print_preview.dart';
+import '../../services/realtime_service.dart';
+import '../flights_v2/flights_v2_status_logic.dart';
 
 class AwbsV2Drawer {
   static void show(BuildContext context, Map<String, dynamic> u, bool dark, int receivedPieces, int expectedPieces, String status) {
     final Future<List<Map<String, dynamic>>> splitsFuture = Supabase.instance.client
         .from('awb_splits')
-        .select('*, ulds(uld_number, is_break), flights(carrier, number, date)')
+        .select('*, ulds(*), flights(carrier, number, date)')
         .eq('awb_id', u['id'])
         .order('created_at', ascending: false)
         .then((res) => List<Map<String, dynamic>>.from(res));
@@ -128,7 +130,38 @@ class AwbsV2Drawer {
                         badgeBorderColor = badgeColor.withAlpha(50);
                       }
 
-                      return Container(
+                      return ValueListenableBuilder<List<Map<String, dynamic>>>(
+                        valueListenable: realtimeService.ulds,
+                        builder: (context, rUlds, child) {
+                          Map<String, dynamic> rtUldData = Map.from(uldData);
+                          if (hasUld && uldIdRaw != null) {
+                            try {
+                              rtUldData = rUlds.firstWhere((ru) => ru['id_uld'].toString() == uldIdRaw);
+                            } catch (_) {}
+                          }
+                          
+                          final String displayStatus = hasUld ? FlightsV2StatusLogic.getUldStatus(rtUldData) : FlightsV2StatusLogic.getAwbStatus(s);
+                          
+                          Color statusBadgeBg;
+                          Color statusBadgeFg;
+                          final stLower = displayStatus.toLowerCase();
+                          if (stLower.contains('deliver') || stLower.contains('ready') || stLower.contains('saved')) {
+                            statusBadgeBg = const Color(0xFF166534).withAlpha(51); statusBadgeFg = const Color(0xFF86efac);
+                          } else if (stLower.contains('process') || stLower.contains('progress')) {
+                            statusBadgeBg = const Color(0xFFd97706).withAlpha(51); statusBadgeFg = const Color(0xFFfde68a);
+                          } else if (stLower == 'checked') {
+                            statusBadgeBg = const Color(0xFF1d4ed8).withAlpha(90); statusBadgeFg = const Color(0xFFbfdbfe);
+                          } else if (stLower == 'checking') {
+                            statusBadgeBg = const Color(0xFF2563eb).withAlpha(40); statusBadgeFg = const Color(0xFF93c5fd);
+                          } else if (stLower == 'received') {
+                            statusBadgeBg = const Color(0xFF7e22ce).withAlpha(90); statusBadgeFg = const Color(0xFFe9d5ff);
+                          } else if (stLower == 'receiving') {
+                            statusBadgeBg = const Color(0xFF9333ea).withAlpha(40); statusBadgeFg = const Color(0xFFd8b4fe);
+                          } else {
+                            statusBadgeBg = const Color(0xFF334155); statusBadgeFg = const Color(0xFFcbd5e1);
+                          }
+
+                          return Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         decoration: BoxDecoration(color: bgCard, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
                         child: Column(
@@ -175,6 +208,15 @@ class AwbsV2Drawer {
                                       child: Text(badgeText, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
                                     ),
                                     const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: statusBadgeBg,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(displayStatus.toUpperCase(), style: TextStyle(color: statusBadgeFg, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                    const SizedBox(width: 8),
                                     Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: textS),
                                   ]
                                 )
@@ -207,10 +249,6 @@ class AwbsV2Drawer {
                                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Text('Weight', style: TextStyle(color: textS, fontSize: 12)),
                                             Text('${s['weight'] ?? '-'} kg', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
-                                         ])),
-                                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            Text('Status', style: TextStyle(color: textS, fontSize: 12)),
-                                            Text('${s['status'] ?? '-'}', style: TextStyle(color: textP, fontWeight: FontWeight.w600)),
                                          ])),
                                       ]
                                     ),
@@ -423,7 +461,9 @@ class AwbsV2Drawer {
                                 ),
                               ),
                           ],
-                        ),
+                            ),
+                          );
+                        }
                       );
                     }).toList(),
                   );

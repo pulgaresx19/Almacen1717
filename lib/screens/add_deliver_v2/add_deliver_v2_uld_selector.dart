@@ -22,11 +22,17 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
 
     filteredUlds.sort((a, b) {
       int getPriority(Map<String, dynamic> u) {
-        final s = FlightsV2StatusLogic.getUldStatus(u);
-        if (u['in_process'] == true) return 2;
-        if (s == 'Received') return 1;
-        if (s == 'Waiting') return 3;
-        return 4;
+        final raw = FlightsV2StatusLogic.getUldStatus(u).toLowerCase();
+        final s = (u['in_process'] == true) ? 'in process' : raw;
+        
+        if (s.contains('deliver') || s.contains('ready') || s.contains('saved')) return 1;
+        if (s.contains('process') || s.contains('progress')) return 2;
+        if (s == 'checked') return 3;
+        if (s == 'checking') return 4;
+        if (s == 'received') return 5;
+        if (s == 'receiving') return 6;
+        if (s.contains('waiting') || s.contains('pending')) return 7;
+        return 8;
       }
       return getPriority(a).compareTo(getPriority(b));
     });
@@ -123,10 +129,11 @@ extension AddDeliverV2UldSelectorExt on AddDeliverV2ScreenState {
                       final String rawStatus = FlightsV2StatusLogic.getUldStatus(uld);
                       final bool isInProcess = uld['in_process'] == true;
                       final String displayStatus = isInProcess ? 'In Process' : rawStatus;
-                      final bool isSelectable = !isInProcess && rawStatus != 'Waiting';
+                      final bool isImport = _typeCtrl.text == 'Import';
+                      final bool isSelectable = !isInProcess && rawStatus != 'Waiting' && !isImport;
 
                       return DataRow(
-                        selected: isSelected,
+                        selected: !isImport && isSelected,
                         onSelectChanged: isSelectable ? (val) {
                           setState(() {
                             if (val == true) {

@@ -261,6 +261,30 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                   if (_showUldTab) {
                     var ulds = dataList.where((u) => u['is_break'] != true).toList();
                     
+                    ulds.sort((a, b) {
+                      int getPriority(Map<String, dynamic> u) {
+                        final raw = FlightsV2StatusLogic.getUldStatus(u).toLowerCase();
+                        final s = (u['in_process'] == true || u['in_process'] == 'true') ? 'in process' : raw;
+                        
+                        if (s.contains('deliver') || s.contains('ready') || s.contains('saved')) return 1;
+                        if (s.contains('process') || s.contains('progress')) return 2;
+                        if (s == 'checked') return 3;
+                        if (s == 'checking') return 4;
+                        if (s == 'received') return 5;
+                        if (s == 'receiving') return 6;
+                        if (s.contains('waiting') || s.contains('pending')) return 7;
+                        return 8;
+                      }
+                      
+                      final pA = getPriority(a);
+                      final pB = getPriority(b);
+                      if (pA != pB) return pA.compareTo(pB);
+                      
+                      final numA = a['uld_number']?.toString() ?? a['ULD-number']?.toString() ?? '';
+                      final numB = b['uld_number']?.toString() ?? b['ULD-number']?.toString() ?? '';
+                      return numA.compareTo(numB);
+                    });
+                    
                     if (_searchController.text.isNotEmpty) {
                       final terms = _searchController.text.toLowerCase().split(' ').where((t) => t.isNotEmpty).toList();
                       ulds = ulds.where((u) {
@@ -385,12 +409,16 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                     final sA = _getAwbStatusStr(a).toLowerCase();
                     final sB = _getAwbStatusStr(b).toLowerCase();
                     
-                    int getWeight(String s) {
-                      if (s.contains('process')) return 1;
-                      if (s.contains('received')) return 2;
-                      if (s.contains('waiting')) return 3;
-                      if (s.contains('delivered') || s.contains('ready')) return 4;
-                      return 5;
+                    int getWeight(String status) {
+                      final s = status.toLowerCase();
+                      if (s.contains('deliver') || s.contains('ready') || s.contains('saved')) return 1;
+                      if (s.contains('process') || s.contains('progress')) return 2;
+                      if (s == 'checked') return 3;
+                      if (s == 'checking') return 4;
+                      if (s == 'received') return 5;
+                      if (s == 'receiving') return 6;
+                      if (s.contains('waiting') || s.contains('pending')) return 7;
+                      return 8;
                     }
                     
                     final wA = getWeight(sA);
@@ -444,6 +472,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           const DataColumn(label: Text('#')),
                           const DataColumn(label: Text('AWB Number')),
                           const DataColumn(label: Text('Expected')),
+                          const DataColumn(label: Text('Arrived')),
                           const DataColumn(label: Text('Received')),
                           const DataColumn(label: Text('In Process')),
                           const DataColumn(label: Text('Remaining')),
@@ -456,6 +485,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           final u = awbs[index];
                           
                           int expectedPieces = int.tryParse(u['total_espected']?.toString() ?? '0') ?? 0;
+                          int arrivedPieces = int.tryParse(u['pieces_arrived']?.toString() ?? '0') ?? 0;
                           int receivedPieces = int.tryParse(u['pieces_received']?.toString() ?? '0') ?? 0;
                           int deliveredPieces = int.tryParse(u['pieces_delivered']?.toString() ?? '0') ?? 0;
                           int inProcessPieces = int.tryParse(u['pieces_in_process']?.toString() ?? '0') ?? 0;
@@ -475,6 +505,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                               DataCell(Text('${index + 1}')),
                               DataCell(Text(u['awb_number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
                               DataCell(Text(expectedPieces.toString())),
+                              DataCell(Text(arrivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFec4899)))), // Pieces Arrived (Pink)
                               DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFf59e0b)))), // Pieces Received (Amber)
                               DataCell(Text(inProcessPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF06b6d4)))), // In Process Pieces (Cyan)
                               DataCell(Text(remainingPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))), // Pieces Remaining (Purple)

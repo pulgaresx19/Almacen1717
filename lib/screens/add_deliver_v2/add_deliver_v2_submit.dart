@@ -2,42 +2,62 @@ part of 'add_deliver_v2_screen.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
-  void _addImportAwb() {
-    String? missingField;
-    if (_importAwbNumberCtrl.text.trim().isEmpty) {
-      missingField = 'AWB Number';
-    } else if (_importPiecesCtrl.text.trim().isEmpty) {
-      missingField = 'Pieces';
-    } else if (_importTotalCtrl.text.trim().isEmpty) {
-      missingField = 'Total';
-    }
+  Future<void> _addImportAwb() async {
+    bool hasError = false;
+    setState(() {
+      _importAwbError = _importAwbNumberCtrl.text.trim().isEmpty;
+      _importPiecesError = _importPiecesCtrl.text.trim().isEmpty;
+      _importTotalError = !_isImportUld && _importTotalCtrl.text.trim().isEmpty;
+      hasError = _importAwbError || _importPiecesError || _importTotalError || _importUldExistsError || _importExceedsRemainingError || _importExistsInListError;
+    });
 
-    if (missingField != null) {
-      _showMissingFieldAlert(missingField);
-      return;
-    }
+    if (hasError) return;
 
-    final int pcs = int.tryParse(_importPiecesCtrl.text) ?? 1;
-    final int tot = int.tryParse(_importTotalCtrl.text) ?? 1;
-    if (tot < pcs) {
-      _showMissingFieldAlert(
-        'Invalid Total', 
-        customMessage: appLanguage.value == 'es'
-          ? 'El campo Total ($tot) no puede ser menor a la cantidad de Pieces ($pcs).'
-          : 'Total ($tot) cannot be less than Pieces ($pcs).'
-      );
-      return;
+    if (_isImportUld) {
+      final uldNumber = _importAwbNumberCtrl.text.trim().toUpperCase();
+      try {
+        final existingUld = await Supabase.instance.client.from('ulds').select('uld_number').eq('uld_number', uldNumber).maybeSingle();
+        if (existingUld != null) {
+          if (mounted) {
+            setState(() {
+              _importUldExistsError = true;
+            });
+          }
+          return;
+        }
+      } catch (_) {}
+    } else {
+      final int pcs = int.tryParse(_importPiecesCtrl.text) ?? 1;
+      final int tot = int.tryParse(_importTotalCtrl.text) ?? 1;
+      if (tot < pcs) {
+        setState(() {
+          _importTotalLessThanPiecesError = true;
+        });
+        return;
+      }
     }
 
     setState(() {
-      _importAwbs.add({
-         'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
-         'pieces': int.tryParse(_importPiecesCtrl.text) ?? 1,
-         'total': int.tryParse(_importTotalCtrl.text) ?? 1,
-         'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
-         'house': _importHouseCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toList(),
-         'remarks': _importRemarksCtrl.text.trim().isEmpty ? null : _importRemarksCtrl.text.trim(),
-      });
+      if (_isImportUld) {
+        _importAwbs.add({
+           'type': 'ULD',
+           'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
+           'pieces': int.tryParse(_importPiecesCtrl.text) ?? 1,
+           'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
+           'is_break': _importIsBreak,
+           'remarks': _importRemarksCtrl.text.trim().isEmpty ? null : _importRemarksCtrl.text.trim(),
+        });
+      } else {
+        _importAwbs.add({
+           'type': 'AWB',
+           'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
+           'pieces': int.tryParse(_importPiecesCtrl.text) ?? 1,
+           'total': int.tryParse(_importTotalCtrl.text) ?? 1,
+           'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
+           'house': _importHouseCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toList(),
+           'remarks': _importRemarksCtrl.text.trim().isEmpty ? null : _importRemarksCtrl.text.trim(),
+        });
+      }
       _importAwbNumberCtrl.clear();
       _importPiecesCtrl.clear();
       _importTotalCtrl.clear();
@@ -45,6 +65,9 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       _importHouseCtrl.clear();
       _importRemarksCtrl.clear();
       _importTotalLocked = false;
+      _importAwbError = false;
+      _importPiecesError = false;
+      _importTotalError = false;
     });
   }
 
@@ -314,62 +337,6 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
         }
       }
 
-      if (_typeCtrl.text == 'Import' && _importAwbs.isNotEmpty) {
-        Map<String, Map<String, dynamic>> mergedAwbs = {};
-        final nowUtc = DateTime.now().toUtc().toIso8601String();
-        for (var a in _importAwbs) {
-          final num = a['awbNumber'];
-          if (!mergedAwbs.containsKey(num)) {
-             mergedAwbs[num] = {
-               'AWB-number': num,
-               'total': a['total'],
-               'data-AWB': [],
-             };
-          }
-          (mergedAwbs[num]!['data-AWB'] as List).add({
-             'flightID': null,
-             'refCarrier': 'WRHS',
-             'refNumber': 'IMP',
-             'refDate': nowUtc.substring(0, 10),
-             'refULD': 'IMPORT',
-             'pieces': a['pieces'],
-             'weight': a['weight'],
-             'remarks': a['remarks'],
-             'house_number': a['house'],
-             'status': 'Received',
-          });
-        }
-        
-        final awbNumbers = mergedAwbs.keys.toList();
-        final existingDbAwbs = await Supabase.instance.client.from('AWB').select('AWB-number, data-AWB').inFilter('AWB-number', awbNumbers);
-        final existingAwbMap = { for (var e in existingDbAwbs) e['AWB-number'] : e['data-AWB'] };
-        
-        for (var awbNum in mergedAwbs.keys) {
-           if (existingAwbMap.containsKey(awbNum)) {
-              var dbData = existingAwbMap[awbNum];
-              if (dbData is List) {
-                 (mergedAwbs[awbNum]!['data-AWB'] as List).insertAll(0, dbData);
-              } else if (dbData is Map) {
-                 (mergedAwbs[awbNum]!['data-AWB'] as List).insert(0, dbData);
-              }
-           }
-        }
-        
-        final finalAwbPayloads = mergedAwbs.values.map((v) {
-          final n = v['AWB-number'];
-          Map<String, dynamic> out = {
-            'AWB-number': n,
-            'total': v['total'],
-            'data-AWB': v['data-AWB'],
-          };
-          if (!existingAwbMap.containsKey(n)) {
-             out['created_at'] = DateTime.now().toIso8601String();
-          }
-          return out;
-        }).toList();
-        
-        await Supabase.instance.client.from('AWB').upsert(finalAwbPayloads, onConflict: 'AWB-number');
-      }
 
       if (mounted) {
         showGeneralDialog(

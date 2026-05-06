@@ -9,6 +9,8 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
         .order('created_at', ascending: false)
         .then((res) => List<Map<String, dynamic>>.from(res));
 
+    int arrivedPieces = int.tryParse(u['pieces_arrived']?.toString() ?? '0') ?? 0;
+
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -479,6 +481,8 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Total:', style: TextStyle(color: textS)), Text(totalPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Expected:', style: TextStyle(color: textS)), Text(expectedPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Arrived:', style: TextStyle(color: textS)), Text(arrivedPieces.toString(), style: const TextStyle(color: Color(0xFFec4899), fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Received:', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
