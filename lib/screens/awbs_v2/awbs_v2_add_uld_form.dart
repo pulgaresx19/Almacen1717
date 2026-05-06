@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import 'awbs_v2_formatters.dart';
 
@@ -23,6 +24,65 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
   bool _uldPiecesError = false;
   bool _autoPieces = true;
   bool _autoWeight = true;
+  bool _isChecking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _uldNumberCtrl.addListener(_onUldNumberChanged);
+  }
+
+  Future<void> _onUldNumberChanged() async {
+    final text = _uldNumberCtrl.text.trim().toUpperCase();
+    if (text.length == 10 && !_isChecking) {
+      bool exists = widget.globalUlds.any((u) => u['uld_number'].toString().toUpperCase() == text);
+      if (exists) {
+        setState(() {
+          _uldNumberError = true;
+          _uldNumberErrorStr = appLanguage.value == 'es' ? 'Ya existe en la lista' : 'Already exists in list';
+        });
+        return;
+      }
+      
+      setState(() {
+        _isChecking = true;
+        _uldNumberError = false;
+        _uldNumberErrorStr = null;
+      });
+
+      bool dbExists = false;
+      try {
+        final res = await Supabase.instance.client
+            .from('ulds')
+            .select('uld_number')
+            .eq('uld_number', text)
+            .maybeSingle();
+        if (res != null) {
+          dbExists = true;
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+
+      if (dbExists && _uldNumberCtrl.text.trim().toUpperCase() == text) {
+        setState(() {
+          _isChecking = false;
+          _uldNumberError = true;
+          _uldNumberErrorStr = appLanguage.value == 'es' ? 'ULD ya registrado' : 'ULD already exists';
+        });
+      } else {
+        setState(() {
+          _isChecking = false;
+        });
+      }
+    } else if (text.length < 10 && _uldNumberError) {
+       // Clear error if they start deleting
+       setState(() {
+         _uldNumberError = false;
+         _uldNumberErrorStr = null;
+       });
+    }
+  }
 
   @override
   void dispose() {
@@ -33,25 +93,62 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
     super.dispose();
   }
 
-  void _handleAdd() {
+  Future<void> _handleAdd() async {
     final text = _uldNumberCtrl.text.trim().toUpperCase();
     bool exists = widget.globalUlds.any((u) => u['uld_number'].toString().toUpperCase() == text);
 
-    setState(() {
-      if (text.isEmpty) {
+    if (text.isEmpty) {
+      setState(() {
         _uldNumberError = true;
         _uldNumberErrorStr = null;
-      } else if (exists) {
+        _uldPiecesError = !_autoPieces && _uldPiecesCtrl.text.trim().isEmpty;
+      });
+      return;
+    }
+
+    if (exists) {
+      setState(() {
         _uldNumberError = true;
-        _uldNumberErrorStr = appLanguage.value == 'es' ? 'Ya existe' : 'Already exists';
-      } else {
-        _uldNumberError = false;
-        _uldNumberErrorStr = null;
+        _uldNumberErrorStr = appLanguage.value == 'es' ? 'Ya existe en la lista' : 'Already exists in list';
+        _uldPiecesError = !_autoPieces && _uldPiecesCtrl.text.trim().isEmpty;
+      });
+      return;
+    }
+
+    setState(() => _isChecking = true);
+
+    bool dbExists = false;
+    try {
+      final res = await Supabase.instance.client
+          .from('ulds')
+          .select('uld_number')
+          .eq('uld_number', text)
+          .maybeSingle();
+      if (res != null) {
+        dbExists = true;
       }
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    if (dbExists) {
+      setState(() {
+        _isChecking = false;
+        _uldNumberError = true;
+        _uldNumberErrorStr = appLanguage.value == 'es' ? 'ULD ya registrado' : 'ULD already exists';
+        _uldPiecesError = !_autoPieces && _uldPiecesCtrl.text.trim().isEmpty;
+      });
+      return;
+    }
+
+    setState(() {
+      _isChecking = false;
+      _uldNumberError = false;
+      _uldNumberErrorStr = null;
       _uldPiecesError = !_autoPieces && _uldPiecesCtrl.text.trim().isEmpty;
     });
 
-    if (_uldNumberError || _uldPiecesError) return;
+    if (_uldPiecesError) return;
 
     widget.onAdd({
       'type': 'uld',
@@ -91,7 +188,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, String? errorText, bool readOnly = false, Widget? trailingLabel, Function(String)? onChanged}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, String? errorText, bool readOnly = false, Widget? trailingLabel, Function(String)? onChanged, TextCapitalization textCapitalization = TextCapitalization.none}) {
     final bool isError = hasError || errorText != null;
     return Padding(
       padding: const EdgeInsets.only(right: 12, bottom: 12),
@@ -112,6 +209,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
               controller: ctrl,
               readOnly: readOnly,
               keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+              textCapitalization: textCapitalization,
               maxLines: maxLines,
               maxLength: maxLength,
               inputFormatters: inputFormatters,
@@ -132,7 +230,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: isError ? const BorderSide(color: Colors.redAccent, width: 2) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent, width: 2) : const BorderSide(color: Color(0xFF6366f1), width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
@@ -142,11 +240,6 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
               },
             ),
           ),
-          if (errorText != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 2),
-              child: Text(errorText, style: const TextStyle(color: Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
-            )
         ],
       ),
     );
@@ -163,13 +256,27 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('ULD No Break', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Text('ULD No Break', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  if (_uldNumberErrorStr != null)
+                    Container(
+                      margin: const EdgeInsets.only(left: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        _uldNumberErrorStr!,
+                        style: const TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  SizedBox(width: 140, child: _buildTextField('ULD Number', _uldNumberCtrl, maxLength: 10, inputFormatters: [UpperCaseTextFormatter()], hasError: _uldNumberError, errorText: _uldNumberErrorStr, onChanged: (_) { if (_uldNumberError) setState(() { _uldNumberError = false; _uldNumberErrorStr = null; }); })),
-                  SizedBox(width: 95, child: _buildTextField('Pieces', _uldPiecesCtrl, isNumber: true, readOnly: _autoPieces, 
+                  SizedBox(width: 140, child: _buildTextField('ULD Number', _uldNumberCtrl, maxLength: 10, inputFormatters: [UpperCaseTextFormatter()], hasError: _uldNumberError, onChanged: (_) { if (_uldNumberError) setState(() { _uldNumberError = false; _uldNumberErrorStr = null; }); })),
+                  SizedBox(width: 95, child: _buildTextField('Pieces', _uldPiecesCtrl, isNumber: true, maxLength: 5, readOnly: _autoPieces, 
                     trailingLabel: _buildAutoCheckbox(_autoPieces, (val) {
                       setState(() {
                         _autoPieces = val;
@@ -180,7 +287,7 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
                       });
                     }),
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly], hasError: _uldPiecesError, onChanged: (_) { if (_uldPiecesError) setState(() => _uldPiecesError = false); })),
-                  SizedBox(width: 95, child: _buildTextField('Weight', _uldWeightCtrl, isNumber: true, readOnly: _autoWeight, 
+                  SizedBox(width: 95, child: _buildTextField('Weight', _uldWeightCtrl, isNumber: true, maxLength: 5, readOnly: _autoWeight, 
                     trailingLabel: _buildAutoCheckbox(_autoWeight, (val) {
                       setState(() {
                         _autoWeight = val;
@@ -188,18 +295,20 @@ class _AwbsV2AddUldFormState extends State<AwbsV2AddUldForm> {
                       });
                     }),
                     inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))])),
-                  Expanded(child: _buildTextField('Remarks', _uldRemarkCtrl)),
+                  Expanded(child: _buildTextField('Remarks', _uldRemarkCtrl, inputFormatters: [SentenceCaseTextFormatter()], textCapitalization: TextCapitalization.sentences)),
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     height: 40,
                     width: 40,
                     decoration: BoxDecoration(
-                      color: _uldNumberCtrl.text.isNotEmpty ? const Color(0xFF6366f1) : (dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)), 
+                      color: const Color(0xFF6366f1), 
                       borderRadius: BorderRadius.circular(8)
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                      onPressed: _handleAdd,
+                      icon: _isChecking 
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                          : const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                      onPressed: _isChecking ? null : _handleAdd,
                     ),
                   ),
                 ],

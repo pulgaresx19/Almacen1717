@@ -5,6 +5,27 @@ import 'add_flight_v2_service.dart';
 class AddFlightV2Logic extends ChangeNotifier {
   final AddFlightV2Service _service = AddFlightV2Service();
 
+  AddFlightV2Logic() {
+    carrierCtrl.addListener(() {
+      if (fieldErrors.containsKey('Carrier') && carrierCtrl.text.trim().isNotEmpty) {
+        fieldErrors.remove('Carrier');
+        notifyListeners();
+      }
+    });
+    numberCtrl.addListener(() {
+      if (fieldErrors.containsKey('Number') && numberCtrl.text.trim().isNotEmpty) {
+        fieldErrors.remove('Number');
+        notifyListeners();
+      }
+    });
+    dateCtrl.addListener(() {
+      if (fieldErrors.containsKey('Date Arrived') && dateCtrl.text.trim().isNotEmpty) {
+        fieldErrors.remove('Date Arrived');
+        notifyListeners();
+      }
+    });
+  }
+
   // Flight Controllers
   final carrierCtrl = TextEditingController();
   final numberCtrl = TextEditingController();
@@ -40,14 +61,7 @@ class AddFlightV2Logic extends ChangeNotifier {
 
   // ULD Controllers
   final searchUldCtrl = TextEditingController();
-  final uldNumberCtrl = TextEditingController();
-  final uldPiecesCtrl = TextEditingController(text: 'Auto');
-  final uldWeightCtrl = TextEditingController(text: 'Auto');
-  final uldRemarksCtrl = TextEditingController();
-  bool uldPriority = false;
-  bool uldBreak = true;
-  bool isUldPiecesAuto = true;
-  bool isUldWeightAuto = true;
+
 
   // Nested Data
   final List<Map<String, dynamic>> flightLocalUlds = [];
@@ -62,10 +76,6 @@ class AddFlightV2Logic extends ChangeNotifier {
     delayedTimeCtrl.dispose();
     breakCtrl.dispose();
     noBreakCtrl.dispose();
-    uldNumberCtrl.dispose();
-    uldPiecesCtrl.dispose();
-    uldWeightCtrl.dispose();
-    uldRemarksCtrl.dispose();
     searchUldCtrl.dispose();
     super.dispose();
   }
@@ -78,8 +88,7 @@ class AddFlightV2Logic extends ChangeNotifier {
     return carrierCtrl.text.isNotEmpty || 
            numberCtrl.text.isNotEmpty || 
            dateCtrl.text.isNotEmpty || 
-           flightLocalUlds.isNotEmpty || 
-           uldNumberCtrl.text.isNotEmpty;
+           flightLocalUlds.isNotEmpty;
   }
 
   void setBreakAuto(bool value) {
@@ -99,27 +108,7 @@ class AddFlightV2Logic extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleUldPiecesAuto(bool value) {
-    isUldPiecesAuto = value;
-    uldPiecesCtrl.text = isUldPiecesAuto ? 'Auto' : '';
-    notifyListeners();
-  }
 
-  void toggleUldWeightAuto(bool value) {
-    isUldWeightAuto = value;
-    uldWeightCtrl.text = isUldWeightAuto ? 'Auto' : '';
-    notifyListeners();
-  }
-
-  void setUldPriority(bool value) {
-    uldPriority = value;
-    notifyListeners();
-  }
-
-  void setUldBreak(bool value) {
-    uldBreak = value;
-    notifyListeners();
-  }
 
   Future<void> selectDate(BuildContext context) async {
     DateTime initD = DateTime.now();
@@ -193,88 +182,25 @@ class AddFlightV2Logic extends ChangeNotifier {
     }
   }
 
-  void addLocalUld(BuildContext context, {required Function(String) showDuplicateError}) {
-    clearErrors();
-    final String newUld = uldNumberCtrl.text.trim().toUpperCase();
-    if (newUld.isEmpty) {
-      setError('ULD Number', 'Required');
-      return;
-    }
 
-    if (flightLocalUlds.any((uld) => uld['uldNumber'] == newUld)) {
-      showDuplicateError(newUld);
-      return;
-    }
 
-    flightLocalUlds.add({
-      'uldNumber': newUld,
-      'pieces': uldPiecesCtrl.text.isNotEmpty ? int.tryParse(uldPiecesCtrl.text) : 0,
-      'weight': uldWeightCtrl.text.isNotEmpty ? double.tryParse(uldWeightCtrl.text) : 0.0,
-      'remarks': uldRemarksCtrl.text,
-      'priority': uldPriority,
-      'break': uldBreak,
-      'isAutoPieces': isUldPiecesAuto,
-      'isAutoWeight': isUldWeightAuto,
-      'awbs': [], 
-      'showAwbs': true,
-    });
+  void recalculateAutoCounts() {
+    cBreak = flightLocalUlds.where((u) => u['break'] == true).length;
+    cNoBreak = flightLocalUlds.where((u) => u['break'] == false).length;
     
-    if (uldBreak) {
-      cBreak++;
-      if (isBreakAuto) breakCtrl.text = '$cBreak';
-    } else {
-      cNoBreak++;
-      if (isNoBreakAuto) noBreakCtrl.text = '$cNoBreak';
-    }
-    
-    uldNumberCtrl.clear();
-    uldPiecesCtrl.text = isUldPiecesAuto ? 'Auto' : '';
-    uldWeightCtrl.text = isUldWeightAuto ? 'Auto' : '';
-    uldRemarksCtrl.clear();
-    uldPriority = false;
-    uldBreak = true;
-    
+    if (isBreakAuto) breakCtrl.text = '$cBreak';
+    if (isNoBreakAuto) noBreakCtrl.text = '$cNoBreak';
     notifyListeners();
   }
 
   void removeLocalUld(int index) {
-    if (flightLocalUlds[index]['break'] == true) {
-      cBreak = (cBreak > 0) ? cBreak - 1 : 0;
-      if (isBreakAuto) breakCtrl.text = '$cBreak';
-    } else {
-      cNoBreak = (cNoBreak > 0) ? cNoBreak - 1 : 0;
-      if (isNoBreakAuto) noBreakCtrl.text = '$cNoBreak';
-    }
     flightLocalUlds.removeAt(index);
-    notifyListeners();
+    recalculateAutoCounts();
   }
 
-  void toggleUldAwbsVisibility(int index) {
-    flightLocalUlds[index]['showAwbs'] = !(flightLocalUlds[index]['showAwbs'] ?? true);
-    notifyListeners();
-  }
 
-  void removeAwbFromUld(int uldIndex, int awbIndex) {
-    flightLocalUlds[uldIndex]['awbs'].removeAt(awbIndex);
-    if (flightLocalUlds[uldIndex]['isAutoPieces'] == true) {
-      flightLocalUlds[uldIndex]['pieces'] = (flightLocalUlds[uldIndex]['awbs'] as List).fold<int>(0, (s, a) => s + ((a['pieces'] as num).toInt()));
-    }
-    if (flightLocalUlds[uldIndex]['isAutoWeight'] == true) {
-      flightLocalUlds[uldIndex]['weight'] = (flightLocalUlds[uldIndex]['awbs'] as List).fold<double>(0.0, (s, a) => s + ((a['weight'] as num).toDouble()));
-    }
-    notifyListeners();
-  }
 
-  void onAwbAddedToUld(int uldIndex, Map<String, dynamic> awbData) {
-    flightLocalUlds[uldIndex]['awbs'].add(awbData);
-    if (flightLocalUlds[uldIndex]['isAutoPieces'] == true) {
-      flightLocalUlds[uldIndex]['pieces'] = (flightLocalUlds[uldIndex]['awbs'] as List).fold<int>(0, (s, a) => s + ((a['pieces'] as num).toInt()));
-    }
-    if (flightLocalUlds[uldIndex]['isAutoWeight'] == true) {
-      flightLocalUlds[uldIndex]['weight'] = (flightLocalUlds[uldIndex]['awbs'] as List).fold<double>(0.0, (s, a) => s + ((a['weight'] as num).toDouble()));
-    }
-    notifyListeners();
-  }
+
 
   int getLocalUsedPieces(String awbNumber) {
     int total = 0;
@@ -307,9 +233,15 @@ class AddFlightV2Logic extends ChangeNotifier {
      required Function(String) onError}
   ) async {
     clearErrors();
-    if (carrierCtrl.text.isEmpty) { setError('Carrier', 'Required'); return; }
-    if (numberCtrl.text.isEmpty) { setError('Number', 'Required'); return; }
-    if (dateCtrl.text.isEmpty) { setError('Date Arrived', 'Required'); return; }
+    bool hasError = false;
+    if (carrierCtrl.text.isEmpty) { fieldErrors['Carrier'] = 'Required'; hasError = true; }
+    if (numberCtrl.text.isEmpty) { fieldErrors['Number'] = 'Required'; hasError = true; }
+    if (dateCtrl.text.isEmpty) { fieldErrors['Date Arrived'] = 'Required'; hasError = true; }
+
+    if (hasError) {
+      notifyListeners();
+      return;
+    }
 
     final emptyUld = flightLocalUlds.firstWhere((u) => (u['awbs'] as List).isEmpty, orElse: () => {});
     if (emptyUld.isNotEmpty) {

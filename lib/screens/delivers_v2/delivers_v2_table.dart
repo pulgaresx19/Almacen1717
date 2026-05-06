@@ -76,21 +76,9 @@ class _DeliversV2TableState extends State<DeliversV2Table> {
                                     const DataColumn(label: Text('Pieces')),
                                     const DataColumn(label: Text('Weight')),
                                     const DataColumn(label: Text('Remarks')),
-                                    DataColumn(
-                                      label: Checkbox(
-                                        visualDensity: VisualDensity.compact,
-                                        value: widget.logic.selectedDeliverIds.isNotEmpty && widget.logic.displayedDelivers.isNotEmpty && widget.logic.selectedDeliverIds.length == widget.logic.displayedDelivers.length,
-                                        onChanged: (val) {
-                                          widget.logic.toggleAll(val == true);
-                                        },
-                                        activeColor: const Color(0xFF6366f1),
-                                        side: const BorderSide(color: Color(0xFF94a3b8)),
-                                      ),
-                                    ),
                                   ],
                                   rows: List.generate(widget.logic.displayedDelivers.length, (index) {
                                     final u = widget.logic.displayedDelivers[index];
-                                    final dId = u['id_delivery']?.toString() ?? '';
                                     
                                     String timeStr = '-';
                                     if (u['time'] != null) {
@@ -118,17 +106,6 @@ class _DeliversV2TableState extends State<DeliversV2Table> {
                                         DataCell(Text(u['total_pieces']?.toString() ?? '0')),
                                         DataCell(Text(u['total_weight'] != null ? '${u['total_weight']} kg' : '0 kg')),
                                         DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
-                                        DataCell(
-                                          Checkbox(
-                                            visualDensity: VisualDensity.compact,
-                                            value: widget.logic.selectedDeliverIds.contains(dId),
-                                            onChanged: (val) {
-                                              widget.logic.toggleSelection(dId, val == true);
-                                            },
-                                            activeColor: const Color(0xFF6366f1),
-                                            side: const BorderSide(color: Color(0xFF94a3b8)),
-                                          ),
-                                        ),
                                       ],
                                     );
                                   }),

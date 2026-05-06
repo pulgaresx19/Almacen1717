@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode, isSidebarExpandedNotifier, currentUserData;
 import '../add_deliver_v2/add_deliver_v2_screen.dart';
 import 'delivers_v2_logic.dart';
 import 'delivers_v2_table.dart';
-import 'deliver_pdf_exporter.dart';
 import 'delivers_v2_history.dart';
 import '../../services/realtime_service.dart';
 
@@ -239,85 +237,8 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                         ),
                       ),
                     ),
-                    ListenableBuilder(
-                      listenable: _logic,
-                      builder: (context, _) {
-                        if (_logic.selectedDeliverIds.isEmpty) return const SizedBox.shrink();
-                        return Positioned(
-                          bottom: 24,
-                          left: 24,
-                          right: 24,
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: dark ? const Color(0xFF1e293b) : Colors.white,
-                                borderRadius: BorderRadius.circular(30),
-                                boxShadow: [BoxShadow(color: Colors.black.withAlpha(50), blurRadius: 20, offset: const Offset(0, 8))],
-                                border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF6366f1).withAlpha(30),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      '${_logic.selectedDeliverIds.length} Selected',
-                                      style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 13),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-                                  const SizedBox(width: 16),
-                                  IconButton(
-                                    onPressed: () async {
-                                        final res = await Supabase.instance.client.from('deliveries').select().inFilter('id_delivery', _logic.selectedDeliverIds.toList());
-                                        final selected = List<Map<String, dynamic>>.from(res);
-                                        if (selected.isNotEmpty) {
-                                          DeliverPdfExporter.printDelivers(selected);
-                                        }
-                                    }, 
-                                    icon: const Icon(Icons.print_rounded, color: Color(0xFF6366f1)), 
-                                    tooltip: 'Print Selected', 
-                                    style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    onPressed: () async {
-                                        final res = await Supabase.instance.client.from('deliveries').select().inFilter('id_delivery', _logic.selectedDeliverIds.toList());
-                                        final selected = List<Map<String, dynamic>>.from(res);
-                                        if (selected.isNotEmpty) {
-                                          DeliverPdfExporter.downloadPdf(selected);
-                                        }
-                                    }, 
-                                    icon: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF6366f1)), 
-                                    tooltip: 'Download PDF', 
-                                    style: IconButton.styleFrom(backgroundColor: const Color(0xFF6366f1).withAlpha(15))
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Container(height: 24, width: 1, color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
-                                  const SizedBox(width: 16),
-                                  IconButton(
-                                    onPressed: () {
-                                      _logic.clearSelection();
-                                    }, 
-                                    icon: const Icon(Icons.close_rounded, color: Colors.redAccent), 
-                                    tooltip: 'Clear Selection', 
-                                    style: IconButton.styleFrom(backgroundColor: Colors.redAccent.withAlpha(15))
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
                 ),
               ),
           ],

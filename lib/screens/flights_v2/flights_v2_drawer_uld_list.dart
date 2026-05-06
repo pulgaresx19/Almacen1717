@@ -60,19 +60,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
     );
   }
 
-  Widget _buildMetric(String label, String value, Color textP, Color textS) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(label, style: TextStyle(color: textS, fontSize: 10)),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(color: textP, fontSize: 13, fontWeight: FontWeight.bold), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ],
-    );
-  }
-
-  Widget _buildStatusMetric(String label, String value, Color textS) {
+  Widget _buildStatusMetric(String value, Color textS) {
     Color bg = const Color(0xFF334155);
     Color fg = const Color(0xFFcbd5e1);
     
@@ -91,27 +79,21 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
       bg = const Color(0xFF854d0e).withAlpha(51); fg = const Color(0xFFfde047);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(label, style: TextStyle(color: textS, fontSize: 10)),
-        const SizedBox(height: 2),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            value,
-            style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+    return Container(
+      width: 85,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        value,
+        style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.bold),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 
@@ -161,38 +143,68 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                           ],
                         ),
                       ),
-                      Expanded(child: Center(child: _buildMetric(appLanguage.value == 'es' ? 'Pcs' : 'Pieces', uld['pieces_total']?.toString() ?? uld['pieces']?.toString() ?? '0', textP, textS))),
-                      Expanded(child: Center(child: _buildMetric(appLanguage.value == 'es' ? 'Wgt' : 'Weight', '${uld['weight_total']?.toString() ?? uld['weight']?.toString() ?? '0'} kg', textP, textS))),
-                      Expanded(child: Center(child: _buildMetric('Priority', uld['is_priority'] == true ? 'Yes' : 'No', uld['is_priority'] == true ? const Color(0xFFeab308) : textP, textS))),
+                      const SizedBox(width: 16),
+                      SizedBox(width: 70, child: Text('${uld['pieces_total']?.toString() ?? uld['pieces']?.toString() ?? '0'} pcs', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13))),
+                      const SizedBox(width: 12),
+                      SizedBox(width: 75, child: Text('${uld['weight_total']?.toString() ?? uld['weight']?.toString() ?? '0'} kg', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13))),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('Break', style: TextStyle(color: textS, fontSize: 10)),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: (uld['is_break'] == true) ? Colors.green.withAlpha(20) : Colors.red.withAlpha(20),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: (uld['is_break'] == true) ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50)),
-                                ),
-                                child: Text(
-                                  (uld['is_break'] == true) ? 'BREAK' : 'NO BRK',
-                                  style: TextStyle(
-                                    color: (uld['is_break'] == true) ? Colors.green : Colors.redAccent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        child: Text(
+                          (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? 'Remark: ${uld['remarks']}' : 'Remark: ...', 
+                          style: TextStyle(color: textS, fontSize: 12, fontStyle: FontStyle.italic), 
+                          maxLines: 1, 
+                          overflow: TextOverflow.ellipsis
+                        )
                       ),
-                      Expanded(child: Center(child: _buildMetric('Remarks', (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? uld['remarks'].toString() : '-', textP, textS))),
-                      Expanded(child: Center(child: _buildStatusMetric('Status', FlightsV2StatusLogic.getUldStatus(uld), textS))),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: widget.dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.inventory_2_outlined, size: 14, color: textP),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${(uld['awb_splits'] as List?)?.length ?? 0} AWBs',
+                                  style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 12)
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Icon(
+                            uld['is_priority'] == true ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: uld['is_priority'] == true ? const Color(0xFFf59e0b) : (widget.dark ? Colors.white.withAlpha(60) : Colors.black.withAlpha(50)),
+                            size: 20
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 85,
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (uld['is_break'] == true) ? Colors.green.withAlpha(20) : Colors.red.withAlpha(20),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: (uld['is_break'] == true) ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50)),
+                            ),
+                            child: Text(
+                              (uld['is_break'] == true) ? 'BREAK' : 'NO BREAK',
+                              style: TextStyle(
+                                color: (uld['is_break'] == true) ? Colors.green : Colors.redAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildStatusMetric(FlightsV2StatusLogic.getUldStatus(uld), textS),
+                        ],
+                      ),
                       const SizedBox(width: 8),
                       Checkbox(
                         value: isSelected,

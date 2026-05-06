@@ -4,6 +4,7 @@ import '../../main.dart' show isDarkMode, appLanguage;
 import 'add_flight_v2_logic.dart';
 import 'add_flight_v2_widgets.dart';
 import 'add_flight_v2_uld_list.dart';
+import 'add_flight_v2_add_uld_drawer.dart';
 
 class AddFlightV2Screen extends StatefulWidget {
   final Function(bool)? onPop;
@@ -230,116 +231,43 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                     const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, constraints) {
-            double rWidth = constraints.maxWidth - 662; if (rWidth < 180) rWidth = 180;
+            double rWidth = constraints.maxWidth - 814; if (rWidth < 180) rWidth = 180;
             return Wrap(
               spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                SizedBox(width: 90, child: buildTextField('Carrier', logic.carrierCtrl, 'AMERICAN', maxLen: 10, isUpperCase: true, hasError: logic.fieldErrors.containsKey('Carrier'), errorText: logic.fieldErrors['Carrier'])),
-                SizedBox(width: 80, child: buildTextField('Number', logic.numberCtrl, '204', isUpperCase: true, maxLen: 10, hasError: logic.fieldErrors.containsKey('Number'), errorText: logic.fieldErrors['Number'])),
+                SizedBox(width: 90, child: buildTextField('Carrier', logic.carrierCtrl, 'AMERICAN', maxLen: 10, isUpperCase: true, hasError: logic.fieldErrors.containsKey('Carrier'))),
+                SizedBox(width: 80, child: buildTextField('Number', logic.numberCtrl, '204', isUpperCase: true, maxLen: 10, hasError: logic.fieldErrors.containsKey('Number'))),
                 SizedBox(width: 85, child: buildTextField('Break', logic.breakCtrl, '', disabled: logic.isBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
                   width: 20, height: 20, child: Checkbox(value: logic.isBreakAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.setBreakAuto(v ?? true))
                 ))),
                 SizedBox(width: 85, child: buildTextField('No Break', logic.noBreakCtrl, '', disabled: logic.isNoBreakAuto, isNum: true, digitsOnly: true, maxLen: 5, titleTrailing: SizedBox(
                   width: 20, height: 20, child: Checkbox(value: logic.isNoBreakAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.setNoBreakAuto(v ?? true))
                 ))),
-                SizedBox(width: 130, child: buildTextField('Date Arrived', logic.dateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDate(context), suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70), hasError: logic.fieldErrors.containsKey('Date Arrived'), errorText: logic.fieldErrors['Date Arrived'])),
+                SizedBox(width: 130, child: buildTextField('Date Arrived', logic.dateCtrl, '__/__/____', readOnly: true, onTap: () => logic.selectDate(context), suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16, color: Colors.white70), hasError: logic.fieldErrors.containsKey('Date Arrived'))),
                 SizedBox(width: 120, child: buildTextField('Time Arrived', logic.timeCtrl, '__:__ --', readOnly: true, onTap: () => logic.selectTime(context), suffixIcon: const Icon(Icons.access_time_rounded, size: 16, color: Colors.white70))),
                 SizedBox(width: rWidth, child: buildTextField('Remarks', logic.remarksCtrl, 'Additional remarks...', isSentenceCase: true)),
+                SizedBox(
+                  width: 140, height: 48,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      AddFlightV2AddUldDrawer.show(context, dark, logic);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15), 
+                      foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), 
+                      elevation: 0, 
+                      padding: const EdgeInsets.symmetric(horizontal: 8), 
+                      side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)), 
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                    ),
+                    child: Text(appLanguage.value == 'es' ? '+ Añadir ULD al vuelo' : '+ Add ULD to flight', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11), textAlign: TextAlign.center),
+                  ),
+                ),
               ]
             );
           }
         ),
-        const SizedBox(height: 24), Divider(color: dark ? const Color(0xFF334155) : const Color(0xFFE5E7EB)), const SizedBox(height: 16),
-        Row(children: [Icon(Icons.inventory_2_rounded, color: textP, size: 20), const SizedBox(width: 8), Text('Add ULD To Flight', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w600))]),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            double uldRWidth = constraints.maxWidth - 764; if (uldRWidth < 200) uldRWidth = 200;
-            return Wrap(
-              spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
-              children: [
-                SizedBox(width: 130, child: buildTextField('ULD Number', logic.uldNumberCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true, hasError: logic.fieldErrors.containsKey('ULD Number'), errorText: logic.fieldErrors['ULD Number'])),
-                SizedBox(width: 95, child: buildTextField('Pieces', logic.uldPiecesCtrl, '0', isNum: true, digitsOnly: true, disabled: logic.isUldPiecesAuto, titleTrailing: SizedBox(
-                  width: 20, height: 20, child: Checkbox(value: logic.isUldPiecesAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.toggleUldPiecesAuto(v ?? true))
-                ))),
-                SizedBox(width: 95, child: buildTextField('Weight', logic.uldWeightCtrl, '0.0', isNum: true, allowDecimal: true, disabled: logic.isUldWeightAuto, titleTrailing: SizedBox(
-                  width: 20, height: 20, child: Checkbox(value: logic.isUldWeightAuto, activeColor: const Color(0xFF6366f1), side: const BorderSide(color: Color(0xFF94a3b8)), materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, onChanged: (v) => logic.toggleUldWeightAuto(v ?? true))
-                ))),
-                SizedBox(width: uldRWidth, child: buildTextField('Remarks', logic.uldRemarksCtrl, 'ULD remarks...', isSentenceCase: true)),
-                SizedBox(
-                  width: 125,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Priority?', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), const SizedBox(height: 6),
-                      Container(
-                        height: 48, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withAlpha(25))),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Icon(Icons.star_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
-                            Switch(value: logic.uldPriority, onChanged: logic.setUldPriority, activeThumbColor: Colors.white, activeTrackColor: const Color(0xFFf59e0b), inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 125,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Break?', style: TextStyle(color: Color(0xFFcbd5e1), fontSize: 12, fontWeight: FontWeight.w500)), const SizedBox(height: 6),
-                      Container(
-                        height: 48, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: Colors.white.withAlpha(13), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withAlpha(25))),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Icon(Icons.broken_image_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
-                            Switch(
-                              value: logic.uldBreak, onChanged: logic.setUldBreak, activeThumbColor: Colors.white, activeTrackColor: const Color(0xFF22c55e), inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
-                              trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) { if (states.contains(WidgetState.selected)) return Colors.transparent; return const Color(0xFFef4444).withAlpha(180); }),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 120, height: 48,
-                  child: ElevatedButton(
-                    onPressed: () { logic.addLocalUld(context, showDuplicateError: (msg) {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          backgroundColor: const Color(0xFF1e293b), 
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), 
-                          title: const Column(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 48), SizedBox(height: 16), Text('Duplicate ULD', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))]), 
-                          content: SizedBox(
-                            width: 260,
-                            height: 70,
-                            child: Column(
-                               mainAxisAlignment: MainAxisAlignment.center,
-                               children: [
-                                  Text('The ULD "$msg" is already in this flight list. Please enter a different ULD number.', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFcbd5e1)))
-                               ]
-                            )
-                          ), 
-                          actionsAlignment: MainAxisAlignment.center,
-                          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: Color(0xFF6366f1), fontSize: 16, fontWeight: FontWeight.bold)))]
-                        )
-                      );
-                    });},
-                    style: ElevatedButton.styleFrom(backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15), foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5), elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 16), side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                    child: const Text('+ Add ULD', style: TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ],
-            );
-          }
-        ),
+
                     ],
                   ),
                 ),

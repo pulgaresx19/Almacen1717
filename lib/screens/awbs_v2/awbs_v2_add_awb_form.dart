@@ -28,6 +28,7 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
   String? _awbNumberError;
   String? _awbPiecesError;
   String? _awbTotalError;
+  bool _awbNumberIncomplete = false;
   
   int? dbTotalPieces;
   int? dbTotalExpected;
@@ -158,9 +159,22 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
   }
 
   void _handleAdd() {
+    _validatePieces();
+
     setState(() {
-      _awbNumberError = _awbNumberCtrl.text.trim().isEmpty ? 'Required' : null;
-      _awbPiecesError = _awbPiecesCtrl.text.trim().isEmpty ? 'Required' : null;
+      _awbNumberIncomplete = _awbNumberCtrl.text.trim().isNotEmpty && _awbNumberCtrl.text.trim().length < 13;
+      if (_awbNumberIncomplete) {
+        _awbNumberError = 'Incomplete';
+      } else if (_awbNumberCtrl.text.trim().isEmpty) {
+        _awbNumberError = 'Required';
+      } else {
+        _awbNumberError = null;
+      }
+
+      if (_awbPiecesCtrl.text.trim().isEmpty) {
+        _awbPiecesError = 'Required';
+      }
+
       _awbTotalError = _awbTotalCtrl.text.trim().isEmpty ? 'Required' : null;
     });
 
@@ -187,6 +201,7 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
       _coordinatorCounts.clear();
       _itemLocations.clear();
       _awbNumberError = null;
+      _awbNumberIncomplete = false;
       _awbPiecesError = null;
       _awbTotalError = null;
     });
@@ -207,7 +222,8 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, String? errorText, bool readOnly = false, FocusNode? focusNode, Function(String)? onChanged}) {
+  Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, String? errorText, bool readOnly = false, FocusNode? focusNode, Function(String)? onChanged, TextCapitalization textCapitalization = TextCapitalization.none}) {
+    final bool isError = hasError || errorText != null;
     return Padding(
       padding: const EdgeInsets.only(right: 12, bottom: 12),
       child: Column(
@@ -216,7 +232,7 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: TextStyle(color: errorText != null ? const Color(0xFFef4444) : (isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(label, style: TextStyle(color: isError ? const Color(0xFFef4444) : (isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 6),
@@ -227,6 +243,7 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
               focusNode: focusNode,
               readOnly: readOnly,
               keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+              textCapitalization: textCapitalization,
               maxLines: maxLines,
               maxLength: maxLength,
               inputFormatters: inputFormatters,
@@ -234,18 +251,18 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
               decoration: InputDecoration(
                 filled: true,
                 counterText: '',
-                fillColor: errorText != null ? const Color(0xFFef4444).withAlpha(10) : (!readOnly ? (isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)) : (isDarkMode.value ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB))),
+                fillColor: isError ? const Color(0xFFef4444).withAlpha(10) : (!readOnly ? (isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)) : (isDarkMode.value ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB))),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: errorText != null ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: errorText != null ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: errorText != null ? const BorderSide(color: Colors.redAccent, width: 2) : BorderSide.none,
+                  borderSide: isError ? const BorderSide(color: Colors.redAccent, width: 2) : const BorderSide(color: Color(0xFF6366f1), width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               ),
@@ -255,11 +272,6 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
               },
             ),
           ),
-          if (errorText != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 2),
-              child: Text(errorText, style: const TextStyle(color: Color(0xFFef4444), fontSize: 11, fontWeight: FontWeight.bold)),
-            )
         ],
       ),
     );
@@ -281,16 +293,34 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
               Row(
                 children: [
                   Text('Air Waybill (AWB)', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
-                  if (_awbPiecesError == null && dbTotalPieces != null)
+                  const Spacer(),
+                  if (_awbNumberIncomplete)
                     Container(
                       margin: const EdgeInsets.only(left: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: const Color(0xFF22c55e).withAlpha(20), borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        appLanguage.value == 'es' ? 'AWB Incompleto' : 'Incomplete AWB',
+                        style: const TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  else if (_awbPiecesError != null && _awbPiecesError != 'Required')
+                    Container(
+                      margin: const EdgeInsets.only(left: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        _awbPiecesError!,
+                        style: const TextStyle(color: Color(0xFFef4444), fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    )
+                  else if (_awbPiecesError == null && dbTotalPieces != null)
+                    Container(
+                      margin: const EdgeInsets.only(left: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Text(
                         appLanguage.value == 'es'
                             ? 'Piezas restantes: ${dbTotalPieces! - (dbTotalExpected ?? 0) - localPiecesSum}'
                             : 'Remaining pieces: ${dbTotalPieces! - (dbTotalExpected ?? 0) - localPiecesSum}',
-                        style: const TextStyle(color: Color(0xFF22c55e), fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Color(0xFF22c55e), fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                     ),
                 ],
@@ -299,13 +329,13 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  SizedBox(width: 140, child: _buildTextField('AWB Number', _awbNumberCtrl, maxLength: 13, inputFormatters: [AwbNumberFormatter()], errorText: _awbNumberError, onChanged: (_) { if (_awbNumberError != null) setState(() => _awbNumberError = null); })),
-                  SizedBox(width: 85, child: _buildTextField('Pieces', _awbPiecesCtrl, isNumber: true, inputFormatters: [
+                  SizedBox(width: 140, child: _buildTextField('AWB Number', _awbNumberCtrl, maxLength: 13, inputFormatters: [AwbNumberFormatter()], hasError: _awbNumberError == 'Required' || _awbNumberError == 'Incomplete', onChanged: (_) { if (_awbNumberError != null) setState(() { _awbNumberError = null; _awbNumberIncomplete = false; }); })),
+                  SizedBox(width: 85, child: _buildTextField('Pieces', _awbPiecesCtrl, isNumber: true, maxLength: 5, inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
-                  ], errorText: _awbPiecesError, onChanged: (_) { if (_awbPiecesError == 'Required') setState(() => _awbPiecesError = null); })),
-                  SizedBox(width: 85, child: _buildTextField('Total', _awbTotalCtrl, isNumber: true, readOnly: isTotalLocked, inputFormatters: [FilteringTextInputFormatter.digitsOnly], errorText: _awbTotalError, onChanged: (_) { if (_awbTotalError != null) setState(() => _awbTotalError = null); })),
-                  SizedBox(width: 95, child: _buildTextField('Weight', _awbWeightCtrl, isNumber: true, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))])),
-                  Expanded(child: _buildTextField('Remarks', _awbRemarkCtrl)),
+                  ], hasError: _awbPiecesError != null, onChanged: (_) { if (_awbPiecesError != null) setState(() => _awbPiecesError = null); })),
+                  SizedBox(width: 85, child: _buildTextField('Total', _awbTotalCtrl, isNumber: true, maxLength: 5, readOnly: isTotalLocked, inputFormatters: [FilteringTextInputFormatter.digitsOnly], hasError: _awbTotalError == 'Required', onChanged: (_) { if (_awbTotalError != null) setState(() => _awbTotalError = null); })),
+                  SizedBox(width: 95, child: _buildTextField('Weight', _awbWeightCtrl, isNumber: true, maxLength: 5, inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))])),
+                  Expanded(child: _buildTextField('Remarks', _awbRemarkCtrl, inputFormatters: [SentenceCaseTextFormatter()], textCapitalization: TextCapitalization.sentences)),
                   Container(
                     margin: const EdgeInsets.only(bottom: 12, right: 12),
                     height: 40,
@@ -332,12 +362,12 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
                     height: 40,
                     width: 40,
                     decoration: BoxDecoration(
-                      color: _awbNumberCtrl.text.isNotEmpty ? const Color(0xFF6366f1) : (dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)), 
+                      color: const Color(0xFF6366f1), 
                       borderRadius: BorderRadius.circular(8)
                     ),
                     child: IconButton(
-                      icon: Icon(Icons.add_rounded, color: _awbNumberCtrl.text.isNotEmpty ? Colors.white : (dark ? Colors.white54 : Colors.black38), size: 20),
-                      onPressed: _awbNumberCtrl.text.isNotEmpty ? _handleAdd : null,
+                      icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                      onPressed: _handleAdd,
                     ),
                   ),
                 ],

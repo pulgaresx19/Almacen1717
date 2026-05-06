@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
+import 'deliver_pdf_exporter.dart';
 
 class DeliversV2Dialogs {
   static void showNoShowDetails(BuildContext context, dynamic noShowData, bool dark, Color textP) {
@@ -131,6 +132,19 @@ class DeliversV2Dialogs {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
+                            IconButton(
+                              onPressed: () => DeliverPdfExporter.printDelivers([u]),
+                              icon: Icon(Icons.print_rounded, color: textP, size: 20),
+                              tooltip: 'Print',
+                            ),
+                            IconButton(
+                              onPressed: () => DeliverPdfExporter.downloadPdf([u]),
+                              icon: Icon(Icons.picture_as_pdf_rounded, color: textP, size: 20),
+                              tooltip: 'Download PDF',
+                            ),
+                            const SizedBox(width: 8),
+                            Container(width: 1, height: 24, color: borderC),
+                            const SizedBox(width: 8),
                             IconButton(
                               onPressed: () => Navigator.pop(ctx),
                               icon: Icon(Icons.close_rounded, color: textP, size: 20),

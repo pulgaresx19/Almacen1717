@@ -24,6 +24,7 @@ Widget buildTextField(
   List<TextInputFormatter>? customFormatters,
   bool hasError = false,
   String? errorText,
+  double? fieldHeight,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,8 +44,10 @@ Widget buildTextField(
         ],
       ),
       const SizedBox(height: 6),
-      TextField(
-        controller: ctrl,
+      SizedBox(
+        height: fieldHeight,
+        child: TextField(
+          controller: ctrl,
         enabled: !disabled,
         readOnly: readOnly,
         onTap: onTap,
@@ -80,7 +83,7 @@ Widget buildTextField(
           hintText: hint,
           hintStyle: TextStyle(color: Colors.white.withAlpha(76), fontSize: 12),
           filled: true,
-          fillColor: disabled ? Colors.white.withAlpha(5) : Colors.white.withAlpha(13),
+          fillColor: hasError ? Colors.redAccent.withAlpha(20) : (disabled ? Colors.white.withAlpha(5) : Colors.white.withAlpha(13)),
           counterText: '',
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           enabledBorder: OutlineInputBorder(
@@ -97,6 +100,7 @@ Widget buildTextField(
           ),
           suffixIcon: suffixIcon,
         ),
+      ),
       ),
       if (hasError && errorText != null)
         Padding(

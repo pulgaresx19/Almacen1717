@@ -377,7 +377,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                               child: Center(
                                 child: Text(
                                   appLanguage.value == 'es' ? 'No hay AWBs agregados aún.' : 'No AWBs added yet.',
-                                  style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)),
+                                  style: TextStyle(color: (_showEmptyError && _addedAwbs.isEmpty) ? Colors.redAccent : (dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563))),
                                 ),
                               ),
                             )
@@ -520,7 +520,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                               child: Center(
                                 child: Text(
                                   appLanguage.value == 'es' ? 'No hay ULDs agregados aún.' : 'No ULDs added yet.',
-                                  style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)),
+                                  style: TextStyle(color: (_showEmptyError && _addedUlds.isEmpty) ? Colors.redAccent : (dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563))),
                                 ),
                               ),
                             )

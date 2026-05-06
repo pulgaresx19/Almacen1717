@@ -448,6 +448,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                           return aNum.compareTo(bNum);
                         });
                         
+                        widget.flightLogic.recalculateAutoCounts();
                         widget.flightLogic.rebuild();
                         Navigator.pop(widget.dialogContext);
                       },
