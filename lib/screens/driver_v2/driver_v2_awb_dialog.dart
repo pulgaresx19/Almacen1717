@@ -231,7 +231,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
                     'qty': qty,
                     'reason': reasonCtrl.text.trim(),
                     'user': currentUserData.value?['full_name'] ?? 'Unknown',
-                    'time': DateTime.now().toIso8601String(),
+                    'time': DateTime.now().toUtc().toIso8601String(),
                   };
                   Navigator.pop(ctx);
                 }
@@ -345,7 +345,7 @@ class _DriverV2AwbDialogScreenState extends State<DriverV2AwbDialogScreen> {
           'p_id_pickup': widget.deliveryData['id_pickup']?.toString() ?? '-',
           'p_id_delivery': widget.deliveryData['id_delivery'], // <-- NUEVO PARÁMETRO
           'p_user_name': currentUserData.value?['full_name'] ?? 'Unknown',
-          'p_time': DateTime.now().toIso8601String(),
+          'p_time': DateTime.now().toUtc().toIso8601String(),
           'p_driver_name': widget.driver,
         },
       );

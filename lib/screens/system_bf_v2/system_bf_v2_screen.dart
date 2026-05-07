@@ -186,6 +186,27 @@ class _SystemBfV2ScreenState extends State<SystemBfV2Screen> {
                     textAlign: TextAlign.center,
                   ),
                   Positioned(
+                    left: 0,
+                    child: IconButton(
+                      onPressed: () async {
+                        try {
+                          await Supabase.instance.client.from(tableName).update({
+                            'carrier_flight$index': null,
+                            'number_flight$index': null,
+                            'date_flight$index': null,
+                            'ULD_number$index': null,
+                            'ULD_isBreak$index': null,
+                          }).eq('id', 1);
+                        } catch (e) {
+                          debugPrint('Reset Error $tableName: $e');
+                        }
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 28),
+                      color: textS,
+                      tooltip: 'Refresh / Reset',
+                    ),
+                  ),
+                  Positioned(
                     right: 0,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

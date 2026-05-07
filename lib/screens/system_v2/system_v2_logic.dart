@@ -416,4 +416,20 @@ class SystemPanelLogic extends ChangeNotifier {
       notifyListeners();
     });
   }
+
+  void resetSystemTable() {
+    final sysTable = panelId == 1 ? 'system1' : 'system2';
+    Supabase.instance.client.from(sysTable).update({
+      'carrier_flight$panelId': null,
+      'number_flight$panelId': null,
+      'date_flight$panelId': null,
+      'ULD_number$panelId': null,
+      'ULD_isBreak$panelId': null,
+    }).eq('id', 1).then((_) {
+      // Silent reset: do not clear local state or notify listeners
+    }).catchError((e) {
+      debugPrint('Error $sysTable manual reset: $e');
+      return null;
+    });
+  }
 }

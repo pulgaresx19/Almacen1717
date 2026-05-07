@@ -79,6 +79,14 @@ class AddUserScreenState extends State<AddUserScreen> {
       'icon': Icons.computer_rounded,
     },
     {
+      'key': 'driver_bf',
+      'titleEs': 'Conductor (BF)',
+      'titleEn': 'Driver (BF)',
+      'descEs': 'Administración de entregas (BF).',
+      'descEn': 'Driver deliveries management (BF).',
+      'icon': Icons.local_shipping_rounded,
+    },
+    {
       'key': 'area_nobreak',
       'titleEs': 'Área (No break)',
       'titleEn': 'Area (No break)',
@@ -141,8 +149,8 @@ class AddUserScreenState extends State<AddUserScreen> {
   final Map<String, bool> _accessMap = {};
 
   void _updateDefaultsForPosition() {
-    final agentDefaults = ['dashboard', 'system', 'location', 'driver', 'system_bf', 'area_nobreak'];
-    final coordinatorDefaults = ['dashboard', 'system', 'coordinator', 'location', 'driver', 'system_bf', 'area_nobreak'];
+    final agentDefaults = ['dashboard', 'system', 'location', 'driver', 'system_bf', 'driver_bf', 'area_nobreak'];
+    final coordinatorDefaults = ['dashboard', 'system', 'coordinator', 'location', 'driver', 'system_bf', 'driver_bf', 'area_nobreak'];
     final officeDefaults = ['dashboard', 'flights', 'ulds', 'awbs', 'delivers', 'users'];
     
     List<String> activeKeys = [];

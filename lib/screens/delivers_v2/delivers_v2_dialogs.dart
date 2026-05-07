@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -97,6 +98,20 @@ class DeliversV2Dialogs {
         final bgCard = dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
         final textP = dark ? Colors.white : const Color(0xFF111827);
         final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
+
+        List<dynamic> deliverItems = [];
+        try {
+          final rawList = u['list_deliver'];
+          if (rawList != null) {
+            if (rawList is String) {
+              deliverItems = jsonDecode(rawList);
+            } else if (rawList is List) {
+              deliverItems = List<dynamic>.from(rawList);
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing list_deliver: $e');
+        }
 
         return Align(
           alignment: Alignment.centerRight,
@@ -249,6 +264,93 @@ class DeliversV2Dialogs {
                                ]
                              )
                           ),
+                          if (deliverItems.isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Icon(Icons.list_alt_rounded, color: textP, size: 20),
+                                const SizedBox(width: 8),
+                                Text('Delivery List', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: bgCard,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: borderC),
+                              ),
+                              child: Column(
+                                children: deliverItems.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final item = entry.value;
+                                  final type = item['type']?.toString() ?? 'Unknown';
+                                  final number = item['awb_number']?.toString() ?? item['uld_number']?.toString() ?? 'N/A';
+                                  final totalPieces = item['total_pieces']?.toString() ?? '0';
+                                  final found = item['found']?.toString() ?? '0';
+                                  final isLast = index == deliverItems.length - 1;
+                                  
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      border: isLast ? null : Border(bottom: BorderSide(color: borderC)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Icon(
+                                            type.toUpperCase() == 'ULD' ? Icons.cases_rounded : Icons.inventory_2_rounded,
+                                            color: const Color(0xFF6366f1),
+                                            size: 24,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(type.toUpperCase(), style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                              const SizedBox(height: 4),
+                                              Text(number, style: TextStyle(color: textP, fontSize: 15, fontWeight: FontWeight.bold)),
+                                            ],
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                            border: Border.all(color: borderC),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text('FOUND / TOTAL', style: TextStyle(color: textS, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                                textBaseline: TextBaseline.alphabetic,
+                                                children: [
+                                                  Text(found, style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                  Text(' / $totalPieces', style: TextStyle(color: textS, fontSize: 12)),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

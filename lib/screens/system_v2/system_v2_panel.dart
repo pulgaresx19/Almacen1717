@@ -138,6 +138,7 @@ class SystemV2PanelState extends State<SystemV2Panel> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+
                               SizedBox(
                                 width: 200,
                                 child: _logic.date != null ? Container(
@@ -194,13 +195,20 @@ class SystemV2PanelState extends State<SystemV2Panel> {
                               ),
                             ],
                           ),
-                          Text(
-                            'System ${widget.panelId}',
-                            style: TextStyle(
-                              color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
+                          InkWell(
+                            onTap: () => _logic.resetSystemTable(),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                              child: Text(
+                                'System ${widget.panelId}',
+                                style: TextStyle(
+                                  color: dark ? Colors.white.withAlpha(150) : const Color(0xFF6B7280),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
                             ),
                           ),
                           Row(

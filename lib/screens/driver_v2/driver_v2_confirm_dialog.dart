@@ -224,7 +224,7 @@ void showDriverConfirmDialog({
                               try {
                                 final pendingReport = {
                                   'reason': reasonController.text.trim(),
-                                  'time': DateTime.now().toIso8601String(),
+                                  'time': DateTime.now().toUtc().toIso8601String(),
                                   'user': currentUserData.value?['full_name'] ?? 'Unknown',
                                 };
                                 

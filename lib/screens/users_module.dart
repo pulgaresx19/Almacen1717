@@ -370,6 +370,7 @@ class _UserDrawerDetailsState extends State<UserDrawerDetails> {
     {'key': 'location', 'titleEs': 'Ubicación', 'titleEn': 'Location', 'descEs': 'Gestión del almacén.', 'descEn': 'Warehouse management.', 'icon': Icons.location_on_rounded},
     {'key': 'driver', 'titleEs': 'Conductor', 'titleEn': 'Driver', 'descEs': 'Administración y asignación de manejo.', 'descEn': 'Driver management and assignment.', 'icon': Icons.local_shipping_rounded},
     {'key': 'system_bf', 'titleEs': 'Sistema (BF)', 'titleEn': 'System (BF)', 'descEs': 'Acceso a la configuración del sistema.', 'descEn': 'Access to the system configuration.', 'icon': Icons.computer_rounded},
+    {'key': 'driver_bf', 'titleEs': 'Conductor (BF)', 'titleEn': 'Driver (BF)', 'descEs': 'Administración de entregas (BF).', 'descEn': 'Driver deliveries management (BF).', 'icon': Icons.local_shipping_rounded},
     {'key': 'area_nobreak', 'titleEs': 'Área (No break)', 'titleEn': 'Area (No break)', 'descEs': 'Acceso a la gestión de áreas.', 'descEn': 'Access to area management.', 'icon': Icons.dashboard_customize_rounded},
 
     {'key': 'dashboard', 'titleEs': 'Dashboard', 'titleEn': 'Dashboard', 'descEs': 'Panel general.', 'descEn': 'General dashboard.', 'icon': Icons.dashboard_rounded},

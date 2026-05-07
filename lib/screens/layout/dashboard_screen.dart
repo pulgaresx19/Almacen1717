@@ -16,6 +16,7 @@ import '../awbs_v2/awbs_v2_screen.dart';
 import '../delivers_v2/delivers_v2_screen.dart';
 import '../location_v2/location_v2_screen.dart';
 import '../driver_v2/driver_v2_screen.dart';
+import '../driver_bf_v2/driver_bf_v2_screen.dart';
 import '../no_break_area_v2/no_break_area_v2_screen.dart';
 import '../../services/realtime_service.dart';
 
@@ -414,6 +415,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'System (BF)',
                                   10,
                                 ),
+                              if (can('driver_bf'))
+                                _buildNavItem(
+                                  Icons.local_shipping_outlined,
+                                  'Driver (BF)',
+                                  20,
+                                ),
                               if (can('area_nobreak'))
                                 _buildNavItem(
                                   Icons.grid_view_rounded,
@@ -805,6 +812,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         DeliversV2Screen(isActive: _selectedIndex == 17),
         LocationV2Screen(isActive: _selectedIndex == 18),
         DriverV2Screen(isActive: _selectedIndex == 19),
+        DriverBfV2Screen(isActive: _selectedIndex == 20),
       ],
     );
   }

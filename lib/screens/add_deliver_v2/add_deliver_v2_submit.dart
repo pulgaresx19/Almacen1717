@@ -326,6 +326,7 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
         'total_pieces': totalPieces,
         'total_weight': totalWeight,
         'all_uld': isAllUld,
+        'id_user': Supabase.instance.client.auth.currentUser?.id,
       };
 
       await Supabase.instance.client.rpc('rpc_save_delivery', params: {'payload': payload});
