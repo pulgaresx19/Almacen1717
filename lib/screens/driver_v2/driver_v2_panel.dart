@@ -17,7 +17,9 @@ class DriverV2Panel extends StatelessWidget {
         return ValueListenableBuilder<List<Map<String, dynamic>>>(
           valueListenable: realtimeService.deliveries,
           builder: (context, deliversList, child) {
-            var items = List<Map<String, dynamic>>.from(deliversList);
+            var items = List<Map<String, dynamic>>.from(deliversList)
+                .where((u) => u['all_uld'] != true)
+                .toList();
             
             // Sort by priority (true first), then by time (oldest first)
             items.sort((a, b) {

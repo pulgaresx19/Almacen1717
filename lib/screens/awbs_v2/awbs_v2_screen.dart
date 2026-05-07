@@ -473,7 +473,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           const DataColumn(label: Text('AWB Number')),
                           const DataColumn(label: Text('Expected')),
                           const DataColumn(label: Text('Arrived')),
-                          const DataColumn(label: Text('Received')),
+                          const DataColumn(label: Text('Checked')),
                           const DataColumn(label: Text('In Process')),
                           const DataColumn(label: Text('Remaining')),
                           const DataColumn(label: Text('Delivered')),

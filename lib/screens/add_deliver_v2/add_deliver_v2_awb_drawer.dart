@@ -484,7 +484,7 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Arrived:', style: TextStyle(color: textS)), Text(arrivedPieces.toString(), style: const TextStyle(color: Color(0xFFec4899), fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
-                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Received:', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))]),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Checked:', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('In Process:', style: TextStyle(color: textS)), Text(inProcessPieces.toString(), style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),

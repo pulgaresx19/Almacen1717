@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../main.dart' show appLanguage;
+import '../../main.dart' show appLanguage, currentUserData;
 
 class DriverBfV2DirectDeliveryDialog extends StatefulWidget {
   final bool dark;
@@ -12,6 +14,7 @@ class DriverBfV2DirectDeliveryDialog extends StatefulWidget {
 
 class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliveryDialog> {
   bool _isLoading = true;
+  bool _formSubmitted = false;
   List<Map<String, dynamic>> _availableUlds = [];
   final Set<String> _selectedUldIds = {};
 
@@ -19,12 +22,19 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
   final _companyCtrl = TextEditingController();
   final _driverNameCtrl = TextEditingController();
   final _doorCtrl = TextEditingController();
-  String _type = 'Send-ULD';
+  final _idPickupCtrl = TextEditingController();
+  final _remarkCtrl = TextEditingController();
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(_onSearchChanged);
     _fetchUlds();
+  }
+
+  void _onSearchChanged() {
+    setState(() {});
   }
 
   Future<void> _fetchUlds() async {
@@ -65,35 +75,149 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
 
   @override
   void dispose() {
+    _searchCtrl.removeListener(_onSearchChanged);
+    _searchCtrl.dispose();
     _companyCtrl.dispose();
     _driverNameCtrl.dispose();
     _doorCtrl.dispose();
+    _idPickupCtrl.dispose();
+    _remarkCtrl.dispose();
     super.dispose();
   }
 
+  void _generatePickupId() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final rnd = Random();
+    final result = String.fromCharCodes(Iterable.generate(
+      10, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
+    _idPickupCtrl.text = result;
+    if (_formSubmitted) setState(() {});
+  }
+
   Future<void> _submit() async {
+    setState(() => _formSubmitted = true);
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedUldIds.isEmpty) {
+    if (_selectedUldIds.isEmpty) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      final userId = user?.id ?? '00000000-0000-0000-0000-000000000000';
+      final userName = currentUserData.value?['full_name'] ?? currentUserData.value?['first_name'] ?? 'Unknown User';
+
+      await Supabase.instance.client.rpc(
+        'rpc_save_direct_delivery_ulds',
+        params: {
+          'p_company': _companyCtrl.text.trim(),
+          'p_driver_name': _driverNameCtrl.text.trim(),
+          'p_door': _doorCtrl.text.trim(),
+          'p_id_pickup': _idPickupCtrl.text.trim(),
+          'p_remark': _remarkCtrl.text.trim(),
+          'p_uld_ids': _selectedUldIds.toList(),
+          'p_user_uuid': userId,
+          'p_user_name': userName,
+        },
+      );
+
+      if (!mounted) return;
+      
+      final dark = widget.dark;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black54,
+        builder: (BuildContext successCtx) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutBack,
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Opacity(
+                    opacity: value.clamp(0.0, 1.0),
+                    child: Container(
+                      width: 320,
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: dark ? const Color(0xFF1e293b) : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10b981).withAlpha(40),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10),
+                          )
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10b981).withAlpha(30),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check_rounded, color: Color(0xFF10b981), size: 48),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            appLanguage.value == 'es' ? '¡Entrega Creada!' : 'Delivery Created!',
+                            style: TextStyle(
+                              color: dark ? Colors.white : const Color(0xFF111827),
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            appLanguage.value == 'es' 
+                                ? 'La entrega directa se procesó correctamente.' 
+                                : 'Direct delivery processed successfully.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+
+      // Auto-close both the success dialog and the main dialog
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          Navigator.of(context).pop(); // Close success dialog
+          Navigator.of(context).pop(true); // Close main dialog & return true to parent
+        }
+      });
+
+    } catch (e) {
+      debugPrint('Error en RPC: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(appLanguage.value == 'es' ? 'Selecciona al menos un ULD.' : 'Select at least one ULD.'),
-          backgroundColor: Colors.orange,
+          content: Text('Error: $e'),
+          backgroundColor: Colors.redAccent,
         ),
       );
-      return;
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-    
-    // El botón es puramente visual por ahora hasta que se defina la lógica del RPC.
-    debugPrint('Botón presionado. Lógica pendiente.');
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(appLanguage.value == 'es' ? 'Funcionalidad de entrega pendiente de configuración.' : 'Delivery functionality pending configuration.'),
-        backgroundColor: Colors.blueAccent,
-      ),
-    );
-    
-    Navigator.pop(context);
   }
 
   @override
@@ -169,7 +293,7 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
                       ? const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)))
                       : Form(
                           key: _formKey,
-                          child: SingleChildScrollView(
+                          child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,41 +316,77 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
                                     children: [
                                       Row(
                                         children: [
-                                          Expanded(child: _buildInput('Company', _companyCtrl, dark, textS, textP, borderC)),
+                                          Expanded(child: _buildInput('Company', _companyCtrl, dark, textS, textP, borderC, 
+                                            textCapitalization: TextCapitalization.characters,
+                                            inputFormatters: [
+                                              TextInputFormatter.withFunction((oldValue, newValue) {
+                                                return TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection);
+                                              }),
+                                            ]
+                                          )),
                                           const SizedBox(width: 16),
-                                          Expanded(child: _buildInput('Driver Name', _driverNameCtrl, dark, textS, textP, borderC)),
+                                          Expanded(child: _buildInput('Driver Name', _driverNameCtrl, dark, textS, textP, borderC, 
+                                            textCapitalization: TextCapitalization.words,
+                                            inputFormatters: [
+                                              TextInputFormatter.withFunction((oldValue, newValue) {
+                                                if (newValue.text.isEmpty) return newValue;
+                                                final text = newValue.text;
+                                                final buffer = StringBuffer();
+                                                bool capitalizeNext = true;
+                                                for (int i = 0; i < text.length; i++) {
+                                                  final char = text[i];
+                                                  if (char == ' ') {
+                                                    capitalizeNext = true;
+                                                    buffer.write(char);
+                                                  } else if (capitalizeNext) {
+                                                    buffer.write(char.toUpperCase());
+                                                    capitalizeNext = false;
+                                                  } else {
+                                                    buffer.write(char.toLowerCase());
+                                                  }
+                                                }
+                                                return TextEditingValue(text: buffer.toString(), selection: newValue.selection);
+                                              }),
+                                            ]
+                                          )),
                                         ],
                                       ),
                                       const SizedBox(height: 16),
                                       Row(
                                         children: [
-                                          Expanded(child: _buildInput('Door', _doorCtrl, dark, textS, textP, borderC)),
+                                          SizedBox(width: 60, child: _buildInput('Door', _doorCtrl, dark, textS, textP, borderC, 
+                                            keyboardType: TextInputType.number,
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter.digitsOnly,
+                                              LengthLimitingTextInputFormatter(2),
+                                            ]
+                                          )),
                                           const SizedBox(width: 16),
                                           Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text('Type', style: TextStyle(color: textS, fontSize: 11)),
-                                                const SizedBox(height: 4),
-                                                DropdownButtonFormField<String>(
-                                                  initialValue: _type,
-                                                  items: ['Import', 'Export', 'Transfer', 'Walk-In', 'Send-ULD']
-                                                      .map((i) => DropdownMenuItem(value: i, child: Text(i)))
-                                                      .toList(),
-                                                  onChanged: (v) => setState(() => _type = v!),
-                                                  dropdownColor: dark ? const Color(0xFF1E293B) : Colors.white,
-                                                  style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold),
-                                                  decoration: InputDecoration(
-                                                    isDense: true,
-                                                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
-                                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
-                                                    focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF6366f1))),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
+                                            flex: 3, 
+                                            child: _buildInput(
+                                              'ID Pickup', 
+                                              _idPickupCtrl, 
+                                              dark, textS, textP, borderC, 
+                                              suffixIcon: IconButton(
+                                                icon: const Icon(Icons.autorenew_rounded, size: 18),
+                                                onPressed: _generatePickupId,
+                                                color: const Color(0xFF6366f1),
+                                              ),
+                                            )
                                           ),
+                                          const SizedBox(width: 16),
+                                          Expanded(flex: 5, child: _buildInput('Remark', _remarkCtrl, dark, textS, textP, borderC, isRequired: false, 
+                                            textCapitalization: TextCapitalization.sentences,
+                                            inputFormatters: [
+                                              TextInputFormatter.withFunction((oldValue, newValue) {
+                                                if (newValue.text.isEmpty) return newValue;
+                                                final text = newValue.text;
+                                                final newText = text[0].toUpperCase() + text.substring(1).toLowerCase();
+                                                return TextEditingValue(text: newText, selection: newValue.selection);
+                                              }),
+                                            ]
+                                          )),
                                         ],
                                       ),
                                     ],
@@ -236,36 +396,100 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
                                 const SizedBox(height: 32),
                                 
                                 // List of Deliveries Section
-                                Text(
-                                  appLanguage.value == 'es' ? 'LISTA DE ENTREGAS' : 'DELIVERIES LIST',
-                                  style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          appLanguage.value == 'es' ? 'LISTA DE ULD NO BREAK' : 'LIST OF ULD NO BREAK',
+                                          style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1),
+                                        ),
+                                        if (_selectedUldIds.isNotEmpty) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF6366f1).withAlpha(30),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              '${_selectedUldIds.length}',
+                                              style: const TextStyle(color: Color(0xFF6366f1), fontSize: 12, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    SizedBox(
+                                      width: 200,
+                                      child: TextField(
+                                        controller: _searchCtrl,
+                                        style: TextStyle(color: textP, fontSize: 13),
+                                        textCapitalization: TextCapitalization.characters,
+                                        inputFormatters: [
+                                          TextInputFormatter.withFunction((oldValue, newValue) {
+                                            return TextEditingValue(text: newValue.text.toUpperCase(), selection: newValue.selection);
+                                          }),
+                                        ],
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: appLanguage.value == 'es' ? 'Buscar ULD...' : 'Search ULD...',
+                                          hintStyle: TextStyle(color: textS),
+                                          prefixIcon: Icon(Icons.search_rounded, color: textS, size: 16),
+                                          prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
+                                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
+                                          focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF6366f1))),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 16),
                                 
-                                if (_availableUlds.isEmpty)
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(32.0),
-                                      child: Text(
-                                        appLanguage.value == 'es' ? 'No hay ULDs disponibles para entrega.' : 'No ULDs available for delivery.',
-                                        style: TextStyle(color: textS),
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  ListView.separated(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: _availableUlds.length,
-                                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                                    itemBuilder: (context, index) {
-                                      final item = _availableUlds[index];
+                                Expanded(
+                                  child: Builder(
+                                  builder: (context) {
+                                    final searchQuery = _searchCtrl.text.toLowerCase().trim();
+                                    final filteredUlds = _availableUlds.where((item) {
+                                      final uldNumber = item['uld_number']?.toString().toLowerCase() ?? '';
+                                      return uldNumber.contains(searchQuery);
+                                    }).toList();
+                                    
+                                    if (_availableUlds.isEmpty) {
+                                      return Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(32.0),
+                                          child: Text(
+                                            appLanguage.value == 'es' ? 'No hay ULDs disponibles para entrega.' : 'No ULDs available for delivery.',
+                                            style: TextStyle(color: textS),
+                                          ),
+                                        ),
+                                      );
+                                    } else if (filteredUlds.isEmpty) {
+                                      return Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(32.0),
+                                          child: Text(
+                                            appLanguage.value == 'es' ? 'No se encontraron ULDs con esa búsqueda.' : 'No ULDs found matching your search.',
+                                            style: TextStyle(color: textS),
+                                          ),
+                                        ),
+                                      );
+                                    } else {
+                                      return ListView.separated(
+                                        itemCount: filteredUlds.length,
+                                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                        itemBuilder: (context, index) {
+                                          final item = filteredUlds[index];
                                       final uldId = item['id_uld']?.toString() ?? '';
                                       final rawNumber = item['uld_number']?.toString() ?? 'N/A';
-                                      final uldNumber = 'ULD: $rawNumber';
+                                      final uldNumber = rawNumber;
                                       
-                                      final pieces = item['pieces']?.toString() ?? '0';
-                                      final weight = item['weight']?.toString() ?? '0';
+                                      final pieces = item['pieces_total']?.toString() ?? '0';
+                                      final weight = item['weight_total']?.toString() ?? '0';
                                       
                                       final isSelected = _selectedUldIds.contains(uldId);
                                       
@@ -341,8 +565,12 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
                                         ),
                                       );
                                     },
-                                  ),
-                              ],
+                                  );
+                                }
+                              },
+                            ),
+                                ),
+                          ],
                             ),
                           ),
                         ),
@@ -357,7 +585,7 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
                     borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
                   ),
                   child: ElevatedButton.icon(
-                    onPressed: _isLoading ? null : _submit,
+                    onPressed: (_isLoading || _selectedUldIds.isEmpty) ? null : _submit,
                     icon: const Icon(Icons.task_alt_rounded, size: 20),
                     label: Text(
                       appLanguage.value == 'es' ? 'Marcar Entrega Finalizada' : 'Mark Delivery Finished',
@@ -382,23 +610,40 @@ class _DriverBfV2DirectDeliveryDialogState extends State<DriverBfV2DirectDeliver
     );
   }
 
-  Widget _buildInput(String label, TextEditingController controller, bool dark, Color textS, Color textP, Color borderC) {
+  Widget _buildInput(String label, TextEditingController controller, bool dark, Color textS, Color textP, Color borderC, {bool isRequired = true, Widget? suffixIcon, List<TextInputFormatter>? inputFormatters, TextInputType? keyboardType, TextCapitalization textCapitalization = TextCapitalization.none}) {
+    final hasError = _formSubmitted && isRequired && controller.text.trim().isEmpty;
+    final labelColor = hasError ? Colors.redAccent : textS;
+    final fillColor = hasError ? Colors.redAccent.withAlpha(15) : Colors.transparent;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: textS, fontSize: 11)),
+        Text(label, style: TextStyle(color: labelColor, fontSize: 11, fontWeight: hasError ? FontWeight.bold : FontWeight.normal)),
         const SizedBox(height: 4),
         TextFormField(
           controller: controller,
+          inputFormatters: inputFormatters,
+          keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold),
-          validator: (v) => v == null || v.trim().isEmpty ? '*' : null,
+          validator: isRequired ? ((v) => v == null || v.trim().isEmpty ? '' : null) : null,
+          onChanged: (value) {
+            if (_formSubmitted) setState(() {});
+          },
           decoration: InputDecoration(
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            filled: true,
+            fillColor: fillColor,
+            contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderC)),
             focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF6366f1))),
-            errorStyle: const TextStyle(height: 0),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.redAccent)),
+            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.redAccent, width: 1.5)),
+            errorStyle: const TextStyle(height: 0, fontSize: 0),
+            suffixIcon: suffixIcon ?? const SizedBox(width: 0, height: 40),
+            suffixIconConstraints: suffixIcon != null ? const BoxConstraints(minWidth: 36, minHeight: 40) : const BoxConstraints(minWidth: 0, minHeight: 40),
           ),
         ),
       ],
