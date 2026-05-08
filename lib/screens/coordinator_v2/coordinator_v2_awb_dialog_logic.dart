@@ -78,6 +78,10 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       notesCtrl = TextEditingController();
     }
     
+    piecesDamageCtrl.addListener(() {
+      notifyListeners();
+    });
+    
     _fetchExistingDamage();
   }
 
@@ -86,9 +90,16 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       final supabase = Supabase.instance.client;
       final fId = combined['flight_id'] ?? awbSplit['flight_id'];
       final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
+      final uId = combined['uld_id'] ?? awbSplit['uld_id'];
       
       if (fId != null && aId != null) {
-        final res = await supabase.from('damage_reports').select().eq('flight_id', fId).eq('awb_id', aId).maybeSingle();
+        var query = supabase.from('damage_reports').select().eq('flight_id', fId).eq('awb_id', aId);
+        if (uId != null) {
+          query = query.eq('uld_id', uId);
+        } else {
+          query = query.isFilter('uld_id', null);
+        }
+        final res = await query.maybeSingle();
         if (res != null) {
           existingDamageReportId = res['id']?.toString();
           if (res['damage_type'] is List) {
@@ -180,16 +191,39 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
     return total;
   }
 
-  Future<void> pickImageLocally(ImageSource source) async {
+  Future<void> pickImageLocally(ImageSource source, BuildContext context) async {
+    final int currentTotal = localPhotos.length + networkPhotos.length;
+    final int remaining = 9 - currentTotal;
+
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(appLanguage.value == 'es' ? 'Límite de 9 fotos alcanzado.' : 'Limit of 9 photos reached.')),
+      );
+      return;
+    }
+
     try {
       if (source == ImageSource.gallery) {
-        final pickedList = await picker.pickMultiImage(imageQuality: 70);
+        final pickedList = await picker.pickMultiImage(imageQuality: 60, maxWidth: 800, maxHeight: 800);
         if (pickedList.isNotEmpty) {
-          localPhotos.addAll(pickedList);
+          if (!context.mounted) return;
+          if (pickedList.length > remaining) {
+            localPhotos.addAll(pickedList.take(remaining));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(appLanguage.value == 'es' ? 'Solo se añadieron $remaining fotos para respetar el límite de 9.' : 'Only $remaining photos added to respect the 9 limit.')),
+            );
+          } else {
+            localPhotos.addAll(pickedList);
+          }
           notifyListeners();
         }
       } else {
-        final picked = await picker.pickImage(source: source, imageQuality: 70);
+        final picked = await picker.pickImage(
+          source: source,
+          imageQuality: 60,
+          maxWidth: 800,
+          maxHeight: 800,
+        );
         if (picked != null) {
           localPhotos.add(picked);
           notifyListeners();
@@ -364,35 +398,6 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       final dmgPieces = int.tryParse(piecesDamageCtrl.text) ?? 0;
       final List<String> finalUrls = [...networkPhotos, ...uploadedUrls];
 
-      if (selectedDamages.isNotEmpty || finalUrls.isNotEmpty || dmgPieces > 0) {
-         final Map<String, dynamic> reportData = {
-           'damage_type': selectedDamages,
-           'photo_urls': finalUrls,
-           'pieces_damage': dmgPieces,
-         };
-         
-         if (existingDamageReportId != null) {
-            await supabase.from('damage_reports').update(reportData).eq('id', existingDamageReportId!);
-         } else {
-            final fId = combined['flight_id'] ?? awbSplit['flight_id'];
-            if (fId != null) reportData['flight_id'] = fId;
-            
-            final uId = combined['uld_id'] ?? awbSplit['uld_id'];
-            if (uId != null) reportData['uld_id'] = uId;
-            
-            final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
-            if (aId != null) reportData['awb_id'] = aId;
-            
-            final usrId = supabase.auth.currentUser?.id;
-            if (usrId != null) reportData['user_id'] = usrId;
-
-            await supabase.from('damage_reports').insert(reportData);
-         }
-      } else if (existingDamageReportId != null && selectedDamages.isEmpty && finalUrls.isEmpty && dmgPieces == 0) {
-         // Si vaciaron todo el reporte existente, lo borramos de la BD
-         await supabase.from('damage_reports').delete().eq('id', existingDamageReportId!);
-      }
-
       final String finLocation = selectedLocation == 'Other' ? locationOtherCtrl.text.trim() : (selectedLocation ?? '');
       
       final Map<String, dynamic> dataCoordinator = {};
@@ -443,20 +448,40 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       }
 
       final awbSplitId = awbSplit['id'];
-      if (awbSplitId != null) {
-        final updateData = <String, dynamic>{
-          'data_coordinator': dataCoordinator,
-          'total_checked': checkedPieces,
-          'not_found': notFoundSelected,
-        };
-        if (finLocation.isNotEmpty) {
-          updateData['required_location'] = finLocation;
-        } else {
-          updateData['required_location'] = null;
-        }
+      
+      final Map<String, dynamic> rpcParams = {
+        'p_split_id': awbSplitId,
+        'p_checked_pieces': checkedPieces,
+        'p_not_found': notFoundSelected,
+        'p_location': finLocation.isNotEmpty ? finLocation : null,
+        'p_data_coordinator': dataCoordinator,
+        'p_existing_damage_id': existingDamageReportId != null ? int.tryParse(existingDamageReportId!) : null,
+      };
 
-        await supabase.from('awb_splits').update(updateData).eq('id', awbSplitId);
+      if (selectedDamages.isNotEmpty || finalUrls.isNotEmpty || dmgPieces > 0) {
+        final fId = combined['flight_id'] ?? awbSplit['flight_id'];
+        final uId = combined['uld_id'] ?? awbSplit['uld_id'];
+        final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
+        final usrId = supabase.auth.currentUser?.id;
+
+        rpcParams['p_flight_id'] = fId;
+        rpcParams['p_uld_id'] = uId;
+        rpcParams['p_awb_id'] = aId;
+        rpcParams['p_user_id'] = usrId;
+        rpcParams['p_damage_type'] = selectedDamages.isEmpty ? null : selectedDamages;
+        rpcParams['p_photo_urls'] = finalUrls.isEmpty ? null : finalUrls;
+        rpcParams['p_pieces_damage'] = dmgPieces;
+      } else {
+        rpcParams['p_flight_id'] = null;
+        rpcParams['p_uld_id'] = null;
+        rpcParams['p_awb_id'] = null;
+        rpcParams['p_user_id'] = null;
+        rpcParams['p_damage_type'] = null;
+        rpcParams['p_photo_urls'] = null;
+        rpcParams['p_pieces_damage'] = 0;
       }
+
+      await supabase.rpc('rpc_save_coordinator_data', params: rpcParams);
 
       if (context.mounted) {
         Navigator.pop(context, true);

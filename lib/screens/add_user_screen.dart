@@ -39,6 +39,54 @@ class AddUserScreenState extends State<AddUserScreen> {
 
   final List<Map<String, dynamic>> _pagesList = [
     {
+      'key': 'dashboard',
+      'titleEs': 'Dashboard',
+      'titleEn': 'Dashboard',
+      'descEs': 'Panel general.',
+      'descEn': 'General dashboard.',
+      'icon': Icons.dashboard_rounded,
+    },
+    {
+      'key': 'flights',
+      'titleEs': 'Vuelos',
+      'titleEn': 'Flights',
+      'descEs': 'Acceso para gestionar y visualizar vuelos.',
+      'descEn': 'Access to manage and view flights.',
+      'icon': Icons.flight_land_rounded,
+    },
+    {
+      'key': 'awbs',
+      'titleEs': 'Almacenaje',
+      'titleEn': 'Storage',
+      'descEs': 'Gestión de carga y almacén.',
+      'descEn': 'Cargo and storage management.',
+      'icon': Icons.description_outlined,
+    },
+    {
+      'key': 'delivers',
+      'titleEs': 'Entregas',
+      'titleEn': 'Delivers',
+      'descEs': 'Acceso para registrar y administrar entregas.',
+      'descEn': 'Access to register and manage deliveries.',
+      'icon': Icons.local_shipping_outlined,
+    },
+    {
+      'key': 'damages',
+      'titleEs': 'Daños',
+      'titleEn': 'Damages',
+      'descEs': 'Reportes de daños y auditoría.',
+      'descEn': 'Damage reports and auditing.',
+      'icon': Icons.broken_image_outlined,
+    },
+    {
+      'key': 'users',
+      'titleEs': 'Usuarios',
+      'titleEn': 'Users',
+      'descEs': 'Administración de roles y accesos.',
+      'descEn': 'Management of roles and accesses.',
+      'icon': Icons.people_alt_rounded,
+    },
+    {
       'key': 'system',
       'titleEs': 'Sistema',
       'titleEn': 'System',
@@ -92,56 +140,7 @@ class AddUserScreenState extends State<AddUserScreen> {
       'titleEn': 'Area (No break)',
       'descEs': 'Acceso a la gestión de áreas.',
       'descEn': 'Access to area management.',
-      'icon': Icons.dashboard_customize_rounded,
-    },
-
-    {
-      'key': 'dashboard',
-      'titleEs': 'Dashboard',
-      'titleEn': 'Dashboard',
-      'descEs': 'Panel general.',
-      'descEn': 'General dashboard.',
-      'icon': Icons.dashboard_rounded,
-    },
-    {
-      'key': 'flights',
-      'titleEs': 'Vuelos',
-      'titleEn': 'Flights',
-      'descEs': 'Acceso para gestionar y visualizar vuelos.',
-      'descEn': 'Access to manage and view flights.',
-      'icon': Icons.flight_land_rounded,
-    },
-    {
-      'key': 'ulds',
-      'titleEs': 'Contenedores (ULD)',
-      'titleEn': 'Unit Load Devices (ULD)',
-      'descEs': 'Acceso para crear y asignar contenedores.',
-      'descEn': 'Access to create and assign ULDs.',
-      'icon': Icons.luggage_rounded,
-    },
-    {
-      'key': 'awbs',
-      'titleEs': 'Guías Aéreas (AWB)',
-      'titleEn': 'Air Waybills (AWB)',
-      'descEs': 'Acceso a la administración de guías aéreas.',
-      'descEn': 'Access to the management of Air Waybills.',
-      'icon': Icons.receipt_long_rounded,
-    },
-    {
-      'key': 'delivers',
-      'titleEs': 'Entregas',
-      'titleEn': 'Delivers',
-      'descEs': 'Acceso para registrar y administrar entregas.',
-      'descEn': 'Access to register and manage deliveries.',
-      'icon': Icons.local_shipping_rounded,
-    },
-    {
-      'key': 'users',
-      'titleEs': 'Usuarios',
-      'titleEn': 'Users',
-      'descEs': 'Administración de roles y accesos.',
-      'descEn': 'Management of roles and accesses.',
-      'icon': Icons.people_alt_rounded,
+      'icon': Icons.grid_view_rounded,
     },
   ];
 
@@ -149,24 +148,11 @@ class AddUserScreenState extends State<AddUserScreen> {
   final Map<String, bool> _accessMap = {};
 
   void _updateDefaultsForPosition() {
-    final agentDefaults = ['dashboard', 'system', 'location', 'driver', 'system_bf', 'driver_bf', 'area_nobreak'];
-    final coordinatorDefaults = ['dashboard', 'system', 'coordinator', 'location', 'driver', 'system_bf', 'driver_bf', 'area_nobreak'];
-    final officeDefaults = ['dashboard', 'flights', 'ulds', 'awbs', 'delivers', 'users'];
-    
-    List<String> activeKeys = [];
-    if (_position == 'Agent') {
-      activeKeys = agentDefaults;
-    } else if (_position == 'Coordinator') {
-      activeKeys = coordinatorDefaults;
-    } else if (_position == 'Office') {
-      activeKeys = officeDefaults;
-    } else if (_position == 'Manager' || _position == 'Supervisor') {
-      activeKeys = _pagesList.map((p) => p['key'] as String).toList();
-    }
-
+    // We disable automatic page activation so the user can be configured manually from scratch
     for (var p in _pagesList) {
       final k = p['key'] as String;
-      _accessMap[k] = activeKeys.contains(k);
+      // If there's already a value, keep it. Otherwise default to false.
+      _accessMap[k] = _accessMap[k] ?? false;
     }
 
     if (_position == 'Coordinator' || _position == 'Supervisor' || _position == 'Manager') {
@@ -174,14 +160,6 @@ class AddUserScreenState extends State<AddUserScreen> {
     } else {
       _masterDriver = false;
     }
-
-    _pagesList.sort((a, b) {
-      bool aActive = activeKeys.contains(a['key']);
-      bool bActive = activeKeys.contains(b['key']);
-      if (aActive && !bActive) return -1;
-      if (!aActive && bActive) return 1;
-      return 0;
-    });
   }
 
   @override
@@ -263,7 +241,7 @@ class AddUserScreenState extends State<AddUserScreen> {
                     width: 320,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                     decoration: BoxDecoration(
-                      color: dark ? const Color(0xFF1e293b) : Colors.white,
+                      color: dark ? const Color(0xFF0f172a) : Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
@@ -377,7 +355,7 @@ class AddUserScreenState extends State<AddUserScreen> {
     final bool? shouldPop = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: const Color(0xFF0f172a),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
         title: const Column(
           children: [
@@ -441,7 +419,7 @@ class AddUserScreenState extends State<AddUserScreen> {
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
         final textP = dark ? Colors.white : const Color(0xFF111827);
-        final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+        final bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
         final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
 
         Widget content = Column(
@@ -690,7 +668,7 @@ class AddUserScreenState extends State<AddUserScreen> {
         return Scaffold(
           backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
           appBar: AppBar(
-            backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            backgroundColor: dark ? const Color(0xFF0f172a) : Colors.white,
             elevation: 0,
             iconTheme: IconThemeData(color: textP),
             title: Text(
@@ -755,7 +733,7 @@ class AddUserScreenState extends State<AddUserScreen> {
         DropdownButtonFormField<String>(
           initialValue: value,
           onChanged: onChanged,
-          dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+          dropdownColor: dark ? const Color(0xFF0f172a) : Colors.white,
           style: TextStyle(color: textP),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 20),

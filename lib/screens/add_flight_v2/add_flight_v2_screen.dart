@@ -45,7 +45,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
     final bool? shouldPop = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: const Color(0xFF0f172a),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
         title: const Column(children: [Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 60), SizedBox(height: 16), Text('Discard Data?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22))]),
         content: const Padding(
@@ -74,7 +74,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1e293b),
+            backgroundColor: const Color(0xFF0f172a),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: Colors.redAccent.withAlpha(50)),
@@ -124,7 +124,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                 color: Colors.transparent,
                 child: Container(
                   width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  decoration: BoxDecoration(color: dark ? const Color(0xFF1e293b) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                  decoration: BoxDecoration(color: dark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -167,7 +167,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
             animation: logic,
             builder: (context, _) {
               final textP = dark ? Colors.white : const Color(0xFF111827);
-              final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+              final bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
               final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
               final content = _buildFormContent(dark, textP, bgCard, borderC);
               if (widget.isInline) return content;
@@ -175,7 +175,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                 backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
                 appBar: AppBar(
                   title: Text('Add New Flight', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
-                  backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+                  backgroundColor: dark ? const Color(0xFF0f172a) : Colors.white,
                   elevation: 0, iconTheme: IconThemeData(color: textP),
                   bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),
                 ),
@@ -308,7 +308,7 @@ class AddFlightV2ScreenState extends State<AddFlightV2Screen> {
                           child: Padding(
                             padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
                             child: Container(
-                              decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
+                              decoration: BoxDecoration(color: dark ? Colors.transparent : const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(12), border: Border.all(color: borderC)),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: logic.flightLocalUlds.isNotEmpty

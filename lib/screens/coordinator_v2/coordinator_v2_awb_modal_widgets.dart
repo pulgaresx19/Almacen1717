@@ -276,6 +276,8 @@ Widget buildDamageSection(
 ) {
   final damagesList = ['Torn', 'Crushed', 'Wet', 'Broken', 'Open', 'Missing', 'Cracked', 'Leaking', 'Other'];
   final int totalPhotos = networkPhotos.length + localPhotos.length;
+  final piecesCount = int.tryParse(piecesDamageCtrl.text.trim()) ?? 0;
+  final hasPieces = piecesCount > 0;
 
   return Expanded(
     flex: 2,
@@ -309,7 +311,7 @@ Widget buildDamageSection(
                     decoration: BoxDecoration(
                       color: dark ? Colors.white.withAlpha(10) : Colors.white,
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                      border: Border.all(color: (!hasPieces && !isReadOnly) ? const Color(0xFFEF4444) : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
                     ),
                     child: Material(
                       color: Colors.transparent,
@@ -336,29 +338,35 @@ Widget buildDamageSection(
                   ),
                   const SizedBox(width: 12),
                   if (!isReadOnly) ...[
-                    InkWell(
-                      onTap: onPickGallery,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: dark ? Colors.white.withAlpha(10) : Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                    Opacity(
+                      opacity: hasPieces ? 1.0 : 0.4,
+                      child: InkWell(
+                        onTap: hasPieces ? onPickGallery : null,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                          ),
+                          child: const Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF3B82F6)),
                         ),
-                        child: const Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF3B82F6)),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    InkWell(
-                      onTap: onPickCamera,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: dark ? Colors.white.withAlpha(10) : Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                    Opacity(
+                      opacity: hasPieces ? 1.0 : 0.4,
+                      child: InkWell(
+                        onTap: hasPieces ? onPickCamera : null,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                          ),
+                          child: const Icon(Icons.camera_alt_outlined, size: 16, color: Color(0xFF10B981)),
                         ),
-                        child: const Icon(Icons.camera_alt_outlined, size: 16, color: Color(0xFF10B981)),
                       ),
                     ),
                   ],
@@ -446,9 +454,11 @@ Widget buildDamageSection(
                 runSpacing: 6,
                 children: damagesList.map((dmg) {
                   final isSelected = selectedDamages.contains(dmg);
-                  return InkWell(
-                    onTap: isReadOnly ? null : () {
-                      final newList = List<String>.from(selectedDamages);
+                  return Opacity(
+                    opacity: (!hasPieces && !isReadOnly) ? 0.4 : 1.0,
+                    child: InkWell(
+                      onTap: (isReadOnly || !hasPieces) ? null : () {
+                        final newList = List<String>.from(selectedDamages);
                       if (isSelected) {
                         newList.remove(dmg);
                       } else {
@@ -476,7 +486,8 @@ Widget buildDamageSection(
                         ),
                       ),
                     ),
-                  );
+                  ),
+                );
                 }).toList(),
               ),
             ),

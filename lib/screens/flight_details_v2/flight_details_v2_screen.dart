@@ -148,7 +148,7 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
   Widget build(BuildContext context) {
     final textP = widget.dark ? Colors.white : const Color(0xFF111827);
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-    final bgCard = widget.dark ? const Color(0xFF1e293b) : Colors.white;
+    final bgCard = widget.dark ? Colors.white.withAlpha(10) : Colors.white;
     final borderCard = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
     
     final carrier = widget.flight['carrier'] ?? '';

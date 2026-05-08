@@ -42,7 +42,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                 width: 320,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                 decoration: BoxDecoration(
-                  color: dark ? const Color(0xFF1e293b) : Colors.white,
+                  color: dark ? const Color(0xFF0f172a) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: dark ? Colors.white12 : Colors.black12),
                 ),
@@ -228,7 +228,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
                  color: Colors.transparent,
                  child: Container(
                    width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                   decoration: BoxDecoration(color: dark ? const Color(0xFF1e293b) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                   decoration: BoxDecoration(color: dark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
                    child: Column(
                      mainAxisSize: MainAxisSize.min,
                      children: [
@@ -270,7 +270,7 @@ class _AwbsV2AddItemsScreenState extends State<AwbsV2AddItemsScreen> {
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
         final Color textP = dark ? Colors.white : const Color(0xFF111827);
-        final Color bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+        final Color bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
         final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
 
         return Column(

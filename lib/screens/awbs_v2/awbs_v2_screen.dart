@@ -8,6 +8,7 @@ import 'awbs_v2_uld_drawer.dart';
 import '../../services/realtime_service.dart';
 import '../flights_v2/flights_v2_status_logic.dart';
 import 'awbs_v2_add_items_screen.dart';
+import 'awbs_v2_history.dart';
 
 class AwbsV2Screen extends StatefulWidget {
   final bool isActive;
@@ -22,6 +23,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
   final _searchController = TextEditingController();
   bool _showAddItemsForm = false;
   bool _showUldTab = false;
+  bool _showHistory = false;
 
   @override
   void initState() {
@@ -52,7 +54,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
       builder: (context, dark, child) {
         final Color textP = dark ? Colors.white : const Color(0xFF111827);
         final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-        final Color bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+        final Color bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
         final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
         final Color iconColor = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
 
@@ -75,7 +77,12 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (!_showAddItemsForm) ...[
+                    if (_showHistory)
+                      Text(
+                        appLanguage.value == 'es' ? 'Historial de Storage' : 'Storage History',
+                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
+                      )
+                    else if (!_showAddItemsForm) ...[
                       Row(
                         children: [
                           GestureDetector(
@@ -122,7 +129,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 ),
                 const Spacer(),
                 
-                if (!_showAddItemsForm) ...[
+                if (!_showAddItemsForm && !_showHistory) ...[
                   // Search Box
                   Container(
                     width: 300,
@@ -196,12 +203,47 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                     ),
                   ],
                   const SizedBox(width: 8),
+                  
+                  // History Button
+                  SizedBox(
+                    height: 40,
+                    width: 40,
+                    child: Tooltip(
+                      message: appLanguage.value == 'es' ? 'Ver Historial' : 'View History',
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _showHistory = true;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFeab308).withAlpha(40),
+                          foregroundColor: const Color(0xFFeab308),
+                          padding: EdgeInsets.zero,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Icon(Icons.folder_open_rounded, size: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                 ],
               ],
             ),
             SizedBox(height: _showAddItemsForm ? 12 : 30),
             
-            if (_showAddItemsForm)
+            if (_showHistory)
+              Expanded(
+                child: AwbsV2History(
+                  onBackToMain: () {
+                    setState(() {
+                      _showHistory = false;
+                    });
+                  },
+                ),
+              )
+            else if (_showAddItemsForm)
               Expanded(
                 child: AwbsV2AddItemsScreen(
                   onPop: () {

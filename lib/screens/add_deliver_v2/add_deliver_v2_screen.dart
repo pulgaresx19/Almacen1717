@@ -150,7 +150,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     final bool? shouldPop = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: const Color(0xFF0f172a),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: const Color(0xFFf59e0b).withAlpha(100), width: 2)),
         title: const Column(
           children: [
@@ -231,7 +231,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
         final textP = dark ? Colors.white : const Color(0xFF111827);
-        final bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+        final bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
         final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
         final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
 
@@ -519,7 +519,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
             backgroundColor: dark ? const Color(0xFF0f172a) : const Color(0xFFF3F4F6),
             appBar: AppBar(
               title: Text(appLanguage.value == 'es' ? 'AÃƒÆ’Ã‚Â±adir Nueva Entrega' : 'Add New Deliver', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.w600)),
-              backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+              backgroundColor: dark ? const Color(0xFF0f172a) : Colors.white,
               elevation: 0,
               iconTheme: IconThemeData(color: textP),
               bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderC, height: 1)),

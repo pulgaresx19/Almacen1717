@@ -2,25 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
-import 'delivers_v2_logic.dart';
-import 'delivers_v2_dialogs.dart';
+import 'damages_v2_table.dart';
+import 'damages_v2_drawer.dart';
 
-class DeliversV2History extends StatefulWidget {
-  final DeliversV2Logic logic;
+class DamagesV2History extends StatefulWidget {
   final VoidCallback onBackToMain;
-  const DeliversV2History({super.key, required this.logic, required this.onBackToMain});
+  const DamagesV2History({super.key, required this.onBackToMain});
 
   @override
-  State<DeliversV2History> createState() => _DeliversV2HistoryState();
+  State<DamagesV2History> createState() => _DamagesV2HistoryState();
 }
 
-class _DeliversV2HistoryState extends State<DeliversV2History> {
-  String? _selectedDate; // The date folder currently opened
+class _DamagesV2HistoryState extends State<DamagesV2History> {
+  String? _selectedDate;
   bool _isLoadingSummary = true;
   List<Map<String, dynamic>> _summaryList = [];
   
   bool _isLoadingDay = false;
-  List<Map<String, dynamic>> _dayDeliveries = [];
+  List<Map<String, dynamic>> _dayDamages = [];
 
   @override
   void initState() {
@@ -30,7 +29,7 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
 
   Future<void> _fetchSummary() async {
     try {
-      final res = await Supabase.instance.client.rpc('rpc_get_deliveries_summary');
+      final res = await Supabase.instance.client.rpc('rpc_get_damages_summary');
       if (mounted) {
         setState(() {
           _summaryList = List<Map<String, dynamic>>.from(res);
@@ -38,38 +37,58 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching deliveries summary: $e');
+      debugPrint('Error fetching damages summary: $e');
       if (mounted) {
         setState(() => _isLoadingSummary = false);
       }
     }
   }
 
-  Future<void> _fetchDayDeliveries(String dateStr) async {
+  Future<void> _fetchDayItems(String dateStr) async {
     setState(() {
       _selectedDate = dateStr;
       _isLoadingDay = true;
-      _dayDeliveries = [];
+      _dayDamages = [];
     });
     try {
       final start = DateTime.parse(dateStr);
       final end = start.add(const Duration(days: 1));
       
-      final res = await Supabase.instance.client
-          .from('deliveries')
-          .select()
-          .gte('time', start.toIso8601String())
-          .lt('time', end.toIso8601String())
-          .order('time', ascending: false);
+      final data = await Supabase.instance.client
+          .from('damage_reports')
+          .select('*, flights(carrier, number, date), ulds(uld_number), awbs(awb_number)')
+          .gte('created_at', start.toUtc().toIso8601String())
+          .lt('created_at', end.toUtc().toIso8601String())
+          .order('created_at', ascending: false);
+
+      final userIds = data.map((d) => d['user_id']).where((id) => id != null).toSet().toList();
+      Map<String, String> userMap = {};
+      if (userIds.isNotEmpty) {
+        final usersData = await Supabase.instance.client
+            .from('users')
+            .select('id, full_name')
+            .inFilter('id', userIds);
+        for (var u in usersData) {
+          userMap[u['id'].toString()] = u['full_name'].toString();
+        }
+      }
+
+      final mappedData = data.map((d) {
+        final Map<String, dynamic> damage = Map<String, dynamic>.from(d);
+        if (damage['user_id'] != null && userMap.containsKey(damage['user_id'].toString())) {
+          damage['users'] = [{'full_name': userMap[damage['user_id'].toString()]}];
+        }
+        return damage;
+      }).toList();
 
       if (mounted && _selectedDate == dateStr) {
         setState(() {
-          _dayDeliveries = List<Map<String, dynamic>>.from(res);
+          _dayDamages = mappedData;
           _isLoadingDay = false;
         });
       }
     } catch (e) {
-      debugPrint('Error fetching deliveries for day: $e');
+      debugPrint('Error fetching damages for day: $e');
       if (mounted && _selectedDate == dateStr) {
         setState(() => _isLoadingDay = false);
       }
@@ -95,7 +114,6 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -122,16 +140,14 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
                     const SizedBox(width: 12),
                     Text(
                       _selectedDate == null
-                          ? (appLanguage.value == 'es' ? 'Historial de Entregas' : 'Deliveries History')
-                          : (appLanguage.value == 'es' ? 'Entregas del $_selectedDate' : 'Deliveries on $_selectedDate'),
+                          ? (appLanguage.value == 'es' ? 'Historial de Daños' : 'Damages History')
+                          : (appLanguage.value == 'es' ? 'Daños del $_selectedDate' : 'Damages on $_selectedDate'),
                       style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
               const Divider(height: 1, color: Colors.transparent),
-
-              // Content
               Expanded(
                 child: _selectedDate == null
                     ? _buildFoldersView(dark, textP, textS, borderCard)
@@ -170,7 +186,7 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
       itemBuilder: (context, index) {
         final item = _summaryList[index];
         final dateKey = item['date_group']?.toString() ?? 'Unknown';
-        final count = item['delivery_count']?.toString() ?? '0';
+        final count = item['damage_count']?.toString() ?? '0';
         
         String niceDate = dateKey;
         if (dateKey != 'Unknown') {
@@ -182,7 +198,7 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
 
         return InkWell(
           onTap: () {
-            _fetchDayDeliveries(dateKey);
+            _fetchDayItems(dateKey);
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
@@ -199,16 +215,19 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
                   color: Color(0xFFeab308),
                   size: 64,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  niceDate,
-                  style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 16),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$count ${appLanguage.value == 'es' ? 'entregas' : 'delivers'}',
-                  style: TextStyle(color: textS, fontSize: 13),
+                const SizedBox(height: 16),
+                Text(niceDate, style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366f1).withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$count reports',
+                    style: const TextStyle(color: Color(0xFF6366f1), fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -223,58 +242,29 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
     }
 
-    if (_dayDeliveries.isEmpty) {
-      return Center(child: Text('No items', style: TextStyle(color: textS)));
+    if (_dayDamages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.report_problem_rounded, size: 64, color: dark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(20)),
+            const SizedBox(height: 16),
+            Text(appLanguage.value == 'es' ? 'No hay daños' : 'No Damages', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(appLanguage.value == 'es' ? 'No hay daños reportados en esta fecha.' : 'There are no damages reported on this date.', style: TextStyle(color: textS)),
+          ],
+        )
+      );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: _dayDeliveries.length,
-      itemBuilder: (context, index) {
-        final item = _dayDeliveries[index];
-        final company = item['company']?.toString() ?? '-';
-        final driver = item['driver_name']?.toString() ?? '-';
-        final door = item['door']?.toString() ?? '-';
-        final time = item['time']?.toString() ?? '';
-        
-        String niceTime = time;
-        if (time.isNotEmpty) {
-          try {
-            final dt = DateTime.parse(time);
-            niceTime = DateFormat('HH:mm').format(dt.toLocal());
-          } catch (_) {}
-        }
-
-        return Card(
-          color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: borderCard),
-          ),
-          child: ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFF6366f1),
-              child: Icon(Icons.local_shipping_rounded, color: Colors.white, size: 20),
-            ),
-            title: Text(company, style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
-            subtitle: Text('$driver • Door $door', style: TextStyle(color: textS)),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(niceTime, style: TextStyle(color: textS, fontWeight: FontWeight.w600)),
-                const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: textS),
-              ],
-            ),
-            onTap: () {
-              DeliversV2Dialogs.showDeliverDetails(context, item, dark);
-            },
-          ),
-        );
-      },
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
+      child: DamagesV2Table(
+        damages: _dayDamages,
+        onSelect: (damage) {
+          DamagesV2Drawer.show(context, damage, dark);
+        },
+      ),
     );
   }
 }
-

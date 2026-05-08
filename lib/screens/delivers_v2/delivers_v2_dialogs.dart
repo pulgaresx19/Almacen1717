@@ -17,7 +17,7 @@ class DeliversV2Dialogs {
 
     showDialog(context: context, builder: (ctx) {
       return Dialog(
-        backgroundColor: dark ? const Color(0xFF1e293b) : Colors.white,
+        backgroundColor: dark ? const Color(0xFF0f172a) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
           width: 400,
@@ -323,7 +323,7 @@ class DeliversV2Dialogs {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                           decoration: BoxDecoration(
-                                            color: dark ? const Color(0xFF1e293b) : Colors.white,
+                                            color: dark ? const Color(0xFF0f172a) : Colors.white,
                                             border: Border.all(color: borderC),
                                             borderRadius: BorderRadius.circular(8),
                                           ),
@@ -442,7 +442,7 @@ class DeliversV2Dialogs {
             initialTime: TimeOfDay(hour: tdt.hour, minute: tdt.minute),
             builder: (context, child) => Theme(
                 data: ThemeData.dark().copyWith(
-                  colorScheme: const ColorScheme.dark(primary: Color(0xFF6366f1), surface: Color(0xFF1e293b)),
+                  colorScheme: const ColorScheme.dark(primary: Color(0xFF6366f1), surface: Color(0xFF0f172a)),
                 ),
                 child: MediaQuery(
                   data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
@@ -475,7 +475,7 @@ class DeliversV2Dialogs {
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             value: currentType,
-            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            dropdownColor: dark ? const Color(0xFF0f172a) : Colors.white,
             isExpanded: true,
             style: TextStyle(color: colorP, fontSize: 12),
             items: const [
@@ -500,7 +500,7 @@ class DeliversV2Dialogs {
         child: DropdownButtonHideUnderline(
           child: DropdownButton<bool>(
             value: tempU[key] == true,
-            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            dropdownColor: dark ? const Color(0xFF0f172a) : Colors.white,
             isExpanded: true,
             style: TextStyle(color: colorP, fontSize: 12),
             items: const [
@@ -529,7 +529,7 @@ class DeliversV2Dialogs {
         child: DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             value: currentStatus,
-            dropdownColor: dark ? const Color(0xFF1e293b) : Colors.white,
+            dropdownColor: dark ? const Color(0xFF0f172a) : Colors.white,
             isExpanded: true,
             style: TextStyle(color: colorP, fontSize: 12),
             items: statuses.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
@@ -595,7 +595,7 @@ class DeliversV2Dialogs {
               width: 280,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: dark ? const Color(0xFF1e293b) : Colors.white,
+                color: dark ? const Color(0xFF0f172a) : Colors.white,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(color: Colors.black.withAlpha(40), blurRadius: 20, offset: const Offset(0, 10))

@@ -38,7 +38,11 @@ class RealtimeService {
       awbSplits.value = data;
     });
 
-    _awbsSub = supabase.from('awbs').stream(primaryKey: ['id']).order('awb_number', ascending: true).listen((data) {
+    final todayStr = DateTime.now().toIso8601String().split('T')[0];
+
+    _awbsSub = supabase.from('awbs').stream(primaryKey: ['id'])
+        .neq('status', 'Delivered')
+        .order('awb_number', ascending: true).listen((data) {
       awbs.value = data;
     });
 
@@ -46,7 +50,9 @@ class RealtimeService {
       damageReports.value = data;
     });
 
-    _deliveriesSub = supabase.from('deliveries').stream(primaryKey: ['id_delivery']).order('time', ascending: true).listen((data) {
+    _deliveriesSub = supabase.from('deliveries').stream(primaryKey: ['id_delivery'])
+        .gte('time', todayStr)
+        .order('time', ascending: true).listen((data) {
       deliveries.value = data;
     });
 
@@ -62,7 +68,9 @@ class RealtimeService {
       system2.value = data;
     });
 
-    _uldsSub = supabase.from('ulds').stream(primaryKey: ['id_uld']).listen((data) {
+    _uldsSub = supabase.from('ulds').stream(primaryKey: ['id_uld'])
+        .neq('status', 'Delivered')
+        .listen((data) {
       ulds.value = data;
     });
   }

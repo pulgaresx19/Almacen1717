@@ -17,12 +17,16 @@ class _UsersModuleState extends State<UsersModule> {
   final _searchController = TextEditingController();
   bool _showAddForm = false;
   final GlobalKey<AddUserScreenState> _addUserKey = GlobalKey<AddUserScreenState>();
-  late Stream<List<Map<String, dynamic>>> _usersStream;
+  late Future<List<Map<String, dynamic>>> _usersFuture;
 
   @override
   void initState() {
     super.initState();
-    _usersStream = Supabase.instance.client.from('users').select().order('full_name', ascending: true).asStream();
+    _loadUsers();
+  }
+
+  void _loadUsers() {
+    _usersFuture = Supabase.instance.client.from('users').select().order('full_name', ascending: true);
   }
 
   @override
@@ -31,7 +35,10 @@ class _UsersModuleState extends State<UsersModule> {
     if (oldWidget.isActive && !widget.isActive) {
       if (_showAddForm && _addUserKey.currentState != null) {
         if (!_addUserKey.currentState!.hasDataSync) {
-          setState(() => _showAddForm = false);
+          setState(() {
+            _showAddForm = false;
+            _loadUsers();
+          });
         }
       }
     }
@@ -82,10 +89,16 @@ class _UsersModuleState extends State<UsersModule> {
                               if (_addUserKey.currentState != null) {
                                 final canPop = await _addUserKey.currentState!.handleBackRequest();
                                 if (canPop) {
-                                  setState(() => _showAddForm = false);
+                                  setState(() {
+                                    _showAddForm = false;
+                                    _loadUsers();
+                                  });
                                 }
                               } else {
-                                setState(() => _showAddForm = false);
+                                setState(() {
+                                  _showAddForm = false;
+                                  _loadUsers();
+                                });
                               }
                             },
                             icon: const Icon(Icons.arrow_back_rounded, size: 20),
@@ -160,7 +173,12 @@ class _UsersModuleState extends State<UsersModule> {
             child: AddUserScreen(
               key: _addUserKey,
               isInline: true,
-              onPop: (_) => setState(() => _showAddForm = false),
+              onPop: (_) {
+                setState(() {
+                  _showAddForm = false;
+                  _loadUsers();
+                });
+              },
             )
           )
         else
@@ -175,8 +193,8 @@ class _UsersModuleState extends State<UsersModule> {
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(
                   children: [
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: _usersStream,
+                  FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _usersFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                         return const Center(

@@ -127,7 +127,7 @@ class DashboardViewModule extends StatelessWidget {
   }
 
   Widget _buildStatCard(BuildContext context, bool dark, String titleEs, String titleEn, String value, IconData icon, Color accentColor) {
-    final Color bg = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
+    final Color bg = dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff);
     final Color border = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
     final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final Color textP = dark ? Colors.white : const Color(0xFF111827);
@@ -198,7 +198,7 @@ class DashboardViewModule extends StatelessWidget {
   }
 
   Widget _buildOperationsSummaryCard(BuildContext context, bool dark) {
-    final Color bg = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
+    final Color bg = dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff);
     final Color border = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
     final Color shadow = dark ? Colors.black.withAlpha(25) : const Color(0xFF000000).withAlpha(12);
     final Color textP = dark ? Colors.white : const Color(0xFF111827);
@@ -331,7 +331,7 @@ class DashboardViewModule extends StatelessWidget {
   }
 
   Widget _buildRecentFlightsList(BuildContext context, bool dark) {
-    final Color bg = dark ? const Color(0xFF1e293b) : const Color(0xFFffffff);
+    final Color bg = dark ? Colors.white.withAlpha(10) : const Color(0xFFffffff);
     final Color border = dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB);
     final Color shadow = dark ? Colors.black.withAlpha(25) : const Color(0xFF000000).withAlpha(12);
     final Color textP = dark ? Colors.white : const Color(0xFF111827);

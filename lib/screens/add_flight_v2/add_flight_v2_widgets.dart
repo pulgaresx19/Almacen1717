@@ -128,7 +128,7 @@ Widget buildDropdown(String label, bool dark, AddFlightV2Logic logic) {
           child: DropdownButton<String>(
             value: logic.status,
             isExpanded: true,
-            dropdownColor: const Color(0xFF1e293b),
+            dropdownColor: const Color(0xFF0f172a),
             style: const TextStyle(color: Colors.white, fontSize: 12),
             icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFFcbd5e1), size: 20),
             items: ['Waiting', 'Received', 'Pending', 'Checked', 'Ready', 'Delayed', 'Canceled']

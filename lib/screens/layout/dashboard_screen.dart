@@ -14,6 +14,7 @@ import '../system_v2/system_v2_screen.dart';
 import '../coordinator_v2/coordinator_v2_screen.dart';
 import '../awbs_v2/awbs_v2_screen.dart';
 import '../delivers_v2/delivers_v2_screen.dart';
+import '../damages_v2/damages_v2_screen.dart';
 import '../location_v2/location_v2_screen.dart';
 import '../driver_v2/driver_v2_screen.dart';
 import '../driver_bf_v2/driver_bf_v2_screen.dart';
@@ -358,6 +359,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   'Delivers',
                                   17,
                                 ),
+                              if (can('damages'))
+                                _buildNavItem(
+                                  Icons.broken_image_outlined,
+                                  'Damages',
+                                  21,
+                                ),
                               if (can('users'))
                                 _buildNavItem(
                                   Icons.people_alt_rounded,
@@ -598,8 +605,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, dark, _) {
         final bgMain = dark ? const Color(0xFF0f172a) : const Color(0xFFF4F7F9);
         final bgSidebar = dark
-            ? const Color(0xFF1e293b)
-            : const Color(0xFFffffff);
+            ? const Color(0xFF0f172a)
+            : Colors.white;
         final borderWhite = dark
             ? Colors.white.withAlpha(15)
             : const Color(0xFFE5E7EB);
@@ -813,6 +820,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         LocationV2Screen(isActive: _selectedIndex == 18),
         DriverV2Screen(isActive: _selectedIndex == 19),
         DriverBfV2Screen(isActive: _selectedIndex == 20),
+        DamagesV2Screen(isActive: _selectedIndex == 21),
       ],
     );
   }
@@ -834,36 +842,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final Color activeBorder = dark
         ? const Color(0xFF6366f1).withAlpha(76)
         : const Color(0xFF6366f1).withAlpha(30);
+    final Color hoverBg = dark
+        ? Colors.white.withAlpha(10)
+        : Colors.black.withAlpha(5);
 
-    return InkWell(
-      onTap: () => _onDestinationSelected(index),
-      borderRadius: BorderRadius.circular(12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: isSelected ? activeBg : Colors.transparent,
-          border: Border.all(
-            color: isSelected ? activeBorder : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: isSelected ? activeColor : textS, size: 22),
-            const SizedBox(width: 14),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? activeColor : textP,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                fontSize: 14,
+    bool isHovered = false;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return MouseRegion(
+          onEnter: (_) => setState(() => isHovered = true),
+          onExit: (_) => setState(() => isHovered = false),
+          child: InkWell(
+            onTap: () => _onDestinationSelected(index),
+            borderRadius: BorderRadius.circular(12),
+            hoverColor: Colors.transparent, // Disable default hover to prevent overlap
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: isSelected 
+                    ? activeBg 
+                    : (isHovered ? hoverBg : Colors.transparent),
+                border: Border.all(
+                  color: isSelected ? activeBorder : Colors.transparent,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: isSelected ? activeColor : textS, size: 22),
+                  const SizedBox(width: 14),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: isSelected ? activeColor : textP,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      }
     );
   }
 }

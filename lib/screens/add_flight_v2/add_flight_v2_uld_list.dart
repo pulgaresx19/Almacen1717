@@ -32,7 +32,7 @@ class AddFlightV2UldList extends StatelessWidget {
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF1e293b) : Colors.white,
+              color: dark ? Colors.white.withAlpha(10) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: borderC),
               boxShadow: [
@@ -50,10 +50,12 @@ class AddFlightV2UldList extends StatelessWidget {
                     AddFlightV2AddUldDrawer.show(context, dark, logic, initialUld: u);
                   },
                   borderRadius: BorderRadius.circular(12),
+                  hoverColor: dark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(10),
+                  splashColor: dark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     decoration: BoxDecoration(
-                      color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(

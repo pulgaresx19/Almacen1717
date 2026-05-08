@@ -48,7 +48,7 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
       builder: (context, dark, child) {
         final Color textP = dark ? Colors.white : const Color(0xFF111827);
         final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-        final Color bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+        final Color bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
         final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
 
         return Column(

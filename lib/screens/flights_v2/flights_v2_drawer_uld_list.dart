@@ -304,7 +304,7 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
   Widget build(BuildContext context) {
     final textP = widget.dark ? Colors.white : const Color(0xFF111827);
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-    final bgCard = widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF3F4F6);
+    final bgCard = widget.dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
 
     final sortedUlds = List<Map<String, dynamic>>.from(widget.ulds);
     sortedUlds.sort((a, b) {

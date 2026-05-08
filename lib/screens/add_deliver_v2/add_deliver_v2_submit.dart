@@ -75,7 +75,7 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
     showDialog(
       context: context,
       builder: (alertCtx) => AlertDialog(
-        backgroundColor: const Color(0xFF1e293b),
+        backgroundColor: const Color(0xFF0f172a),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: Colors.redAccent.withAlpha(50)),
@@ -346,7 +346,7 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
               child: FadeTransition(
                 opacity: animation,
                 child: AlertDialog(
-                  backgroundColor: const Color(0xFF1e293b),
+                  backgroundColor: const Color(0xFF0f172a),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                     side: BorderSide(color: const Color(0xFF10b981).withAlpha(50), width: 1),

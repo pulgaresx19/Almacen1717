@@ -236,7 +236,7 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                     else if (logic.selectedType == 1)
                       buildDamageSection(context, widget.dark, bgCard, bgModal, textP, textS, logic.selectedDamages, (damages) {
                         logic.setDamages(damages);
-                      }, logic.localPhotos, logic.networkPhotos, () => logic.pickImageLocally(ImageSource.gallery), () => logic.pickImageLocally(ImageSource.camera), (idx) {
+                      }, logic.localPhotos, logic.networkPhotos, () => logic.pickImageLocally(ImageSource.gallery, context), () => logic.pickImageLocally(ImageSource.camera, context), (idx) {
                         logic.removePhoto(idx);
                       }, (idx) {
                         logic.removeNetworkPhoto(idx);

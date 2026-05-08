@@ -63,7 +63,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
           builder: (context, dark, child) {
             final Color textP = dark ? Colors.white : const Color(0xFF111827);
             final Color textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
-            final Color bgCard = dark ? const Color(0xFF1e293b) : Colors.white;
+            final Color bgCard = dark ? Colors.white.withAlpha(10) : Colors.white;
             final Color borderCard = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
             final Color iconColor = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
 
@@ -346,7 +346,7 @@ class FlightsV2ScreenState extends State<FlightsV2Screen> {
               if (item is String) {
                 final isCollapsed = _collapsedDates.contains(item);
                 return DataRow(
-                  color: WidgetStateProperty.all(dark ? const Color(0xFF334155).withAlpha(150) : const Color(0xFFE5E7EB)),
+                  color: WidgetStateProperty.all(dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15)),
                   onSelectChanged: (_) {
                     setState(() {
                       if (isCollapsed) {
