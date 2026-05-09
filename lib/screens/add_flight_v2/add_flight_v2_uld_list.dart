@@ -81,13 +81,13 @@ class AddFlightV2UldList extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(Icons.inventory_2_outlined, size: 14, color: textP), const SizedBox(width: 6), Text('${awbs.length} AWBs', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 12))])), const SizedBox(width: 16),
                             Icon(
                               u['priority'] == true ? Icons.star_rounded : Icons.star_outline_rounded,
                               color: u['priority'] == true ? const Color(0xFFf59e0b) : (dark ? Colors.white.withAlpha(60) : Colors.black.withAlpha(50)),
                               size: 20
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 16),
+                            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(20)), child: Row(children: [Icon(Icons.inventory_2_outlined, size: 14, color: textP), const SizedBox(width: 6), Text('${awbs.length} AWBs', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 12))])), const SizedBox(width: 12),
                             Container(width: 85, alignment: Alignment.center, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: (u['break'] == true) ? const Color(0xFF10b981).withAlpha(30) : const Color(0xFFef4444).withAlpha(30), borderRadius: BorderRadius.circular(8)), child: Text((u['break'] == true) ? 'BREAK' : 'NO BREAK', style: TextStyle(color: (u['break'] == true) ? (dark ? const Color(0xFF6ee7b7) : const Color(0xFF059669)) : (dark ? const Color(0xFFfca5a5) : const Color(0xFFdc2626)), fontSize: 11, fontWeight: FontWeight.bold))), const SizedBox(width: 16),
                             Container(decoration: BoxDecoration(color: const Color(0xFFef4444).withAlpha(20), borderRadius: BorderRadius.circular(8)), child: IconButton(icon: const Icon(Icons.delete_outline, color: Color(0xFFef4444), size: 20), tooltip: 'Eliminar ULD', onPressed: () => logic.removeLocalUld(i))),
                           ],

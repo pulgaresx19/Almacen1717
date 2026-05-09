@@ -29,42 +29,6 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
   final Set<int> _expandedItems = {};
   bool _isHistoryExpanded = true;
 
-  void _showHouseList(BuildContext context, String awb, List<String> houses) {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
-          title: Text('House Numbers - $awb', style: TextStyle(color: widget.dark ? Colors.white : Colors.black, fontSize: 16)),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 350, maxHeight: 400),
-            child: SizedBox(
-              width: 350,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: houses.length,
-                itemBuilder: (c, i) => ListTile(
-                  leading: CircleAvatar(
-                    radius: 12,
-                    backgroundColor: widget.dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10),
-                    child: Text('${i + 1}', style: TextStyle(fontSize: 10, color: widget.dark ? Colors.white : Colors.black)),
-                  ),
-                  title: Text(houses[i], style: TextStyle(color: widget.dark ? Colors.white : Colors.black)),
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Close', style: TextStyle(color: widget.dark ? Colors.white70 : Colors.black87)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
 
   String _formatLogTime(String? timeStr) {
     if (timeStr == null || timeStr.trim().isEmpty || timeStr.toLowerCase() == 'null') return '';
@@ -346,17 +310,6 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
             const SizedBox(height: 8),
           ...locationItems,
         ],
-      ],
-    );
-  }
-
-  Widget _buildMetric(String label, String value, Color textP, Color textS) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: textS, fontSize: 11)),
-        const SizedBox(height: 2),
-        Text(value, style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -721,8 +674,7 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
                                     ),
                                     _buildStatusMetric('', FlightsV2StatusLogic.getAwbStatus(split), textS),
                                     const SizedBox(width: 8),
-                                    if (houseList.isNotEmpty || (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null'))
-                                      Icon(isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textS, size: 16),
+                                    Icon(isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textS, size: 16),
                                   ],
                                 ),
                                 
@@ -735,52 +687,65 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      // Left Column: House
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('House Numbers', style: TextStyle(color: textS, fontSize: 11)),
-                                            const SizedBox(height: 4),
-                                            if (houseList.isEmpty)
-                                              Text('-', style: TextStyle(color: textP, fontSize: 13))
-                                            else
-                                              InkWell(
-                                                onTap: () => _showHouseList(context, awbNumber, houseList),
-                                                borderRadius: BorderRadius.circular(6),
-                                                child: Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                  decoration: BoxDecoration(
-                                                    color: const Color(0xFF6366f1).withAlpha(20),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: const Color(0xFF6366f1).withAlpha(50)),
-                                                  ),
+                                      // House Numbers
+                                      if (houseList.isNotEmpty)
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.home_work_outlined, size: 14, color: textP),
+                                                  const SizedBox(width: 6),
+                                                  Text('House Num:', style: TextStyle(color: textP, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                ]
+                                              ),
+                                              const SizedBox(height: 6),
+                                              ...houseList.map((h) => 
+                                                Padding(
+                                                  padding: const EdgeInsets.only(bottom: 4, left: 6),
                                                   child: Row(
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
-                                                      const Icon(Icons.list_alt_rounded, size: 12, color: Color(0xFF818cf8)),
-                                                      const SizedBox(width: 6),
-                                                      Text('${houseList.length} items', style: const TextStyle(color: Color(0xFF818cf8), fontSize: 12, fontWeight: FontWeight.bold)),
+                                                      Container(
+                                                        margin: const EdgeInsets.only(top: 5, right: 6),
+                                                        width: 4, height: 4,
+                                                        decoration: BoxDecoration(color: textS, shape: BoxShape.circle),
+                                                      ),
+                                                      Expanded(child: Text(h.trim(), style: TextStyle(color: textS, fontSize: 12))),
                                                     ],
                                                   ),
+                                                )
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      if (houseList.isNotEmpty && (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null'))
+                                        const SizedBox(width: 16),
+                                      // Remarks
+                                      if (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null')
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Icon(Icons.notes_rounded, size: 14, color: textP),
+                                                  const SizedBox(width: 6),
+                                                  Text('Remarks:', style: TextStyle(color: textP, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                ]
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Padding(
+                                                padding: const EdgeInsets.only(left: 6),
+                                                child: Text(
+                                                  combined['remarks'].toString(), 
+                                                  style: TextStyle(color: textS, fontSize: 12)
                                                 ),
                                               ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      
-                                      // Right Column: Remarks
-                                      Expanded(
-                                        child: _buildMetric(
-                                          'Remarks',
-                                          (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null')
-                                              ? combined['remarks'].toString()
-                                              : '-',
-                                          textP,
-                                          textS,
-                                        ),
-                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 16),

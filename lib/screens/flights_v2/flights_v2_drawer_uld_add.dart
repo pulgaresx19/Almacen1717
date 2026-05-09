@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage;
-import 'add_flight_v2_logic.dart';
-import 'add_flight_v2_widgets.dart';
-import 'add_flight_v2_add_awb_section.dart';
+import '../add_flight_v2/add_flight_v2_widgets.dart';
+import '../add_flight_v2/add_flight_v2_add_awb_section.dart';
 
-class AddFlightV2AddUldDrawer {
-  static void show(BuildContext context, bool dark, AddFlightV2Logic flightLogic, {Map<String, dynamic>? initialUld}) {
+class FlightsV2DrawerUldAdd {
+  static void show(BuildContext context, bool dark, String flightId, VoidCallback onSaveSuccess) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -13,11 +13,18 @@ class AddFlightV2AddUldDrawer {
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (ctx, anim1, anim2) {
-        return _AddUldDrawerBody(dark: dark, flightLogic: flightLogic, dialogContext: ctx, initialUld: initialUld);
+        return _FlightsV2DrawerUldAddBody(
+          dark: dark, 
+          flightId: flightId, 
+          dialogContext: ctx, 
+          onSaveSuccess: onSaveSuccess
+        );
       },
       transitionBuilder: (ctx, anim1, anim2, child) {
         return SlideTransition(
-          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(
+            CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)
+          ),
           child: child,
         );
       }
@@ -25,19 +32,24 @@ class AddFlightV2AddUldDrawer {
   }
 }
 
-class _AddUldDrawerBody extends StatefulWidget {
+class _FlightsV2DrawerUldAddBody extends StatefulWidget {
   final bool dark;
-  final AddFlightV2Logic flightLogic;
+  final String flightId;
   final BuildContext dialogContext;
-  final Map<String, dynamic>? initialUld;
+  final VoidCallback onSaveSuccess;
 
-  const _AddUldDrawerBody({required this.dark, required this.flightLogic, required this.dialogContext, this.initialUld});
+  const _FlightsV2DrawerUldAddBody({
+    required this.dark, 
+    required this.flightId, 
+    required this.dialogContext, 
+    required this.onSaveSuccess
+  });
 
   @override
-  State<_AddUldDrawerBody> createState() => _AddUldDrawerBodyState();
+  State<_FlightsV2DrawerUldAddBody> createState() => _FlightsV2DrawerUldAddBodyState();
 }
 
-class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
+class _FlightsV2DrawerUldAddBodyState extends State<_FlightsV2DrawerUldAddBody> {
   // ULD Controllers
   final uldNumCtrl = TextEditingController();
   final uldPiecesCtrl = TextEditingController();
@@ -53,37 +65,12 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
   bool uldRequiredError = false;
   bool uldExistsError = false;
   bool listRequiredError = false;
-  List<Map<String, dynamic>>? _initialAwbs;
 
-  bool isReadOnly = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
-    isReadOnly = widget.initialUld != null;
-    
-    if (widget.initialUld != null) {
-      final u = widget.initialUld!;
-      uldNumCtrl.text = u['uldNumber'] ?? '';
-      uldPiecesCtrl.text = u['pieces']?.toString() ?? 'Auto';
-      uldWeightCtrl.text = u['weight']?.toString() ?? 'Auto';
-      uldRemarkCtrl.text = u['remarks'] ?? '';
-      uldPriority = u['priority'] == true;
-      uldBreak = u['break'] == true;
-      autoCalcPieces = u['isAutoPieces'] ?? true;
-      autoCalcWeight = u['isAutoWeight'] ?? true;
-      
-      final rawAwbs = u['awbs'] as List? ?? [];
-      _initialAwbs = rawAwbs.map((a) => {
-        'awb': a['awb_number'] ?? '',
-        'pieces': a['pieces']?.toString() ?? '0',
-        'weight': a['weight']?.toString() ?? '0',
-        'total': a['total']?.toString() ?? '0',
-        'house': a['house_number'] ?? '',
-        'remark': a['remarks'] ?? '',
-      }).cast<Map<String, dynamic>>().toList();
-      addedAwbs = List.from(_initialAwbs!);
-    }
 
     uldNumCtrl.addListener(() {
       bool shouldUpdate = false;
@@ -124,6 +111,83 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
     });
   }
 
+  Future<void> _handleSave() async {
+    final uldNum = uldNumCtrl.text.trim().toUpperCase();
+    bool hasError = false;
+    
+    if (uldNum.isEmpty) {
+      uldRequiredError = true;
+      hasError = true;
+    } else {
+      try {
+        final existing = await Supabase.instance.client
+            .from('ulds')
+            .select('id_uld')
+            .eq('uld_number', uldNum)
+            .maybeSingle();
+        if (existing != null) {
+          uldExistsError = true;
+          hasError = true;
+        }
+      } catch (_) {}
+    }
+    
+    if (addedAwbs.isEmpty) {
+      listRequiredError = true;
+      hasError = true;
+    }
+    
+    if (hasError) {
+      setState(() {});
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final payload = {
+        'uldNumber': uldNum,
+        'pieces': int.tryParse(uldPiecesCtrl.text.trim()) ?? 0,
+        'weight': int.tryParse(uldWeightCtrl.text.trim()) ?? 0,
+        'priority': uldPriority,
+        'break': uldBreak,
+        'remarks': uldRemarkCtrl.text.trim(),
+        'isAutoPieces': autoCalcPieces,
+        'isAutoWeight': autoCalcWeight,
+        'awbs': addedAwbs.map((a) => {
+          'awb_number': a['awb'],
+          'pieces': int.tryParse(a['pieces'].toString()) ?? 0,
+          'total': int.tryParse(a['total'].toString()) ?? 0,
+          'weight': int.tryParse(a['weight'].toString()) ?? 0,
+          'house_number': a['house'] ?? '',
+          'remarks': a['remark'] ?? '',
+        }).toList(),
+      };
+
+      await Supabase.instance.client.rpc('rpc_add_uld_to_flight', params: {
+        'p_flight_id': widget.flightId,
+        'p_payload': payload,
+      });
+
+      if (mounted) {
+        widget.onSaveSuccess();
+        if (widget.dialogContext.mounted) {
+          Navigator.pop(widget.dialogContext);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'), 
+            backgroundColor: Colors.redAccent
+          )
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dark = widget.dark;
@@ -138,7 +202,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
         color: bg,
         elevation: 16,
         child: SizedBox(
-          width: 550, // Wider to accommodate the forms comfortably
+          width: 550,
           height: double.infinity,
           child: Column(
             children: [
@@ -154,14 +218,12 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.initialUld == null 
-                              ? (appLanguage.value == 'es' ? 'Añadir ULD al vuelo' : 'Add ULD to flight')
-                              : (isReadOnly ? (appLanguage.value == 'es' ? 'Detalles del ULD' : 'ULD Details') : (appLanguage.value == 'es' ? 'Editar ULD' : 'Edit ULD')), 
+                          appLanguage.value == 'es' ? 'Añadir nuevo ULD al vuelo' : 'Add new ULD to flight', 
                           style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          appLanguage.value == 'es' ? 'Gestión de ULDs in-flight' : 'In-flight ULD management', 
+                          appLanguage.value == 'es' ? 'Se creará en la base de datos de inmediato' : 'It will be created in the database immediately', 
                           style: TextStyle(color: textS, fontSize: 13)
                         ),
                       ],
@@ -211,12 +273,12 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                           Wrap(
                             spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.end,
                             children: [
-                              SizedBox(width: 122, child: buildTextField('ULD Number', uldNumCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true, hasError: uldRequiredError || uldExistsError, disabled: isReadOnly)),
+                              SizedBox(width: 122, child: buildTextField('ULD Number', uldNumCtrl, 'AKE12345AA', maxLen: 10, isUpperCase: true, hasError: uldRequiredError || uldExistsError, disabled: _isSubmitting)),
                               SizedBox(
                                 width: 75,
                                 child: buildTextField(
                                   'Pieces', uldPiecesCtrl, autoCalcPieces ? 'Auto' : '0',
-                                  maxLen: 5, isNum: true, digitsOnly: true, disabled: autoCalcPieces || isReadOnly,
+                                  maxLen: 5, isNum: true, digitsOnly: true, disabled: autoCalcPieces || _isSubmitting,
                                   titleTrailing: SizedBox(
                                     width: 14, height: 14,
                                     child: Checkbox(
@@ -227,7 +289,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       splashRadius: 0,
-                                      onChanged: isReadOnly ? null : (v) {
+                                      onChanged: _isSubmitting ? null : (v) {
                                         setState(() {
                                           autoCalcPieces = v ?? true;
                                           if (autoCalcPieces) {
@@ -245,7 +307,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                                 width: 75,
                                 child: buildTextField(
                                   'Weight', uldWeightCtrl, autoCalcWeight ? 'Auto' : '0',
-                                  maxLen: 5, isNum: true, digitsOnly: true, disabled: autoCalcWeight || isReadOnly,
+                                  maxLen: 5, isNum: true, digitsOnly: true, disabled: autoCalcWeight || _isSubmitting,
                                   titleTrailing: SizedBox(
                                     width: 14, height: 14,
                                     child: Checkbox(
@@ -256,7 +318,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       splashRadius: 0,
-                                      onChanged: isReadOnly ? null : (v) {
+                                      onChanged: _isSubmitting ? null : (v) {
                                         setState(() {
                                           autoCalcWeight = v ?? true;
                                           if (autoCalcWeight) {
@@ -282,7 +344,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
                                           Icon(Icons.star_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 15),
-                                          Switch(value: uldPriority, onChanged: isReadOnly ? null : (v) => setState(() => uldPriority = v), activeThumbColor: Colors.white, activeTrackColor: const Color(0xFFf59e0b), inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
+                                          Switch(value: uldPriority, onChanged: _isSubmitting ? null : (v) => setState(() => uldPriority = v), activeThumbColor: Colors.white, activeTrackColor: const Color(0xFFf59e0b), inactiveThumbColor: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)),
                                         ],
                                       ),
                                     ),
@@ -302,7 +364,7 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                                         children: [
                                           Icon(Icons.broken_image_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 15),
                                           Switch(
-                                            value: uldBreak, onChanged: isReadOnly ? null : (v) => setState(() => uldBreak = v), activeThumbColor: Colors.white, activeTrackColor: const Color(0xFF22c55e), inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                            value: uldBreak, onChanged: _isSubmitting ? null : (v) => setState(() => uldBreak = v), activeThumbColor: Colors.white, activeTrackColor: const Color(0xFF22c55e), inactiveThumbColor: dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF), inactiveTrackColor: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
                                             trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
                                               if (states.contains(WidgetState.selected)) {
                                                 return Colors.transparent;
@@ -316,14 +378,14 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                                   ],
                                 ),
                               ),
-                              SizedBox(width: double.infinity, child: buildTextField('Remarks', uldRemarkCtrl, 'ULD remarks...', isSentenceCase: true, disabled: isReadOnly)),
+                              SizedBox(width: double.infinity, child: buildTextField('Remarks', uldRemarkCtrl, 'ULD remarks...', isSentenceCase: true, disabled: _isSubmitting)),
                             ],
                           ),
                         ],
                       ),
                     ),
 
-                    // Extracted AWB Section (Middle: List + Bottom: Form)
+                    // Middle: List + Bottom: Form
                     Expanded(
                       child: AddFlightV2AddAwbSection(
                         dark: widget.dark,
@@ -331,11 +393,9 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                         textP: textP,
                         textS: textS,
                         borderC: borderC,
-                        getLocalUsedPieces: widget.flightLogic.getLocalUsedPieces,
-                        flightLocalUlds: widget.flightLogic.flightLocalUlds,
+                        getLocalUsedPieces: (awb) => 0, // No local unsaved state to worry about
                         listRequiredError: listRequiredError,
-                        initialAwbs: _initialAwbs,
-                        isReadOnly: isReadOnly,
+                        isReadOnly: _isSubmitting,
                         onAwbsChanged: (awbs) {
                           setState(() {
                             addedAwbs = awbs;
@@ -358,101 +418,13 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (isReadOnly) ...[
-                      ElevatedButton(
-                        onPressed: () => setState(() => isReadOnly = false),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(appLanguage.value == 'es' ? 'Editar' : 'Edit', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ] else ...[
-                      TextButton(
-                        onPressed: () => Navigator.pop(widget.dialogContext),
-                        child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: TextStyle(color: textP, fontWeight: FontWeight.w500)),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: () {
-                          final uldNum = uldNumCtrl.text.trim();
-                        bool hasError = false;
-                        if (uldNum.isEmpty) {
-                          uldRequiredError = true;
-                          hasError = true;
-                        } else {
-                          // Check for duplicate ULD
-                          bool isDuplicate = false;
-                          if (widget.initialUld == null || widget.initialUld!['uldNumber'] != uldNum) {
-                             isDuplicate = widget.flightLogic.flightLocalUlds.any((u) => u['uldNumber'] == uldNum);
-                          }
-                          if (isDuplicate) {
-                             uldExistsError = true;
-                             hasError = true;
-                          }
-                        }
-                        
-                        if (addedAwbs.isEmpty) {
-                          listRequiredError = true;
-                          hasError = true;
-                        }
-                        
-                        if (hasError) {
-                          setState(() {});
-                          return;
-                        }
-
-                        // Build ULD object
-                        final newUld = {
-                          'uldNumber': uldNum,
-                          'pieces': int.tryParse(uldPiecesCtrl.text.trim()) ?? 0,
-                          'weight': int.tryParse(uldWeightCtrl.text.trim()) ?? 0,
-                          'priority': uldPriority,
-                          'break': uldBreak,
-                          'remarks': uldRemarkCtrl.text.trim(),
-                          'isAutoPieces': autoCalcPieces,
-                          'isAutoWeight': autoCalcWeight,
-                          'showAwbs': true,
-                          'awbs': addedAwbs.map((a) => {
-                            'awb_number': a['awb'],
-                            'pieces': int.tryParse(a['pieces'].toString()) ?? 0,
-                            'total': int.tryParse(a['total'].toString()) ?? 0,
-                            'weight': int.tryParse(a['weight'].toString()) ?? 0,
-                            'house_number': a['house'] ?? '',
-                            'remarks': a['remark'] ?? '',
-                            'status': 'received',
-                          }).toList(),
-                        };
-                        
-                        // Check if we are editing an existing ULD or creating a new one
-                        int existIdx = -1;
-                        if (widget.initialUld != null) {
-                          existIdx = widget.flightLogic.flightLocalUlds.indexWhere((u) => u['uldNumber'] == widget.initialUld!['uldNumber']);
-                        } else {
-                          existIdx = widget.flightLogic.flightLocalUlds.indexWhere((u) => u['uldNumber'] == uldNum);
-                        }
-
-                        if (existIdx >= 0) {
-                          widget.flightLogic.flightLocalUlds[existIdx] = newUld;
-                        } else {
-                          widget.flightLogic.flightLocalUlds.add(newUld);
-                        }
-                        
-                        // Sort the list: BULK first, then alphabetically by uldNumber
-                        widget.flightLogic.flightLocalUlds.sort((a, b) {
-                          final aNum = (a['uldNumber'] ?? '').toString().toUpperCase();
-                          final bNum = (b['uldNumber'] ?? '').toString().toUpperCase();
-                          if (aNum == 'BULK' && bNum != 'BULK') return -1;
-                          if (bNum == 'BULK' && aNum != 'BULK') return 1;
-                          return aNum.compareTo(bNum);
-                        });
-                        
-                        widget.flightLogic.recalculateAutoCounts();
-                        widget.flightLogic.rebuild();
-                        Navigator.pop(widget.dialogContext);
-                      },
+                    TextButton(
+                      onPressed: _isSubmitting ? null : () => Navigator.pop(widget.dialogContext),
+                      child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: TextStyle(color: textP, fontWeight: FontWeight.w500)),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _isSubmitting ? null : _handleSave,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6366f1),
                         foregroundColor: Colors.white,
@@ -460,9 +432,10 @@ class _AddUldDrawerBodyState extends State<_AddUldDrawerBody> {
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: Text(widget.initialUld != null ? (appLanguage.value == 'es' ? 'Guardar Cambios' : 'Save Changes') : (appLanguage.value == 'es' ? 'Guardar ULD' : 'Save ULD'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      child: _isSubmitting 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Text(appLanguage.value == 'es' ? 'Guardar Nuevo ULD' : 'Save New ULD', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                     ),
-                    ],
                   ],
                 ),
               ),

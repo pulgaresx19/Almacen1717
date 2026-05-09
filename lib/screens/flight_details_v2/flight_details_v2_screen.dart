@@ -6,7 +6,7 @@ import '../flights_v2/flights_v2_service.dart';
 import '../flights_v2/flights_v2_drawer_general_info.dart';
 import '../flights_v2/flights_v2_drawer_uld_list.dart';
 import '../flights_v2/flights_v2_print_preview.dart';
-import 'flight_details_v2_add_uld.dart';
+import '../flights_v2/flights_v2_drawer_uld_add.dart';
 import 'flight_details_v2_reports_dialog.dart';
 import 'flight_details_v2_damage_reports_dialog.dart';
 
@@ -241,11 +241,13 @@ class _FlightDetailsV2ScreenState extends State<FlightDetailsV2Screen> {
                 Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () async {
-                         final bool? result = await showAddUldComponent(context, widget.flight, widget.dark, _ulds);
-                         if (result == true) {
-                           _fetchDetails();
-                         }
+                      onPressed: () {
+                         FlightsV2DrawerUldAdd.show(
+                           context, 
+                           widget.dark, 
+                           widget.flight['id_flight']?.toString() ?? '', 
+                           () => _fetchDetails()
+                         );
                       },
                       icon: const Icon(Icons.add_rounded, size: 16),
                       label: Text(appLanguage.value == 'es' ? 'Añadir ULD' : 'Add ULD', style: const TextStyle(fontWeight: FontWeight.bold)),

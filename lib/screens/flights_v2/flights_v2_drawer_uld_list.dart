@@ -82,10 +82,10 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
     return Container(
       width: 85,
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         value,
@@ -123,42 +123,42 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      SizedBox(
-                        width: 135,
+                      Expanded(
                         child: Row(
                           children: [
                             Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: widget.dark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(15)),
-                              ),
+                              width: 36, height: 36,
                               alignment: Alignment.center,
-                              child: Text('${index + 1}', style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold)),
+                              decoration: BoxDecoration(color: widget.dark ? const Color(0x326366f1) : const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
+                              child: Text('${index + 1}', style: const TextStyle(color: Color(0xFF818cf8), fontWeight: FontWeight.bold, fontSize: 14)),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(child: Text(uld['uld_number']?.toString() ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 16),
+                            SizedBox(width: 125, child: Text(uld['uld_number']?.toString() ?? '', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 0.5), overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 16),
+                            SizedBox(width: 70, child: Text('${uld['pieces_total']?.toString() ?? uld['pieces']?.toString() ?? '0'} pcs', style: TextStyle(color: widget.dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w500))),
+                            const SizedBox(width: 12),
+                            SizedBox(width: 75, child: Text('${uld['weight_total']?.toString() ?? uld['weight']?.toString() ?? '0'} kg', style: TextStyle(color: widget.dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 13, fontWeight: FontWeight.w500))),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? 'Remarks: ${uld['remarks']}' : 'Remarks: ...', 
+                                style: TextStyle(color: widget.dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af), fontSize: 12, fontStyle: FontStyle.italic), 
+                                maxLines: 1, 
+                                overflow: TextOverflow.ellipsis
+                              )
+                            ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      SizedBox(width: 70, child: Text('${uld['pieces_total']?.toString() ?? uld['pieces']?.toString() ?? '0'} pcs', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13))),
-                      const SizedBox(width: 12),
-                      SizedBox(width: 75, child: Text('${uld['weight_total']?.toString() ?? uld['weight']?.toString() ?? '0'} kg', style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          (uld['remarks']?.toString().trim().isNotEmpty == true && uld['remarks']?.toString().trim().toLowerCase() != 'null') ? 'Remark: ${uld['remarks']}' : 'Remark: ...', 
-                          style: TextStyle(color: textS, fontSize: 12, fontStyle: FontStyle.italic), 
-                          maxLines: 1, 
-                          overflow: TextOverflow.ellipsis
-                        )
                       ),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          Icon(
+                            uld['is_priority'] == true ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: uld['is_priority'] == true ? const Color(0xFFf59e0b) : (widget.dark ? Colors.white.withAlpha(60) : Colors.black.withAlpha(50)),
+                            size: 20
+                          ),
+                          const SizedBox(width: 16),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
@@ -176,32 +176,25 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Icon(
-                            uld['is_priority'] == true ? Icons.star_rounded : Icons.star_outline_rounded,
-                            color: uld['is_priority'] == true ? const Color(0xFFf59e0b) : (widget.dark ? Colors.white.withAlpha(60) : Colors.black.withAlpha(50)),
-                            size: 20
-                          ),
                           const SizedBox(width: 12),
                           Container(
                             width: 85,
                             alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: (uld['is_break'] == true) ? Colors.green.withAlpha(20) : Colors.red.withAlpha(20),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: (uld['is_break'] == true) ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50)),
+                              color: (uld['is_break'] == true) ? const Color(0xFF10b981).withAlpha(30) : const Color(0xFFef4444).withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               (uld['is_break'] == true) ? 'BREAK' : 'NO BREAK',
                               style: TextStyle(
-                                color: (uld['is_break'] == true) ? Colors.green : Colors.redAccent,
-                                fontSize: 10,
+                                color: (uld['is_break'] == true) ? (widget.dark ? const Color(0xFF6ee7b7) : const Color(0xFF059669)) : (widget.dark ? const Color(0xFFfca5a5) : const Color(0xFFdc2626)),
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 16),
                           _buildStatusMetric(FlightsV2StatusLogic.getUldStatus(uld), textS),
                         ],
                       ),

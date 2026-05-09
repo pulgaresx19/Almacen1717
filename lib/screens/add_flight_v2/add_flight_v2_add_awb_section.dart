@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_flight_v2_widgets.dart';
-import 'add_flight_v2_logic.dart';
 
 class AddFlightV2AddAwbSection extends StatefulWidget {
   final bool dark;
@@ -9,7 +9,8 @@ class AddFlightV2AddAwbSection extends StatefulWidget {
   final Color textS;
   final Color borderC;
   final void Function(List<Map<String, dynamic>>) onAwbsChanged;
-  final AddFlightV2Logic logic;
+  final int Function(String)? getLocalUsedPieces;
+  final List<Map<String, dynamic>> flightLocalUlds;
   final bool listRequiredError;
   final List<Map<String, dynamic>>? initialAwbs;
   final bool isReadOnly;
@@ -22,7 +23,8 @@ class AddFlightV2AddAwbSection extends StatefulWidget {
     required this.textS,
     required this.borderC,
     required this.onAwbsChanged,
-    required this.logic,
+    this.getLocalUsedPieces,
+    this.flightLocalUlds = const [],
     this.listRequiredError = false,
     this.initialAwbs,
     this.isReadOnly = false,
@@ -118,7 +120,7 @@ class _AddFlightV2AddAwbSectionState extends State<AddFlightV2AddAwbSection> {
       }
 
       final dbExp = dbExpected.value;
-      final localUsedOtherUlds = widget.logic.getLocalUsedPieces(text);
+      final localUsedOtherUlds = widget.getLocalUsedPieces != null ? widget.getLocalUsedPieces!(text) : 0;
       final localUsedThisUld = _getLocalUsedPiecesInCurrentUld(text);
       final totalAllowed = t - dbExp - localUsedOtherUlds - localUsedThisUld;
 
@@ -161,9 +163,9 @@ class _AddFlightV2AddAwbSectionState extends State<AddFlightV2AddAwbSection> {
     if (text.length == 13) {
       bool foundLocally = false;
       String foundTotal = '';
-      for (var u in widget.logic.flightLocalUlds) {
+      for (var u in widget.flightLocalUlds) {
         for (var a in (u['awbs'] as List)) {
-          if (a['awb_number'] == text) {
+          if (a['awb_number'] == text || a['awb'] == text) {
             foundLocally = true;
             foundTotal = a['total'].toString();
             break;
@@ -172,7 +174,23 @@ class _AddFlightV2AddAwbSectionState extends State<AddFlightV2AddAwbSection> {
         if (foundLocally) break;
       }
 
-      await widget.logic.fetchAwbTotalAsync(text, totalLocked, awbTotalCtrl, dbExpected);
+      try {
+        final res = await Supabase.instance.client
+            .from('awbs')
+            .select('id, total_pieces, total_weight, total_espected')
+            .eq('awb_number', text)
+            .maybeSingle();
+            
+        if (res != null && res['total_pieces'] != null) {
+          totalLocked.value = true;
+          awbTotalCtrl.text = res['total_pieces'].toString();
+          dbExpected.value = (res['total_espected'] as num?)?.toInt() ?? 0;
+        } else {
+          dbExpected.value = 0;
+        }
+      } catch (_) {
+        dbExpected.value = 0;
+      }
 
       if (foundLocally && mounted) {
         totalLocked.value = true;
@@ -438,7 +456,7 @@ class _AddFlightV2AddAwbSectionState extends State<AddFlightV2AddAwbSection> {
                         valueListenable: dbExpected,
                         builder: (ctx, dbExp, _) {
                           final t = int.tryParse(awbTotalCtrl.text) ?? 0;
-                          final localUsedOtherUlds = widget.logic.getLocalUsedPieces(awbNumCtrl.text.toUpperCase());
+                          final localUsedOtherUlds = widget.getLocalUsedPieces != null ? widget.getLocalUsedPieces!(awbNumCtrl.text.toUpperCase()) : 0;
                           final localUsedThisUld = _getLocalUsedPiecesInCurrentUld(awbNumCtrl.text.toUpperCase());
                           final remaining = t - dbExp - localUsedOtherUlds - localUsedThisUld;
                           if (remaining > 0) {
