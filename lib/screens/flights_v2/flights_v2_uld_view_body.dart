@@ -5,6 +5,7 @@ import 'flights_v2_status_logic.dart';
 
 class FlightsV2UldViewBody extends StatefulWidget {
   final Map<String, dynamic> uld;
+  final Map<String, dynamic> flight;
   final bool dark;
   final VoidCallback onEdit;
   final VoidCallback onPrint;
@@ -13,6 +14,7 @@ class FlightsV2UldViewBody extends StatefulWidget {
   const FlightsV2UldViewBody({
     super.key,
     required this.uld,
+    required this.flight,
     required this.dark,
     required this.onEdit,
     required this.onPrint,
@@ -25,6 +27,7 @@ class FlightsV2UldViewBody extends StatefulWidget {
 
 class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
   final Set<int> _expandedItems = {};
+  bool _isHistoryExpanded = true;
 
   void _showHouseList(BuildContext context, String awb, List<String> houses) {
     showDialog(
@@ -399,14 +402,48 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
     );
   }
 
+  Widget _buildReadOnlyField(String label, String value, Color textP, Color textS, Color bgC, Color borderC, {Widget? suffix}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+            suffix ?? const SizedBox.shrink(),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: bgC,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderC),
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: TextStyle(color: textS, fontSize: 13, fontWeight: FontWeight.w500)),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textP = widget.dark ? Colors.white : const Color(0xFF111827);
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
+    final bgDisabled = widget.dark ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB);
 
     final uldNumber = widget.uld['uld_number']?.toString() ?? '';
     final awbSplits = List<Map<String, dynamic>>.from(widget.uld['awb_splits'] ?? []);
+    
+    final carrier = widget.flight['carrier'] ?? '';
+    final number = widget.flight['number'] ?? '';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -428,42 +465,26 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ULD Details', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(appLanguage.value == 'es' ? 'Manifiesto del ULD' : 'ULD Manifest', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 2),
-                      Text(uldNumber, style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text('$carrier $number', style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF3F4F6),
-                      foregroundColor: textP,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: borderC),
-                      ),
-                    ),
-                    onPressed: widget.onPrint,
-                    icon: const Icon(Icons.print_rounded, size: 16),
-                    label: Text(appLanguage.value == 'es' ? 'Imprimir' : 'Print'),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: widget.dark ? const Color(0xFF1e293b) : const Color(0xFFF3F4F6),
+                  foregroundColor: textP,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: borderC),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366f1).withAlpha(20),
-                      foregroundColor: const Color(0xFF818cf8),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: widget.onEdit,
-                    icon: const Icon(Icons.edit_rounded, size: 16),
-                    label: Text(appLanguage.value == 'es' ? 'Editar' : 'Edit'),
-                  ),
-                ],
+                ),
+                onPressed: widget.onPrint,
+                icon: const Icon(Icons.print_rounded, size: 16),
+                label: Text(appLanguage.value == 'es' ? 'Imprimir' : 'Print'),
               ),
             ],
           ),
@@ -471,57 +492,157 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
         
         // ULD Info
         Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: widget.dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+            border: Border(bottom: BorderSide(color: borderC))
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: _buildMetric('Pcs', widget.uld['pieces_total']?.toString() ?? widget.uld['pieces']?.toString() ?? '0', textP, textS)),
-                  Expanded(child: _buildMetric('Weight', '${widget.uld['weight_total']?.toString() ?? widget.uld['weight']?.toString() ?? '0'} kg', textP, textS)),
-                  Expanded(child: _buildMetric('Priority', widget.uld['is_priority'] == true ? 'Yes' : 'No', widget.uld['is_priority'] == true ? const Color(0xFFeab308) : textP, textS)),
+                  Row(
+                    children: [
+                      Icon(Icons.inventory_2_rounded, size: 18, color: textP),
+                      const SizedBox(width: 8),
+                      Text('ULD Details', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  _buildStatusMetric('', FlightsV2StatusLogic.getUldStatus(widget.uld), textS),
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.end,
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: 122,
+                    child: _buildReadOnlyField('ULD Number', uldNumber, textP, textS, bgDisabled, borderC),
+                  ),
+                  SizedBox(
+                    width: 75,
+                    child: _buildReadOnlyField(
+                      'Pieces', widget.uld['pieces_total']?.toString() ?? widget.uld['pieces']?.toString() ?? '0', textP, textS, bgDisabled, borderC,
+                      suffix: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: Checkbox(
+                          value: true,
+                          onChanged: null,
+                          activeColor: const Color(0xFF6366f1),
+                          checkColor: Colors.white,
+                          side: BorderSide(color: widget.dark ? const Color(0xFF94a3b8).withAlpha(128) : const Color(0xFF9CA3AF).withAlpha(128), width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          splashRadius: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 75,
+                    child: _buildReadOnlyField(
+                      'Weight', widget.uld['weight_total']?.toString() ?? widget.uld['weight']?.toString() ?? '0', textP, textS, bgDisabled, borderC,
+                      suffix: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: Checkbox(
+                          value: true,
+                          onChanged: null,
+                          activeColor: const Color(0xFF6366f1),
+                          checkColor: Colors.white,
+                          side: BorderSide(color: widget.dark ? const Color(0xFF94a3b8).withAlpha(128) : const Color(0xFF9CA3AF).withAlpha(128), width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          splashRadius: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 95,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Break', style: TextStyle(color: textS, fontSize: 11)),
-                        const SizedBox(height: 2),
+                        Text('Priority?', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           decoration: BoxDecoration(
-                            color: (widget.uld['is_break'] == true) ? Colors.green.withAlpha(20) : Colors.red.withAlpha(20),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: (widget.uld['is_break'] == true) ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50)),
+                            color: bgDisabled,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderC),
                           ),
-                          child: Text(
-                            (widget.uld['is_break'] == true) ? 'BREAK' : 'NO BRK',
-                            style: TextStyle(
-                              color: (widget.uld['is_break'] == true) ? Colors.green : Colors.redAccent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Icon(Icons.star_rounded, color: textS, size: 16),
+                              Switch(
+                                value: widget.uld['is_priority'] == true,
+                                onChanged: null,
+                                activeTrackColor: const Color(0xFFf59e0b).withAlpha(128),
+                                activeThumbColor: Colors.white70,
+                                inactiveThumbColor: widget.dark ? const Color(0xFF94a3b8).withAlpha(128) : const Color(0xFF9CA3AF).withAlpha(128),
+                                inactiveTrackColor: widget.dark ? Colors.white.withAlpha(10) : const Color(0xFFE5E7EB).withAlpha(128),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Expanded(child: _buildStatusMetric('Status', FlightsV2StatusLogic.getUldStatus(widget.uld), textS)),
-                  Expanded(child: _buildMetric('Remarks', (widget.uld['remarks']?.toString().trim().isNotEmpty == true && widget.uld['remarks']?.toString().trim().toLowerCase() != 'null') ? widget.uld['remarks'].toString() : '-', textP, textS)),
+                  SizedBox(
+                    width: 95,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Break?', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: bgDisabled,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: borderC),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Icon(Icons.broken_image_rounded, color: textS, size: 16),
+                              Switch(
+                                value: widget.uld['is_break'] == true,
+                                onChanged: null,
+                                activeTrackColor: const Color(0xFF22c55e).withAlpha(128),
+                                activeThumbColor: Colors.white70,
+                                inactiveThumbColor: widget.dark ? const Color(0xFFbdc3c7).withAlpha(128) : const Color(0xFF9CA3AF).withAlpha(128),
+                                inactiveTrackColor: widget.dark ? Colors.white.withAlpha(10) : const Color(0xFFE5E7EB).withAlpha(128),
+                                trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                  if (states.contains(WidgetState.selected)) {
+                                    return Colors.transparent;
+                                  }
+                                  return const Color(0xFFef4444).withAlpha(80);
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _buildReadOnlyField('Remarks', (widget.uld['remarks']?.toString().trim().isNotEmpty == true && widget.uld['remarks']?.toString().trim().toLowerCase() != 'null') ? widget.uld['remarks'].toString() : '-', textP, textS, bgDisabled, borderC),
+                  ),
                 ],
               ),
             ],
           ),
-        ),
-
-        // AWBs List Header
-        Container(
-          padding: const EdgeInsets.only(left: 24, right: 24, top: 24, bottom: 8),
-          child: Text(appLanguage.value == 'es' ? 'AWBs Asociados' : 'Associated AWBs', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
         ),
 
         // AWBs List
@@ -580,32 +701,28 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
                                 Row(
                                   children: [
                                     Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: widget.dark ? const Color(0xFFf472b6).withAlpha(30) : const Color(0xFFdb2777).withAlpha(20),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: widget.dark ? const Color(0xFFf472b6).withAlpha(80) : const Color(0xFFdb2777).withAlpha(60)),
-                                      ),
+                                      width: 28, height: 28,
                                       alignment: Alignment.center,
-                                      child: Text('${index + 1}', style: TextStyle(color: widget.dark ? const Color(0xFFf472b6) : const Color(0xFFdb2777), fontSize: 9, fontWeight: FontWeight.bold)),
+                                      decoration: BoxDecoration(color: const Color(0xFF3b82f6).withAlpha(30), shape: BoxShape.circle),
+                                      child: Text('${index + 1}', style: const TextStyle(color: Color(0xFF60a5fa), fontSize: 12, fontWeight: FontWeight.bold)),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 16),
                                     Expanded(
                                       flex: 3,
-                                      child: Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                                      child: Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
                                     ),
                                     Expanded(
                                       flex: 2,
-                                      child: Text('P: $splitPieces/$masterPieces', style: TextStyle(color: textS, fontSize: 12)),
+                                      child: Text('$splitPieces/$masterPieces pcs', style: TextStyle(color: textS, fontSize: 13)),
                                     ),
                                     Expanded(
                                       flex: 2,
-                                      child: Text('W: ${splitWeight}kg', style: TextStyle(color: textS, fontSize: 12)),
+                                      child: Text('$splitWeight kg', style: TextStyle(color: textS, fontSize: 13)),
                                     ),
                                     _buildStatusMetric('', FlightsV2StatusLogic.getAwbStatus(split), textS),
                                     const SizedBox(width: 8),
-                                    Icon(isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textS, size: 16),
+                                    if (houseList.isNotEmpty || (combined['remarks']?.toString().trim().isNotEmpty == true && combined['remarks']?.toString().trim().toLowerCase() != 'null'))
+                                      Icon(isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textS, size: 16),
                                   ],
                                 ),
                                 
@@ -702,23 +819,71 @@ class _FlightsV2UldViewBodyState extends State<FlightsV2UldViewBody> {
             (widget.uld['time_delivery']?.toString().isNotEmpty == true && widget.uld['time_delivery'].toString() != 'null') ||
             (widget.uld['time_deliver']?.toString().isNotEmpty == true && widget.uld['time_deliver'].toString() != 'null'))
           Container(
-            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+              color: Colors.transparent,
               border: Border(top: BorderSide(color: borderC)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(appLanguage.value == 'es' ? 'Historial de Eventos' : 'Event History', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                _buildTraceStep('RECEIVED', Icons.download_rounded, widget.uld['user_received']?.toString(), widget.uld['time_received']?.toString(), const Color(0xFFa855f7), textP, textS),
-                _buildTraceStep('CHECKED', Icons.inventory_rounded, widget.uld['user_checked']?.toString(), widget.uld['time_checked']?.toString(), const Color(0xFF0ea5e9), textP, textS),
-                _buildTraceStep('SAVED', Icons.save_rounded, widget.uld['user_saved']?.toString(), widget.uld['time_saved']?.toString(), const Color(0xFF22c55e), textP, textS),
-                _buildTraceStep('DELIVERED', Icons.local_shipping_rounded, widget.uld['user_delivery']?.toString() ?? widget.uld['user_deliver']?.toString(), widget.uld['time_delivery']?.toString() ?? widget.uld['time_deliver']?.toString() ?? widget.uld['time-deliver']?.toString(), const Color(0xFFf59e0b), textP, textS),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isHistoryExpanded = !_isHistoryExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(appLanguage.value == 'es' ? 'Historial de Eventos' : 'Event History', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
+                        Icon(_isHistoryExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: textS, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_isHistoryExpanded)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+                    child: Column(
+                      children: [
+                        _buildTraceStep('RECEIVED', Icons.download_rounded, widget.uld['user_received']?.toString(), widget.uld['time_received']?.toString(), const Color(0xFFa855f7), textP, textS),
+                        _buildTraceStep('CHECKED', Icons.inventory_rounded, widget.uld['user_checked']?.toString(), widget.uld['time_checked']?.toString(), const Color(0xFF0ea5e9), textP, textS),
+                        _buildTraceStep('SAVED', Icons.save_rounded, widget.uld['user_saved']?.toString(), widget.uld['time_saved']?.toString(), const Color(0xFF22c55e), textP, textS),
+                        _buildTraceStep('DELIVERED', Icons.local_shipping_rounded, widget.uld['user_delivery']?.toString() ?? widget.uld['user_deliver']?.toString(), widget.uld['time_delivery']?.toString() ?? widget.uld['time_deliver']?.toString() ?? widget.uld['time-deliver']?.toString(), const Color(0xFFf59e0b), textP, textS),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
+          
+        // Action Buttons at the bottom
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            border: Border(top: BorderSide(color: borderC)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366f1),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  minimumSize: const Size(120, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: widget.onEdit,
+                icon: const Icon(Icons.edit_rounded, size: 16),
+                label: Text(appLanguage.value == 'es' ? 'Editar ULD' : 'Edit ULD', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

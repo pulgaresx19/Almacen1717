@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage;
-import '../flight_details_v2/flight_details_v2_add_awb_dialog.dart';
+import 'flights_v2_inline_add_awb_form.dart';
 
 class FlightsV2UldEditBody extends StatefulWidget {
   final Map<String, dynamic> uld;
@@ -148,16 +148,6 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
     }
   }
 
-  Future<void> _handleShowAddAwbDialog() async {
-    final String currentUld = _uldNumberCtrl.text.trim().isNotEmpty ? _uldNumberCtrl.text.trim().toUpperCase() : 'ULD';
-    final newAwb = await showAddAwbDialog(context, widget.dark, _awbs, currentUld);
-    if (newAwb != null) {
-      setState(() {
-        _awbs.add(newAwb);
-        _recalcularTotales();
-      });
-    }
-  }
 
   Future<void> _handleSave() async {
     final currentUld = _uldNumberCtrl.text.trim().toUpperCase();
@@ -279,9 +269,9 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
     List<TextInputFormatter>? formatters,
   }) {
     final textP = widget.dark ? Colors.white : const Color(0xFF111827);
-    final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b);
+    final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
-    final bgC = widget.dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5);
+    final bgC = widget.dark ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,18 +279,13 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.w600)),
-            ?suffix,
+            Text(label, style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+            suffix ?? const SizedBox.shrink(),
           ],
         ),
-        const SizedBox(height: 4),
-        Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: disabled ? (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(3)) : bgC,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: borderC),
-          ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 48,
           child: TextField(
             controller: ctrl,
             keyboardType: isNum ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
@@ -309,11 +294,15 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
               if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
               if (formatters != null) ...formatters,
             ],
-            style: TextStyle(color: disabled ? textS : textP, fontWeight: FontWeight.w500, fontSize: 13),
+            style: TextStyle(color: disabled ? (widget.dark ? Colors.white54 : Colors.black54) : textP, fontWeight: FontWeight.w500, fontSize: 13),
             enabled: !disabled,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: disabled ? (widget.dark ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB)) : bgC,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderC)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderC)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF6366f1), width: 1.5)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
           ),
         ),
@@ -338,6 +327,9 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
     final textS = widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final borderC = widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
 
+    final carrier = widget.flight['carrier'] ?? '';
+    final number = widget.flight['number'] ?? '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -358,43 +350,10 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ULD Details', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(appLanguage.value == 'es' ? 'Manifiesto del ULD' : 'ULD Manifest', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 2),
-                      SizedBox(
-                        width: 150,
-                        height: 30,
-                        child: TextField(
-                          controller: _uldNumberCtrl,
-                          style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: borderC)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: borderC)),
-                            focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(6)), borderSide: BorderSide(color: Color(0xFF6366f1))),
-                          ),
-                        ),
-                      )
+                      Text('$carrier $number', style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold)),
                     ],
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: widget.onCancel,
-                    child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: TextStyle(color: textS, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366f1),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _isSubmitting ? null : _handleSave,
-                    icon: _isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save_rounded, size: 16),
-                    label: Text(appLanguage.value == 'es' ? 'Guardar' : 'Save'),
                   ),
                 ],
               ),
@@ -404,188 +363,231 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
         
         // ULD Info
         Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderC))),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: widget.dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+            border: Border(bottom: BorderSide(color: borderC))
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
+                  Icon(Icons.inventory_2_rounded, size: 18, color: textP),
+                  const SizedBox(width: 8),
+                  Text('ULD Details', style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  SizedBox(
+                    width: 122,
+                    child: _buildTextField(
+                      'ULD Number',
+                      _uldNumberCtrl,
+                      maxLength: 10,
+                      textCapitalization: TextCapitalization.characters,
+                      formatters: [
+                        TextInputFormatter.withFunction(
+                          (oldValue, newValue) => TextEditingValue(
+                            text: newValue.text.toUpperCase(),
+                            selection: newValue.selection,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 75,
                     child: _buildTextField(
                       'Pieces',
                       _piecesCtrl,
                       isNum: true,
                       disabled: _autoPieces,
-                      suffix: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Auto', style: TextStyle(color: textS, fontSize: 10)),
-                          const SizedBox(width: 2),
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: Checkbox(
-                              value: _autoPieces,
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setState(() {
-                                    _autoPieces = v;
-                                    _recalcularTotales();
-                                  });
-                                }
-                              },
-                              activeColor: const Color(0xFF6366f1),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            ),
-                          ),
-                        ],
+                      maxLength: 5,
+                      suffix: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: Checkbox(
+                          value: _autoPieces,
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() {
+                                _autoPieces = v;
+                                _recalcularTotales();
+                              });
+                            }
+                          },
+                          activeColor: const Color(0xFF6366f1),
+                          checkColor: Colors.white,
+                          side: BorderSide(color: widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          splashRadius: 0,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
+                  SizedBox(
+                    width: 75,
                     child: _buildTextField(
                       'Weight',
                       _weightCtrl,
                       isNum: true,
                       disabled: _autoWeight,
-                      suffix: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Auto', style: TextStyle(color: textS, fontSize: 10)),
-                          const SizedBox(width: 2),
-                          SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: Checkbox(
-                              value: _autoWeight,
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setState(() {
-                                    _autoWeight = v;
-                                    _recalcularTotales();
-                                  });
-                                }
-                              },
-                              activeColor: const Color(0xFF6366f1),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            ),
-                          ),
-                        ],
+                      maxLength: 5,
+                      suffix: SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: Checkbox(
+                          value: _autoWeight,
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() {
+                                _autoWeight = v;
+                                _recalcularTotales();
+                              });
+                            }
+                          },
+                          activeColor: const Color(0xFF6366f1),
+                          checkColor: Colors.white,
+                          side: BorderSide(color: widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          splashRadius: 0,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField('Remarks', _remarksCtrl),
+                  SizedBox(
+                    width: 95,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Priority?', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: widget.dark ? Colors.white.withAlpha(13) : const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Icon(Icons.star_rounded, color: textS, size: 16),
+                              Switch(
+                                value: _isPriority,
+                                onChanged: (v) => setState(() => _isPriority = v),
+                                activeTrackColor: const Color(0xFFf59e0b),
+                                activeThumbColor: Colors.white,
+                                inactiveThumbColor: widget.dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF),
+                                inactiveTrackColor: widget.dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 95,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Break?', style: TextStyle(color: textS, fontSize: 12, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 48,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: widget.dark ? Colors.white.withAlpha(13) : const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: widget.dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Icon(Icons.broken_image_rounded, color: textS, size: 16),
+                              Switch(
+                                value: _isBreak,
+                                onChanged: (v) => setState(() => _isBreak = v),
+                                activeTrackColor: const Color(0xFF22c55e),
+                                activeThumbColor: Colors.white,
+                                inactiveThumbColor: widget.dark ? const Color(0xFFbdc3c7) : const Color(0xFF9CA3AF),
+                                inactiveTrackColor: widget.dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB),
+                                trackOutlineColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                  if (states.contains(WidgetState.selected)) {
+                                    return Colors.transparent;
+                                  }
+                                  return const Color(0xFFef4444).withAlpha(180);
+                                }),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: _buildTextField(
+                      'Remarks',
+                      _remarksCtrl,
+                      textCapitalization: TextCapitalization.sentences,
+                      formatters: [
+                        TextInputFormatter.withFunction(
+                          (oldValue, newValue) {
+                            if (newValue.text.isEmpty) return newValue;
+                            final text = newValue.text;
+                            final formatted = text[0].toUpperCase() + text.substring(1).toLowerCase();
+                            return TextEditingValue(
+                              text: formatted,
+                              selection: newValue.selection,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () => setState(() => _isPriority = !_isPriority),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _isPriority ? const Color(0xFFeab308).withAlpha(20) : (widget.dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: _isPriority ? const Color(0xFFeab308).withAlpha(50) : borderC),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isPriority ? Icons.star_rounded : Icons.star_border_rounded,
-                            color: _isPriority ? const Color(0xFFeab308) : textS,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text('Priority', style: TextStyle(color: _isPriority ? const Color(0xFFeab308) : textS, fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  InkWell(
-                    onTap: () => setState(() => _isBreak = !_isBreak),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: _isBreak ? Colors.green.withAlpha(20) : Colors.red.withAlpha(20),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: _isBreak ? Colors.green.withAlpha(50) : Colors.red.withAlpha(50)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _isBreak ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                            color: _isBreak ? Colors.green : Colors.redAccent,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text('Break', style: TextStyle(color: _isBreak ? Colors.green : Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              )
             ],
           ),
         ),
-
-        // AWBs List Header
-        Container(
-          padding: const EdgeInsets.only(left: 24, right: 24, top: 24, bottom: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(appLanguage.value == 'es' ? 'AWBs Asociados' : 'Associated AWBs', style: TextStyle(color: textP, fontSize: 14, fontWeight: FontWeight.bold)),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
-                  foregroundColor: _isFlightLocked ? textS : textP,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: _isFlightLocked ? borderC.withAlpha(128) : borderC)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                onPressed: _isFlightLocked ? null : _handleShowAddAwbDialog,
-                icon: Icon(_isFlightLocked ? Icons.lock_outline_rounded : Icons.add_rounded, size: 14),
-                label: Text(appLanguage.value == 'es' ? (_isFlightLocked ? 'Bloqueado' : 'Añadir') : (_isFlightLocked ? 'Locked' : 'Add'), style: const TextStyle(fontSize: 12)),
-              ),
-            ],
-          ),
-        ),
-
-        if (_awbs.isEmpty && _hasAttemptedSave)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withAlpha(50))),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(appLanguage.value == 'es' ? 'Debe añadir al menos un AWB.' : 'You must add at least one AWB.', style: const TextStyle(color: Colors.redAccent, fontSize: 12))),
-                ],
-              ),
-            ),
-          ),
 
         // AWBs List
         Expanded(
           child: Container(
             color: widget.dark ? const Color(0xFF1e293b).withAlpha(50) : const Color(0xFFF9FAFB),
-            child: _awbs.isEmpty
-                ? Center(child: Text(appLanguage.value == 'es' ? 'No hay AWBs.' : 'No AWBs.', style: TextStyle(color: textS)))
-                : ListView.builder(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_awbs.isEmpty && _hasAttemptedSave)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.redAccent.withAlpha(20), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withAlpha(50))),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(appLanguage.value == 'es' ? 'Debe añadir al menos un AWB.' : 'You must add at least one AWB.', style: const TextStyle(color: Colors.redAccent, fontSize: 12))),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: _awbs.isEmpty
+                      ? Center(child: Text(appLanguage.value == 'es' ? 'No hay AWBs.' : 'No AWBs.', style: TextStyle(color: textS)))
+                      : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     itemCount: _awbs.length,
                     itemBuilder: (context, index) {
@@ -599,52 +601,77 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
                       if (split['house']?.toString().trim().isNotEmpty == true) {
                         houseList = split['house'].toString().split(RegExp(r'[,\n]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
                       }
+                      final isExpanded = split['isExpanded'] == true;
                       
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: widget.dark ? Colors.white.withAlpha(5) : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: widget.dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)),
-                        ),
-                        child: Stack(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Top Linear Row
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 20,
-                                        height: 20,
-                                        decoration: BoxDecoration(
-                                          color: widget.dark ? const Color(0xFFf472b6).withAlpha(30) : const Color(0xFFdb2777).withAlpha(20),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: widget.dark ? const Color(0xFFf472b6).withAlpha(80) : const Color(0xFFdb2777).withAlpha(60)),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text('${index + 1}', style: TextStyle(color: widget.dark ? const Color(0xFFf472b6) : const Color(0xFFdb2777), fontSize: 9, fontWeight: FontWeight.bold)),
+                      return GestureDetector(
+                        onTap: () {
+                          if (houseList.isNotEmpty || (split['remarks']?.toString().trim().isNotEmpty == true && split['remarks']?.toString().trim().toLowerCase() != 'null')) {
+                            setState(() {
+                              split['isExpanded'] = !isExpanded;
+                            });
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: widget.dark ? Colors.white.withAlpha(5) : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: widget.dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)),
+                          ),
+                          child: Stack(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Top Linear Row
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 28, height: 28,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(color: const Color(0xFF3b82f6).withAlpha(30), shape: BoxShape.circle),
+                                            child: Text('${index + 1}', style: const TextStyle(color: Color(0xFF60a5fa), fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            flex: 3,
+                                            child: Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 14), overflow: TextOverflow.ellipsis),
+                                          ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text('$splitPieces/$masterPieces pcs', style: TextStyle(color: textS, fontSize: 13)),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text('$splitWeight kg', style: TextStyle(color: textS, fontSize: 13)),
+                                    ),
+                                    if (houseList.isNotEmpty || (split['remarks']?.toString().trim().isNotEmpty == true && split['remarks']?.toString().trim().toLowerCase() != 'null'))
+                                      Icon(
+                                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                        color: textS.withAlpha(150),
+                                        size: 20,
                                       ),
+                                    if (!_isFlightLocked) ...[
                                       const SizedBox(width: 8),
-                                      Expanded(
-                                        flex: 3,
-                                        child: Text(awbNumber, style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                                      InkWell(
+                                        onTap: () {
+                                          setState(() {
+                                            _awbs.removeAt(index);
+                                            _recalcularTotales();
+                                          });
+                                        },
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(4.0),
+                                          child: Icon(Icons.close_rounded, color: Colors.redAccent, size: 18),
+                                        ),
                                       ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text('P: $splitPieces/$masterPieces', style: TextStyle(color: textS, fontSize: 12)),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text('W: ${splitWeight}kg', style: TextStyle(color: textS, fontSize: 12)),
-                                      ),
-                                      if (!_isFlightLocked) const SizedBox(width: 32), // Space for delete button
                                     ],
-                                  ),
-                                  
+                                  ],
+                                ),
+                                
+                                if (isExpanded) ...[
                                   const SizedBox(height: 12),
                                   
                                   // Bottom Row: House and Remarks
@@ -699,40 +726,69 @@ class _FlightsV2UldEditBodyState extends State<FlightsV2UldEditBody> {
                                     ],
                                   ),
                                 ],
-                              ),
-                            ),
-                            if (!_isFlightLocked)
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _awbs.removeAt(index);
-                                      _recalcularTotales();
-                                    });
-                                  },
-                                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(12), topRight: Radius.circular(12)),
-                                  child: Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: widget.dark ? Colors.redAccent.withAlpha(40) : Colors.redAccent.withAlpha(20),
-                                      borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(12), topRight: Radius.circular(12)),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Icon(Icons.delete_outline_rounded, color: widget.dark ? const Color(0xFFfca5a5) : Colors.red, size: 16),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      );
+                                  ], // End Column children
+                                ), // End Column
+                              ), // End Padding
+                            ], // End Stack children
+                          ), // End Stack
+                        ), // End Container
+                      ); // End GestureDetector
                     },
                   ),
+                ), // Close Expanded for list
+              ], // Close Column children
+            ), // Close Column
+          ), // Close Container
+        ), // Close outer Expanded
+
+        if (!_isFlightLocked)
+          FlightsV2InlineAddAwbForm(
+            dark: widget.dark,
+            appLanguage: appLanguage,
+            textP: textP,
+            textS: textS,
+            borderC: borderC,
+            existingAwbs: _awbs,
+            uldNumber: _uldNumberCtrl.text.trim().isNotEmpty ? _uldNumberCtrl.text.trim().toUpperCase() : 'ULD',
+            onAdd: (newAwb) {
+              setState(() {
+                _awbs.add(newAwb);
+                _recalcularTotales();
+              });
+            },
+          ),
+          
+        // Action Buttons at the bottom
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            border: Border(top: BorderSide(color: borderC)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: widget.onCancel,
+                child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: TextStyle(color: textS, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366f1),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  minimumSize: const Size(120, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _isSubmitting ? null : _handleSave,
+                icon: _isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save_rounded, size: 16),
+                label: Text(appLanguage.value == 'es' ? 'Guardar' : 'Save', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         ),
-      ],
+      ], // Close main Column children
     );
   }
 }

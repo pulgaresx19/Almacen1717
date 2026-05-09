@@ -65,6 +65,7 @@ class _FlightsV2UldDetailsDrawerState extends State<FlightsV2UldDetailsDrawer> {
             )
           : FlightsV2UldViewBody(
               uld: widget.uld,
+              flight: widget.flight,
               dark: widget.dark,
               onEdit: () {
                 setState(() {
