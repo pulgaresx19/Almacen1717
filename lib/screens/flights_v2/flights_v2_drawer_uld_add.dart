@@ -124,8 +124,9 @@ class _FlightsV2DrawerUldAddBodyState extends State<_FlightsV2DrawerUldAddBody> 
             .from('ulds')
             .select('id_uld')
             .eq('uld_number', uldNum)
-            .maybeSingle();
-        if (existing != null) {
+            .eq('id_flight', widget.flightId)
+            .limit(1);
+        if (existing.isNotEmpty) {
           uldExistsError = true;
           hasError = true;
         }

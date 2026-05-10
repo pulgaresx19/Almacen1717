@@ -41,7 +41,6 @@ class RealtimeService {
     final todayStr = DateTime.now().toIso8601String().split('T')[0];
 
     _awbsSub = supabase.from('awbs').stream(primaryKey: ['id'])
-        .neq('status', 'Delivered')
         .order('awb_number', ascending: true).listen((data) {
       awbs.value = data;
     });
@@ -69,7 +68,6 @@ class RealtimeService {
     });
 
     _uldsSub = supabase.from('ulds').stream(primaryKey: ['id_uld'])
-        .neq('status', 'Delivered')
         .listen((data) {
       ulds.value = data;
     });

@@ -301,7 +301,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                   }
 
                   if (_showUldTab) {
-                    var ulds = dataList.where((u) => u['is_break'] != true).toList();
+                    var ulds = dataList.where((u) => u['is_break'] != true && FlightsV2StatusLogic.getUldStatus(u) != 'Delivered').toList();
                     
                     ulds.sort((a, b) {
                       int getPriority(Map<String, dynamic> u) {
@@ -445,7 +445,9 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                     );
                   }
 
-                  var awbs = List<Map<String, dynamic>>.from(dataList);
+                  var awbs = List<Map<String, dynamic>>.from(dataList)
+                      .where((a) => _getAwbStatusStr(a) != 'Delivered')
+                      .toList();
                   
                   awbs.sort((a, b) {
                     final sA = _getAwbStatusStr(a).toLowerCase();

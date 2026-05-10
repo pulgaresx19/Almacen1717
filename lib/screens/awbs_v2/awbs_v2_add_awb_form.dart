@@ -224,6 +224,7 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
 
   Widget _buildTextField(String label, TextEditingController ctrl, {bool isNumber = false, int maxLines = 1, List<TextInputFormatter>? inputFormatters, int? maxLength, bool hasError = false, String? errorText, bool readOnly = false, FocusNode? focusNode, Function(String)? onChanged, TextCapitalization textCapitalization = TextCapitalization.none}) {
     final bool isError = hasError || errorText != null;
+    final dark = isDarkMode.value;
     return Padding(
       padding: const EdgeInsets.only(right: 12, bottom: 12),
       child: Column(
@@ -232,45 +233,44 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: TextStyle(color: isError ? const Color(0xFFef4444) : (isDarkMode.value ? const Color(0xFF94a3b8) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(label, style: TextStyle(color: isError ? Colors.redAccent : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w500)),
             ],
           ),
           const SizedBox(height: 6),
-          SizedBox(
-            height: 40,
-            child: TextFormField(
-              controller: ctrl,
-              focusNode: focusNode,
-              readOnly: readOnly,
-              keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-              textCapitalization: textCapitalization,
-              maxLines: maxLines,
-              maxLength: maxLength,
-              inputFormatters: inputFormatters,
-              style: TextStyle(color: isDarkMode.value ? Colors.white : Colors.black, fontSize: 13),
-              decoration: InputDecoration(
-                filled: true,
-                counterText: '',
-                fillColor: isError ? const Color(0xFFef4444).withAlpha(10) : (!readOnly ? (isDarkMode.value ? Colors.white.withAlpha(10) : const Color(0xFFF3F4F6)) : (isDarkMode.value ? Colors.white.withAlpha(5) : const Color(0xFFE5E7EB))),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: isError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: isError ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: isError ? const BorderSide(color: Colors.redAccent, width: 2) : const BorderSide(color: Color(0xFF6366f1), width: 1.5),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          TextFormField(
+            controller: ctrl,
+            focusNode: focusNode,
+            readOnly: readOnly,
+            keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+            textCapitalization: textCapitalization,
+            maxLines: maxLines,
+            maxLength: maxLength,
+            inputFormatters: inputFormatters,
+            style: TextStyle(color: readOnly ? (dark ? Colors.white.withAlpha(120) : Colors.black54) : (dark ? Colors.white : Colors.black), fontSize: 12),
+            decoration: InputDecoration(
+              filled: true,
+              counterText: '',
+              hintText: readOnly ? 'Auto' : null,
+              hintStyle: TextStyle(color: dark ? Colors.white.withAlpha(76) : Colors.black.withAlpha(76), fontSize: 12),
+              fillColor: isError ? Colors.redAccent.withAlpha(20) : (readOnly ? (dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6)) : (dark ? Colors.white.withAlpha(13) : Colors.white)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: isError ? Colors.redAccent : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
               ),
-              onChanged: (val) {
-                if (onChanged != null) onChanged(val);
-                setState(() {});
-              },
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: isError ? Colors.redAccent : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: isError ? Colors.redAccent : const Color(0xFF8b5cf6), width: 1.5),
+              ),
             ),
+            onChanged: (val) {
+              if (onChanged != null) onChanged(val);
+              setState(() {});
+            },
           ),
         ],
       ),
@@ -338,11 +338,11 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
                   Expanded(child: _buildTextField('Remarks', _awbRemarkCtrl, inputFormatters: [SentenceCaseTextFormatter()], textCapitalization: TextCapitalization.sentences)),
                   Container(
                     margin: const EdgeInsets.only(bottom: 12, right: 12),
-                    height: 40,
-                    width: 40,
+                    height: 48,
+                    width: 48,
                     decoration: BoxDecoration(
                       color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: borderC),
                     ),
                     child: IconButton(
@@ -359,11 +359,11 @@ class _AwbsV2AddAwbFormState extends State<AwbsV2AddAwbForm> {
                   ),
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
-                    height: 40,
-                    width: 40,
+                    height: 48,
+                    width: 48,
                     decoration: BoxDecoration(
                       color: const Color(0xFF6366f1), 
-                      borderRadius: BorderRadius.circular(8)
+                      borderRadius: BorderRadius.circular(12)
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),

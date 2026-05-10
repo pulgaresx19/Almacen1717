@@ -46,13 +46,20 @@ BEGIN
             -- Create or get AWB master
             INSERT INTO awbs (
                 awb_number,
-                total_pieces
+                total_pieces,
+                total_espected,
+                total_weight
             ) VALUES (
                 v_awb->>'awb_number',
-                CAST(NULLIF(v_awb->>'total', '') AS integer)
+                CAST(NULLIF(v_awb->>'total', '') AS integer),
+                COALESCE(CAST(NULLIF(v_awb->>'pieces', '') AS integer), 0),
+                COALESCE(CAST(NULLIF(v_awb->>'weight', '') AS numeric), 0)
             )
             ON CONFLICT (awb_number) DO UPDATE
-            SET total_pieces = EXCLUDED.total_pieces
+            SET 
+                total_pieces = EXCLUDED.total_pieces,
+                total_espected = COALESCE(awbs.total_espected, 0) + EXCLUDED.total_espected,
+                total_weight = COALESCE(awbs.total_weight, 0) + EXCLUDED.total_weight
             RETURNING id INTO v_awb_master_id;
 
             -- Create AWB split

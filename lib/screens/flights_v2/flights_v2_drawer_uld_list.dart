@@ -229,26 +229,77 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                 onTap: () async {
                   final confirm = await showDialog<bool>(
                     context: context,
-                    builder: (ctx) => AlertDialog(
-                      backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
-                      title: Text(appLanguage.value == 'es' ? 'Eliminar ULD' : 'Delete ULD', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
-                      content: Text(
-                        appLanguage.value == 'es' 
-                            ? '¿Estás seguro de que deseas eliminar este ULD y todas sus guías asociadas? Esta acción no se puede deshacer.'
-                            : 'Are you sure you want to delete this ULD and all its associated AWBs? This action cannot be undone.',
-                        style: TextStyle(color: textS),
+                    builder: (ctx) => Dialog(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      child: Container(
+                        width: 320,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.redAccent.withAlpha(80), width: 2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.redAccent.withAlpha(20), blurRadius: 20, spreadRadius: 5),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent.withAlpha(20),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 40),
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              appLanguage.value == 'es' ? 'Eliminar ULD' : 'Delete ULD',
+                              style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 20),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              appLanguage.value == 'es' 
+                                  ? '¿Estás seguro de que deseas eliminar este ULD y todas sus guías asociadas? Esta acción es peligrosa y no se puede deshacer.'
+                                  : 'Are you sure you want to delete this ULD and all its associated AWBs? This is a dangerous action and cannot be undone.',
+                              style: TextStyle(color: textS, fontSize: 14, height: 1.4),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextButton(
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent, 
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: Text(appLanguage.value == 'es' ? 'Eliminar' : 'Delete', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8))),
-                        ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: Text(appLanguage.value == 'es' ? 'Eliminar' : 'Delete'),
-                        ),
-                      ],
                     ),
                   );
 
@@ -391,26 +442,77 @@ class _FlightsV2UldListState extends State<FlightsV2UldList> {
                       onPressed: () async {
                         final confirm = await showDialog<bool>(
                           context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
-                            title: Text(appLanguage.value == 'es' ? 'Eliminar Múltiples ULDs' : 'Delete Multiple ULDs', style: TextStyle(color: textP, fontWeight: FontWeight.bold)),
-                            content: Text(
-                              appLanguage.value == 'es' 
-                                  ? '¿Estás seguro de que deseas eliminar los ${_selectedUlds.length} ULDs seleccionados y sus guías?'
-                                  : 'Are you sure you want to delete the ${_selectedUlds.length} selected ULDs and their AWBs?',
-                              style: TextStyle(color: textS),
+                          builder: (ctx) => Dialog(
+                            backgroundColor: Colors.transparent,
+                            elevation: 0,
+                            child: Container(
+                              width: 320,
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.redAccent.withAlpha(80), width: 2),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.redAccent.withAlpha(20), blurRadius: 20, spreadRadius: 5),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withAlpha(20),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 40),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Text(
+                                    appLanguage.value == 'es' ? 'Eliminar Múltiples ULDs' : 'Delete Multiple ULDs',
+                                    style: TextStyle(color: textP, fontWeight: FontWeight.bold, fontSize: 20),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    appLanguage.value == 'es' 
+                                        ? '¿Estás seguro de que deseas eliminar los ${_selectedUlds.length} ULDs seleccionados y sus guías? Esta acción es peligrosa y no se puede deshacer.'
+                                        : 'Are you sure you want to delete the ${_selectedUlds.length} selected ULDs and their AWBs? This is a dangerous action and cannot be undone.',
+                                    style: TextStyle(color: textS, fontSize: 14, height: 1.4),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextButton(
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          ),
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8), fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.redAccent, 
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          ),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: Text(appLanguage.value == 'es' ? 'Eliminar' : 'Delete', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: Text(appLanguage.value == 'es' ? 'Cancelar' : 'Cancel', style: const TextStyle(color: Color(0xFF94a3b8))),
-                              ),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: Text(appLanguage.value == 'es' ? 'Eliminar' : 'Delete'),
-                              ),
-                            ],
                           ),
                         );
 
