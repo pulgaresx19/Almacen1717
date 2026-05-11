@@ -66,121 +66,116 @@ class _DeliversV2ScreenState extends State<DeliversV2Screen> {
                     );
                   },
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_showAddForm)
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () async {
-                              if (_addDeliverKey.currentState != null) {
-                                final canPop = await _addDeliverKey.currentState!.handleBackRequest();
-                                if (canPop) {
+                if (!_showHistory) ...[
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_showAddForm)
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () async {
+                                if (_addDeliverKey.currentState != null) {
+                                  final canPop = await _addDeliverKey.currentState!.handleBackRequest();
+                                  if (canPop) {
+                                    setState(() => _showAddForm = false);
+                                  }
+                                } else {
                                   setState(() => _showAddForm = false);
                                 }
-                              } else {
-                                setState(() => _showAddForm = false);
-                              }
-                            },
-                            icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                            tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
-                            color: textS,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(appLanguage.value == 'es' ? 'Añadir Nuevo Deliver' : 'Add New Deliver', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
-                        ],
-                      )
-                    else if (_showHistory)
-                      Text(
-                        appLanguage.value == 'es' ? 'Historial de Entregas' : 'Delivery History',
-                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
-                      )
-                    else
-                      Text(
-                        appLanguage.value == 'es' ? 'Entregas / Transferencias de Hoy' : 'Today\'s Delivers / Transfers',
-                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
-                      ),
-                    const SizedBox(height: 4),
-                    if (_showAddForm)
-                      Text(appLanguage.value == 'es' ? 'Registrar un Nuevo Deliver en el sistema.' : 'Register a New Deliver in the system.', style: TextStyle(color: textS, fontSize: 13))
-                    else if (_showHistory)
-                      Text(appLanguage.value == 'es' ? 'Consulta de entregas y transferencias pasadas.' : 'Query past deliveries and transfers.', style: TextStyle(color: textS, fontSize: 13))
-                    else
-                      Text(
-                        appLanguage.value == 'es' ? 'Manejo de entregas diarias.' : 'Daily deliveries management.',
-                        style: TextStyle(fontSize: 13, color: textS),
-                      ),
-                  ],
-                ),
-                const Spacer(),
-                if (!_showAddForm)
-                  Container(
-                    width: 300,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: bgCard,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: borderCard),
-                    ),
-                    child: TextField(
-                      controller: _searchController,
-                      style: TextStyle(color: textP, fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
-                        hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
-                        prefixIcon: Icon(Icons.search_rounded, color: textS, size: 16),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    ),
+                              },
+                              icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                              tooltip: appLanguage.value == 'es' ? 'Volver' : 'Back',
+                              color: textS,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(appLanguage.value == 'es' ? 'Añadir Nuevo Deliver' : 'Add New Deliver', style: TextStyle(color: textP, fontSize: 32, fontWeight: FontWeight.w700)),
+                          ],
+                        )
+                      else
+                        Text(
+                          appLanguage.value == 'es' ? 'Entregas / Transferencias de Hoy' : 'Today\'s Delivers / Transfers',
+                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
+                        ),
+                      const SizedBox(height: 4),
+                      if (_showAddForm)
+                        Text(appLanguage.value == 'es' ? 'Registrar un Nuevo Deliver en el sistema.' : 'Register a New Deliver in the system.', style: TextStyle(color: textS, fontSize: 13))
+                      else
+                        Text(
+                          appLanguage.value == 'es' ? 'Manejo de entregas diarias.' : 'Daily deliveries management.',
+                          style: TextStyle(fontSize: 13, color: textS),
+                        ),
+                    ],
                   ),
-                const SizedBox(width: 16),
-                if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor')
-                  SizedBox(
-                    height: 40,
-                    child: ElevatedButton.icon(
-                      onPressed: () => setState(() => _showAddForm = true),
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: Text(appLanguage.value == 'es' ? 'Añadir Entrega' : 'Add Deliver', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366f1),
-                        foregroundColor: Colors.white,
-                        elevation: 4,
-                        shadowColor: const Color(0xFF6366f1).withAlpha(100),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  const Spacer(),
+                  if (!_showAddForm)
+                    Container(
+                      width: 300,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: bgCard,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: borderCard),
                       ),
-                    ),
-                  ),
-                if (!_showAddForm) ...[
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    height: 40,
-                    width: 40,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _showHistory = !_showHistory;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _showHistory ? const Color(0xFF6366f1) : bgCard,
-                        foregroundColor: _showHistory ? Colors.white : const Color(0xFF6366f1),
-                        elevation: _showHistory ? 4 : 0,
-                        padding: EdgeInsets.zero,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(color: _showHistory ? Colors.transparent : borderCard),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textP, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: appLanguage.value == 'es' ? 'Buscar...' : 'Search...',
+                          hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                          prefixIcon: Icon(Icons.search_rounded, color: textS, size: 16),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
                       ),
-                      child: Icon(_showHistory ? Icons.folder_open_rounded : Icons.folder_special_rounded, size: 20),
                     ),
-                  ),
+                  const SizedBox(width: 16),
+                  if (!_showAddForm && currentUserData.value?['position'] != 'Supervisor')
+                    SizedBox(
+                      height: 40,
+                      child: ElevatedButton.icon(
+                        onPressed: () => setState(() => _showAddForm = true),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: Text(appLanguage.value == 'es' ? 'Añadir Entrega' : 'Add Deliver', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366f1),
+                          foregroundColor: Colors.white,
+                          elevation: 4,
+                          shadowColor: const Color(0xFF6366f1).withAlpha(100),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                      ),
+                    ),
+                  if (!_showAddForm) ...[
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 40,
+                      width: 40,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _showHistory = !_showHistory;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _showHistory ? const Color(0xFF6366f1) : bgCard,
+                          foregroundColor: _showHistory ? Colors.white : const Color(0xFF6366f1),
+                          elevation: _showHistory ? 4 : 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(color: _showHistory ? Colors.transparent : borderCard),
+                          ),
+                        ),
+                        child: Icon(_showHistory ? Icons.folder_open_rounded : Icons.folder_special_rounded, size: 20),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
-            const SizedBox(height: 24),
+            if (!_showHistory) const SizedBox(height: 24),
             if (_showAddForm)
               Expanded(
                 child: AddDeliverV2Screen(

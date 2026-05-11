@@ -170,10 +170,10 @@ class _DamagesV2ScreenState extends State<DamagesV2Screen> {
                         );
                       },
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (!_showHistory) ...[
+                    if (!_showHistory) ...[
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
                             appLanguage.value == 'es' ? 'Reportes de Daños' : 'Damage Reports',
                             style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
@@ -183,16 +183,9 @@ class _DamagesV2ScreenState extends State<DamagesV2Screen> {
                             appLanguage.value == 'es' ? 'Manejo de registros y reportes de daños.' : 'Damage reports and records management.',
                             style: TextStyle(fontSize: 13, color: textS),
                           ),
-                        ] else ...[
-                          Text(
-                            appLanguage.value == 'es' ? 'Historial de Daños' : 'Damages History',
-                            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
-                          ),
-                        ]
-                      ],
-                    ),
-                    const Spacer(),
-                    if (!_showHistory) ...[
+                        ],
+                      ),
+                      const Spacer(),
                       Container(
                         width: 300,
                         height: 40,
@@ -214,35 +207,38 @@ class _DamagesV2ScreenState extends State<DamagesV2Screen> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                    ],
-                    
-                    // History Button
-                    SizedBox(
-                      height: 40,
-                      width: 40,
-                      child: Tooltip(
-                        message: appLanguage.value == 'es' ? 'Ver Historial' : 'View History',
-                        child: ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _showHistory = true;
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFeab308).withAlpha(40),
-                            foregroundColor: const Color(0xFFeab308),
-                            padding: EdgeInsets.zero,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      
+                      // History Button
+                      SizedBox(
+                        height: 40,
+                        width: 40,
+                        child: Tooltip(
+                          message: appLanguage.value == 'es' ? 'Ver Historial' : 'View History',
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _showHistory = true;
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: bgCard,
+                              foregroundColor: const Color(0xFF6366f1),
+                              elevation: 0,
+                              padding: EdgeInsets.zero,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(color: borderC),
+                              ),
+                            ),
+                            child: const Icon(Icons.folder_special_rounded, size: 20),
                           ),
-                          child: const Icon(Icons.folder_open_rounded, size: 20),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
+                      const SizedBox(width: 16),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 24),
+                if (!_showHistory) const SizedBox(height: 24),
                 if (_showHistory)
                   Expanded(
                     child: DamagesV2History(

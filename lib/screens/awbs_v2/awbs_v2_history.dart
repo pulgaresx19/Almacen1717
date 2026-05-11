@@ -26,6 +26,11 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
   List<Map<String, dynamic>> _dayAwbs = [];
   List<Map<String, dynamic>> _dayUlds = [];
 
+  final TextEditingController _searchController = TextEditingController();
+  bool _isGlobalSearch = false;
+  List<Map<String, dynamic>> _searchAwbs = [];
+  List<Map<String, dynamic>> _searchUlds = [];
+
   final ScrollController _horizontalScrollController = ScrollController();
 
   @override
@@ -37,6 +42,7 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
   @override
   void dispose() {
     _horizontalScrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -94,6 +100,59 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
     } catch (e) {
       debugPrint('Error fetching items for day: $e');
       if (mounted && _selectedDate == dateStr) {
+        setState(() => _isLoadingDay = false);
+      }
+    }
+  }
+
+  Future<void> _executeSearch() async {
+    final query = _searchController.text.trim();
+    if (query.length < 4) {
+      if (query.isEmpty) {
+        setState(() {
+          _isGlobalSearch = false;
+          _searchAwbs = [];
+          _searchUlds = [];
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _selectedDate = null;
+      _isGlobalSearch = true;
+      _isLoadingDay = true;
+      _searchAwbs = [];
+      _searchUlds = [];
+    });
+
+    try {
+      final resAwbs = await Supabase.instance.client
+          .from('awbs')
+          .select()
+          .eq('status', 'Delivered')
+          .ilike('awb_number', '%$query%')
+          .order('time_deliver', ascending: false)
+          .limit(50);
+
+      final resUlds = await Supabase.instance.client
+          .from('ulds')
+          .select()
+          .eq('status', 'Delivered')
+          .ilike('uld_number', '%$query%')
+          .order('time_deliver', ascending: false)
+          .limit(50);
+
+      if (mounted && _isGlobalSearch) {
+        setState(() {
+          _searchAwbs = List<Map<String, dynamic>>.from(resAwbs);
+          _searchUlds = List<Map<String, dynamic>>.from(resUlds);
+          _isLoadingDay = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error searching: $e');
+      if (mounted && _isGlobalSearch) {
         setState(() => _isLoadingDay = false);
       }
     }
@@ -161,7 +220,12 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
                   children: [
                     IconButton(
                       onPressed: () {
-                        if (_selectedDate != null) {
+                        if (_isGlobalSearch) {
+                          setState(() {
+                            _isGlobalSearch = false;
+                            _searchController.clear();
+                          });
+                        } else if (_selectedDate != null) {
                           setState(() {
                             _selectedDate = null;
                           });
@@ -174,19 +238,22 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
                     ),
                     const SizedBox(width: 8),
                     Icon(
-                      _selectedDate == null ? Icons.folder_special_rounded : Icons.folder_open_rounded,
+                      _isGlobalSearch ? Icons.search_rounded : (_selectedDate == null ? Icons.folder_special_rounded : Icons.folder_open_rounded),
                       color: const Color(0xFF6366f1),
                       size: 28,
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      _selectedDate == null
-                          ? (appLanguage.value == 'es' ? 'Historial de Storage' : 'Storage History')
-                          : (appLanguage.value == 'es' ? 'Entregados el $_selectedDate' : 'Delivered on $_selectedDate'),
+                      _isGlobalSearch
+                          ? (appLanguage.value == 'es' ? 'Resultados de Búsqueda' : 'Search Results')
+                          : (_selectedDate == null
+                              ? (appLanguage.value == 'es' ? 'Historial de Storage' : 'Storage History')
+                              : (appLanguage.value == 'es' ? 'Entregados el $_selectedDate' : 'Delivered on $_selectedDate')),
                       style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                    if (_selectedDate != null) ...[
-                      const Spacer(),
+                    const Spacer(),
+                    
+                    if (_selectedDate != null || _isGlobalSearch) ...[
                       Row(
                         children: [
                           GestureDetector(
@@ -226,7 +293,60 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
                           ),
                         ],
                       ),
-                    ]
+                      const SizedBox(width: 16),
+                    ],
+                    
+                    // Search Box
+                    Container(
+                      width: 250,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: borderCard),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textP, fontSize: 13),
+                        onSubmitted: (val) {
+                          _executeSearch();
+                        },
+                        decoration: InputDecoration(
+                          hintText: appLanguage.value == 'es' ? 'Buscar en historial...' : 'Search history...',
+                          hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _searchController,
+                            builder: (context, value, child) {
+                              final bool isEnabled = value.text.trim().length >= 4;
+                              return Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: InkWell(
+                                  onTap: isEnabled ? () => _executeSearch() : null,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isEnabled 
+                                          ? const Color(0xFF6366f1) 
+                                          : (dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                                    ),
+                                    child: Icon(
+                                      Icons.search_rounded, 
+                                      color: isEnabled ? Colors.white : textS.withAlpha(100), 
+                                      size: 16
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -234,9 +354,11 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
 
               // Content
               Expanded(
-                child: _selectedDate == null
-                    ? _buildFoldersView(dark, textP, textS, borderCard)
-                    : _buildDayView(dark, textP, textS, borderCard),
+                child: _isGlobalSearch
+                    ? _buildDayView(dark, textP, textS, borderCard, isSearch: true)
+                    : (_selectedDate == null
+                        ? _buildFoldersView(dark, textP, textS, borderCard)
+                        : _buildDayView(dark, textP, textS, borderCard, isSearch: false)),
               ),
             ],
           ),
@@ -322,12 +444,14 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
     );
   }
 
-  Widget _buildDayView(bool dark, Color textP, Color textS, Color borderCard) {
+  Widget _buildDayView(bool dark, Color textP, Color textS, Color borderCard, {bool isSearch = false}) {
     if (_isLoadingDay) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
     }
 
-    final dataList = _showUldTab ? _dayUlds : _dayAwbs;
+    final dataList = _showUldTab 
+        ? (isSearch ? _searchUlds : _dayUlds) 
+        : (isSearch ? _searchAwbs : _dayAwbs);
 
     if (dataList.isEmpty) {
       return Center(
@@ -338,7 +462,10 @@ class _AwbsV2HistoryState extends State<AwbsV2History> {
             const SizedBox(height: 16),
             Text(appLanguage.value == 'es' ? 'No hay ítems' : 'No Items', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(appLanguage.value == 'es' ? 'No hay ítems entregados en esta fecha.' : 'There are no items delivered on this date.', style: TextStyle(color: textS)),
+            Text(isSearch 
+                ? (appLanguage.value == 'es' ? 'No se encontraron resultados para tu búsqueda.' : 'No results found for your search.')
+                : (appLanguage.value == 'es' ? 'No hay ítems entregados en esta fecha.' : 'There are no items delivered on this date.'), 
+                 style: TextStyle(color: textS)),
           ],
         )
       );

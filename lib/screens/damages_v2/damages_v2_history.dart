@@ -21,10 +21,20 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
   bool _isLoadingDay = false;
   List<Map<String, dynamic>> _dayDamages = [];
 
+  final TextEditingController _searchController = TextEditingController();
+  bool _isGlobalSearch = false;
+  List<Map<String, dynamic>> _searchDamages = [];
+
   @override
   void initState() {
     super.initState();
     _fetchSummary();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchSummary() async {
@@ -95,6 +105,90 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
     }
   }
 
+  Future<void> _executeSearch() async {
+    final query = _searchController.text.trim();
+    if (query.length < 4) {
+      if (query.isEmpty) {
+        setState(() {
+          _isGlobalSearch = false;
+          _searchDamages = [];
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _selectedDate = null;
+      _isGlobalSearch = true;
+      _isLoadingDay = true;
+      _searchDamages = [];
+    });
+
+    try {
+      final awbRes = await Supabase.instance.client.from('awbs').select('id').ilike('awb_number', '%$query%').limit(10);
+      final uldRes = await Supabase.instance.client.from('ulds').select('id').ilike('uld_number', '%$query%').limit(10);
+
+      final List<int> awbIds = (awbRes as List).map((e) => e['id'] as int).toList();
+      final List<int> uldIds = (uldRes as List).map((e) => e['id'] as int).toList();
+
+      if (awbIds.isEmpty && uldIds.isEmpty) {
+        if (mounted && _isGlobalSearch) {
+          setState(() {
+            _searchDamages = [];
+            _isLoadingDay = false;
+          });
+        }
+        return;
+      }
+
+      var q = Supabase.instance.client
+          .from('damage_reports')
+          .select('*, flights(carrier, number, date), ulds(uld_number), awbs(awb_number)');
+
+      if (awbIds.isNotEmpty && uldIds.isNotEmpty) {
+        q = q.or('awb_id.in.(${awbIds.join(',')}),uld_id.in.(${uldIds.join(',')})');
+      } else if (awbIds.isNotEmpty) {
+        q = q.filter('awb_id', 'in', awbIds);
+      } else if (uldIds.isNotEmpty) {
+        q = q.filter('uld_id', 'in', uldIds);
+      }
+
+      final data = await q.order('created_at', ascending: false).limit(50);
+
+      final userIds = data.map((d) => d['user_id']).where((id) => id != null).toSet().toList();
+      Map<String, String> userMap = {};
+      if (userIds.isNotEmpty) {
+        final usersData = await Supabase.instance.client
+            .from('users')
+            .select('id, full_name')
+            .inFilter('id', userIds);
+        for (var u in usersData) {
+          userMap[u['id'].toString()] = u['full_name'].toString();
+        }
+      }
+
+      final mappedData = data.map((d) {
+        final Map<String, dynamic> damage = Map<String, dynamic>.from(d);
+        if (damage['user_id'] != null && userMap.containsKey(damage['user_id'].toString())) {
+          damage['users'] = [{'full_name': userMap[damage['user_id'].toString()]}];
+        }
+        return damage;
+      }).toList();
+
+      if (mounted && _isGlobalSearch) {
+        setState(() {
+          _searchDamages = mappedData;
+          _isLoadingDay = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error searching damages: $e');
+      if (mounted && _isGlobalSearch) {
+        setState(() => _isLoadingDay = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -120,7 +214,12 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
                   children: [
                     IconButton(
                       onPressed: () {
-                        if (_selectedDate != null) {
+                        if (_isGlobalSearch) {
+                          setState(() {
+                            _isGlobalSearch = false;
+                            _searchController.clear();
+                          });
+                        } else if (_selectedDate != null) {
                           setState(() {
                             _selectedDate = null;
                           });
@@ -133,25 +232,80 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
                     ),
                     const SizedBox(width: 8),
                     Icon(
-                      _selectedDate == null ? Icons.folder_special_rounded : Icons.folder_open_rounded,
+                      _isGlobalSearch ? Icons.search_rounded : (_selectedDate == null ? Icons.folder_special_rounded : Icons.folder_open_rounded),
                       color: const Color(0xFF6366f1),
                       size: 28,
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      _selectedDate == null
-                          ? (appLanguage.value == 'es' ? 'Historial de Daños' : 'Damages History')
-                          : (appLanguage.value == 'es' ? 'Daños del $_selectedDate' : 'Damages on $_selectedDate'),
+                      _isGlobalSearch
+                          ? (appLanguage.value == 'es' ? 'Resultados de Búsqueda' : 'Search Results')
+                          : (_selectedDate == null
+                              ? (appLanguage.value == 'es' ? 'Historial de Daños' : 'Damages History')
+                              : (appLanguage.value == 'es' ? 'Daños del $_selectedDate' : 'Damages on $_selectedDate')),
                       style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    Container(
+                      width: 250,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: borderCard),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textP, fontSize: 13),
+                        onSubmitted: (val) {
+                          _executeSearch();
+                        },
+                        decoration: InputDecoration(
+                          hintText: appLanguage.value == 'es' ? 'Buscar en historial...' : 'Search history...',
+                          hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _searchController,
+                            builder: (context, value, child) {
+                              final bool isEnabled = value.text.trim().length >= 4;
+                              return Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: InkWell(
+                                  onTap: isEnabled ? () => _executeSearch() : null,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isEnabled 
+                                          ? const Color(0xFF6366f1) 
+                                          : (dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                                    ),
+                                    child: Icon(
+                                      Icons.search_rounded, 
+                                      color: isEnabled ? Colors.white : textS.withAlpha(100), 
+                                      size: 16
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
               const Divider(height: 1, color: Colors.transparent),
               Expanded(
-                child: _selectedDate == null
-                    ? _buildFoldersView(dark, textP, textS, borderCard)
-                    : _buildDayView(dark, textP, textS, borderCard),
+                child: _isGlobalSearch
+                    ? _buildDayView(dark, textP, textS, borderCard, isSearch: true)
+                    : (_selectedDate == null
+                        ? _buildFoldersView(dark, textP, textS, borderCard)
+                        : _buildDayView(dark, textP, textS, borderCard, isSearch: false)),
               ),
             ],
           ),
@@ -237,12 +391,14 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
     );
   }
 
-  Widget _buildDayView(bool dark, Color textP, Color textS, Color borderCard) {
+  Widget _buildDayView(bool dark, Color textP, Color textS, Color borderCard, {bool isSearch = false}) {
     if (_isLoadingDay) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
     }
 
-    if (_dayDamages.isEmpty) {
+    final dataList = isSearch ? _searchDamages : _dayDamages;
+
+    if (dataList.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -251,7 +407,10 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
             const SizedBox(height: 16),
             Text(appLanguage.value == 'es' ? 'No hay daños' : 'No Damages', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(appLanguage.value == 'es' ? 'No hay daños reportados en esta fecha.' : 'There are no damages reported on this date.', style: TextStyle(color: textS)),
+            Text(isSearch
+                ? (appLanguage.value == 'es' ? 'No se encontraron resultados para tu búsqueda.' : 'No results found for your search.')
+                : (appLanguage.value == 'es' ? 'No hay daños reportados en esta fecha.' : 'There are no damages reported on this date.'), 
+                 style: TextStyle(color: textS)),
           ],
         )
       );
@@ -260,7 +419,7 @@ class _DamagesV2HistoryState extends State<DamagesV2History> {
     return ClipRRect(
       borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(16), bottomRight: Radius.circular(16)),
       child: DamagesV2Table(
-        damages: _dayDamages,
+        damages: dataList,
         onSelect: (damage) {
           DamagesV2Drawer.show(context, damage, dark);
         },

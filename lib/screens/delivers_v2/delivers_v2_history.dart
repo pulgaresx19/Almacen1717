@@ -22,10 +22,20 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
   bool _isLoadingDay = false;
   List<Map<String, dynamic>> _dayDeliveries = [];
 
+  final TextEditingController _searchController = TextEditingController();
+  bool _isGlobalSearch = false;
+  List<Map<String, dynamic>> _searchDeliveries = [];
+
   @override
   void initState() {
     super.initState();
     _fetchSummary();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchSummary() async {
@@ -76,6 +86,47 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
     }
   }
 
+  Future<void> _executeSearch() async {
+    final query = _searchController.text.trim();
+    if (query.length < 4) {
+      if (query.isEmpty) {
+        setState(() {
+          _isGlobalSearch = false;
+          _searchDeliveries = [];
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _selectedDate = null;
+      _isGlobalSearch = true;
+      _isLoadingDay = true;
+      _searchDeliveries = [];
+    });
+
+    try {
+      final res = await Supabase.instance.client
+          .from('deliveries')
+          .select()
+          .or('company.ilike.%$query%,driver_name.ilike.%$query%')
+          .order('time', ascending: false)
+          .limit(50);
+
+      if (mounted && _isGlobalSearch) {
+        setState(() {
+          _searchDeliveries = List<Map<String, dynamic>>.from(res);
+          _isLoadingDay = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error searching deliveries: $e');
+      if (mounted && _isGlobalSearch) {
+        setState(() => _isLoadingDay = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -102,7 +153,12 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
                   children: [
                     IconButton(
                       onPressed: () {
-                        if (_selectedDate != null) {
+                        if (_isGlobalSearch) {
+                          setState(() {
+                            _isGlobalSearch = false;
+                            _searchController.clear();
+                          });
+                        } else if (_selectedDate != null) {
                           setState(() {
                             _selectedDate = null;
                           });
@@ -115,16 +171,71 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
                     ),
                     const SizedBox(width: 8),
                     Icon(
-                      _selectedDate == null ? Icons.folder_special_rounded : Icons.folder_open_rounded,
+                      _isGlobalSearch ? Icons.search_rounded : (_selectedDate == null ? Icons.folder_special_rounded : Icons.folder_open_rounded),
                       color: const Color(0xFF6366f1),
                       size: 28,
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      _selectedDate == null
-                          ? (appLanguage.value == 'es' ? 'Historial de Entregas' : 'Deliveries History')
-                          : (appLanguage.value == 'es' ? 'Entregas del $_selectedDate' : 'Deliveries on $_selectedDate'),
+                      _isGlobalSearch
+                          ? (appLanguage.value == 'es' ? 'Resultados de Búsqueda' : 'Search Results')
+                          : (_selectedDate == null
+                              ? (appLanguage.value == 'es' ? 'Historial de Entregas' : 'Deliveries History')
+                              : (appLanguage.value == 'es' ? 'Entregas del $_selectedDate' : 'Deliveries on $_selectedDate')),
                       style: TextStyle(color: textP, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    
+                    // Search Box
+                    Container(
+                      width: 250,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white.withAlpha(10) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: borderCard),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: TextStyle(color: textP, fontSize: 13),
+                        onSubmitted: (val) {
+                          _executeSearch();
+                        },
+                        decoration: InputDecoration(
+                          hintText: appLanguage.value == 'es' ? 'Buscar en historial...' : 'Search history...',
+                          hintStyle: TextStyle(color: textP.withAlpha(76), fontSize: 13),
+                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _searchController,
+                            builder: (context, value, child) {
+                              final bool isEnabled = value.text.trim().length >= 4;
+                              return Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: InkWell(
+                                  onTap: isEnabled ? () => _executeSearch() : null,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isEnabled 
+                                          ? const Color(0xFF6366f1) 
+                                          : (dark ? Colors.white.withAlpha(20) : Colors.black.withAlpha(10)),
+                                    ),
+                                    child: Icon(
+                                      Icons.search_rounded, 
+                                      color: isEnabled ? Colors.white : textS.withAlpha(100), 
+                                      size: 16
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -133,9 +244,11 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
 
               // Content
               Expanded(
-                child: _selectedDate == null
-                    ? _buildFoldersView(dark, textP, textS, borderCard)
-                    : _buildDayView(dark, textP, textS, borderCard),
+                child: _isGlobalSearch
+                    ? _buildDayView(dark, textP, textS, borderCard, isSearch: true)
+                    : (_selectedDate == null
+                        ? _buildFoldersView(dark, textP, textS, borderCard)
+                        : _buildDayView(dark, textP, textS, borderCard, isSearch: false)),
               ),
             ],
           ),
@@ -206,9 +319,16 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '$count ${appLanguage.value == 'es' ? 'entregas' : 'delivers'}',
-                  style: TextStyle(color: textS, fontSize: 13),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366f1).withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$count ${appLanguage.value == 'es' ? 'entregas' : 'delivers'}',
+                    style: const TextStyle(color: Color(0xFF6366f1), fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -218,20 +338,36 @@ class _DeliversV2HistoryState extends State<DeliversV2History> {
     );
   }
 
-  Widget _buildDayView(bool dark, Color textP, Color textS, Color borderCard) {
+  Widget _buildDayView(bool dark, Color textP, Color textS, Color borderCard, {bool isSearch = false}) {
     if (_isLoadingDay) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1)));
     }
 
-    if (_dayDeliveries.isEmpty) {
-      return Center(child: Text('No items', style: TextStyle(color: textS)));
+    final dataList = isSearch ? _searchDeliveries : _dayDeliveries;
+
+    if (dataList.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_rounded, size: 64, color: dark ? Colors.white.withAlpha(25) : Colors.black.withAlpha(20)),
+            const SizedBox(height: 16),
+            Text(appLanguage.value == 'es' ? 'No hay entregas' : 'No Delivers', style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(isSearch 
+                ? (appLanguage.value == 'es' ? 'No se encontraron resultados para tu búsqueda.' : 'No results found for your search.')
+                : (appLanguage.value == 'es' ? 'No hay entregas en esta fecha.' : 'There are no deliveries on this date.'), 
+                 style: TextStyle(color: textS)),
+          ],
+        )
+      );
     }
 
     return ListView.builder(
       padding: const EdgeInsets.all(24),
-      itemCount: _dayDeliveries.length,
+      itemCount: dataList.length,
       itemBuilder: (context, index) {
-        final item = _dayDeliveries[index];
+        final item = dataList[index];
         final company = item['company']?.toString() ?? '-';
         final driver = item['driver_name']?.toString() ?? '-';
         final door = item['door']?.toString() ?? '-';

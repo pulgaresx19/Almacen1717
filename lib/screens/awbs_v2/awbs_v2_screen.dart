@@ -77,12 +77,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_showHistory)
-                      Text(
-                        appLanguage.value == 'es' ? 'Historial de Storage' : 'Storage History',
-                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, color: textP),
-                      )
-                    else if (!_showAddItemsForm) ...[
+                    if (!_showHistory && !_showAddItemsForm) ...[
                       Row(
                         children: [
                           GestureDetector(
@@ -217,13 +212,16 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           });
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFeab308).withAlpha(40),
-                          foregroundColor: const Color(0xFFeab308),
-                          padding: EdgeInsets.zero,
+                          backgroundColor: bgCard,
+                          foregroundColor: const Color(0xFF6366f1),
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(color: borderCard),
+                          ),
                         ),
-                        child: const Icon(Icons.folder_open_rounded, size: 20),
+                        child: const Icon(Icons.folder_special_rounded, size: 20),
                       ),
                     ),
                   ),
@@ -231,7 +229,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                 ],
               ],
             ),
-            SizedBox(height: _showAddItemsForm ? 12 : 30),
+            SizedBox(height: _showHistory ? 0 : (_showAddItemsForm ? 12 : 30)),
             
             if (_showHistory)
               Expanded(
