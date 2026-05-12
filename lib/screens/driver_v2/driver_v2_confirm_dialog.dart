@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show currentUserData;
 import 'driver_v2_awb_dialog.dart';
+import 'driver_v2_animated_toast.dart';
 
 void showDriverConfirmDialog({
   required BuildContext context,
@@ -259,11 +260,12 @@ void showDriverConfirmDialog({
                                 Navigator.pop(context); // Close loading
                                 Navigator.pop(ctx);     // Close main dialog
                                 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Delivery marked as Pending', style: TextStyle(color: Colors.white)),
-                                    backgroundColor: Colors.orange,
-                                  ),
+                                showAnimatedCenterToast(
+                                  context: context,
+                                  message: 'Delivery marked as Pending',
+                                  icon: Icons.pause_circle_filled_rounded,
+                                  color: Colors.orange,
+                                  dark: dark,
                                 );
                               } catch (e) {
                                 if (!context.mounted) return;
