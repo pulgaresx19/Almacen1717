@@ -482,7 +482,48 @@ class _LocationV2UldModalState extends State<LocationV2UldModal> {
                             if (idUld != null && idUld.isNotEmpty) {
                               await widget.logic.markUldAsCompleted(idUld);
                               if (context.mounted) {
-                                Navigator.pop(context);
+                                final nav = Navigator.of(context);
+                                nav.pop();
+                                
+                                if (!nav.mounted) return;
+
+                                bool dialogOpen = true;
+                                showGeneralDialog(
+                                  context: nav.context,
+                                  barrierDismissible: false,
+                                  barrierColor: Colors.black54,
+                                  transitionDuration: const Duration(milliseconds: 250),
+                                  pageBuilder: (ctx, anim1, anim2) {
+                                    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                                    final uldNum = widget.uld['uld_number']?.toString() ?? '';
+                                    return Center(
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: Container(
+                                          width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                          decoration: BoxDecoration(color: isDark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                                              const SizedBox(height: 24),
+                                              Text(appLanguage.value == 'es' ? '¡ULD Completado!' : 'ULD Completed!', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                              const SizedBox(height: 8),
+                                              Text(appLanguage.value == 'es' ? 'El ULD $uldNum ha sido marcado como completado exitosamente.' : 'ULD $uldNum has been marked as completed successfully.', style: TextStyle(color: isDark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  transitionBuilder: (ctx, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+                                ).then((_) => dialogOpen = false);
+
+                                Future.delayed(const Duration(milliseconds: 1500), () {
+                                  if (dialogOpen) {
+                                    nav.pop();
+                                  }
+                                });
                               }
                             }
                           },

@@ -348,7 +348,6 @@ class SystemV2PanelState extends State<SystemV2Panel> {
               ),
             ),
             SystemV2AwbOverlay(logic: _logic, dark: dark, textP: textP, textS: textS, borderC: borderC),
-            SystemV2SuccessOverlay(logic: _logic, dark: dark, textP: textP),
           ],
         );
       },

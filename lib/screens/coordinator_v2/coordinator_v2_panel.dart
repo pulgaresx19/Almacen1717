@@ -563,8 +563,44 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                                             const SizedBox(width: 12),
                                           ],
                                           ElevatedButton(
-                                            onPressed: (isAllChecked && !isReady) ? () {
-                                              widget.logic.markUldReady(uld['id_uld']?.toString() ?? '');
+                                            onPressed: (isAllChecked && !isReady) ? () async {
+                                              await widget.logic.markUldReady(uld['id_uld']?.toString() ?? '');
+                                              if (context.mounted) {
+                                                bool dialogOpen = true;
+                                                showGeneralDialog(
+                                                  context: context,
+                                                  barrierDismissible: false,
+                                                  barrierColor: Colors.black54,
+                                                  transitionDuration: const Duration(milliseconds: 350),
+                                                  pageBuilder: (context, anim1, anim2) {
+                                                    return Center(
+                                                      child: Material(
+                                                        color: Colors.transparent,
+                                                        child: Container(
+                                                          width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                                          decoration: BoxDecoration(color: dark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                                                          child: Column(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                                                              const SizedBox(height: 24),
+                                                              Text(appLanguage.value == 'es' ? '¡ULD Chequeado!' : 'ULD Checked!', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                                              const SizedBox(height: 8),
+                                                              Text(appLanguage.value == 'es' ? 'El ULD ha sido marcado como listo y los datos se han guardado.' : 'The ULD has been marked as ready and data saved successfully.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                  transitionBuilder: (context, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+                                                ).then((_) => dialogOpen = false);
+
+                                                await Future.delayed(const Duration(milliseconds: 2000));
+                                                if (context.mounted && dialogOpen) {
+                                                  Navigator.of(context).pop();
+                                                }
+                                              }
                                             } : null,
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: isReady ? const Color(0xFF10b981) : const Color(0xFF6366f1),

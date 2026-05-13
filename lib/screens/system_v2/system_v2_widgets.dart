@@ -317,6 +317,45 @@ class SystemV2StatsFooter extends StatelessWidget {
                         ? () async {
                             try {
                               await logic.receiveFlight();
+                              if (context.mounted) {
+                                bool dialogOpen = true;
+                                showGeneralDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  barrierColor: Colors.black54,
+                                  transitionDuration: const Duration(milliseconds: 250),
+                                  pageBuilder: (ctx, anim1, anim2) {
+                                    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                                    final flightName = logic.selectedFlightId?.replaceAll('-', ' ') ?? '';
+                                    return Center(
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: Container(
+                                          width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                          decoration: BoxDecoration(color: isDark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                                              const SizedBox(height: 24),
+                                              Text(appLanguage.value == 'es' ? '¡Vuelo Recibido!' : 'Flight Received!', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                              const SizedBox(height: 8),
+                                              Text(appLanguage.value == 'es' ? 'El vuelo $flightName ha sido marcado como recibido correctamente.' : 'Flight $flightName has been marked as received successfully.', style: TextStyle(color: isDark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  transitionBuilder: (ctx, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+                                ).then((_) => dialogOpen = false);
+
+                                Future.delayed(const Duration(milliseconds: 1500), () {
+                                  if (context.mounted && dialogOpen) {
+                                    Navigator.of(context).pop();
+                                  }
+                                });
+                              }
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -356,7 +395,6 @@ class SystemV2StatsFooter extends StatelessWidget {
     );
   }
 }
-
 
 class SystemV2AwbOverlay extends StatelessWidget {
   final SystemPanelLogic logic;
@@ -457,55 +495,6 @@ class SystemV2AwbOverlay extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class SystemV2SuccessOverlay extends StatelessWidget {
-  final SystemPanelLogic logic;
-  final bool dark;
-  final Color textP;
-
-  const SystemV2SuccessOverlay({
-    super.key,
-    required this.logic,
-    required this.dark,
-    required this.textP,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (!logic.showReceivedOverlay) return const SizedBox.shrink();
-
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black45,
-        padding: const EdgeInsets.all(32),
-        alignment: Alignment.center,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: dark ? const Color(0xFF1e293b) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Color(0xFF10b981), size: 64),
-              const SizedBox(height: 16),
-              Text(
-                appLanguage.value == 'es'
-                    ? 'Vuelo ${logic.selectedFlightId?.replaceAll('-', ' ') ?? ''} recibido exitosamente'
-                    : 'Flight ${logic.selectedFlightId?.replaceAll('-', ' ') ?? ''} received successfully',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textP),
-              ),
-            ],
           ),
         ),
       ),

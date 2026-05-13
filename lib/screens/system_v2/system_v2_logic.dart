@@ -19,7 +19,7 @@ class SystemPanelLogic extends ChangeNotifier {
 
   String searchQuery = '';
 
-  bool showReceivedOverlay = false;
+
   Map<String, dynamic>? lastReceivedUld;
   Map<String, dynamic>? activeAwbOverlay;
 
@@ -176,12 +176,7 @@ class SystemPanelLogic extends ChangeNotifier {
       flights[currentFlightIdx]['is_received'] = true;
       flights[currentFlightIdx]['first_truck'] = firstTruckTime;
       flights[currentFlightIdx]['last_truck'] = lastTruckTime;
-      showReceivedOverlay = true;
       notifyListeners();
-      Future.delayed(const Duration(seconds: 2), () {
-        showReceivedOverlay = false;
-        notifyListeners();
-      });
     }
   }
 
@@ -409,12 +404,7 @@ class SystemPanelLogic extends ChangeNotifier {
       'ULD_isBreak$panelId': null,
     }).eq('id', 1).catchError((e) => debugPrint('Error $sysTable reset: $e'));
 
-    showReceivedOverlay = true;
     notifyListeners();
-    Future.delayed(const Duration(seconds: 2), () {
-      showReceivedOverlay = false;
-      notifyListeners();
-    });
   }
 
   void resetSystemTable() {

@@ -43,6 +43,9 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
     final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF4B5563);
     final bgCard = dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6);
 
+    final thisUld = logic.ulds.firstWhere((u) => u['id_uld'].toString() == logic.selectedUldId, orElse: () => <String, dynamic>{});
+    final bool isUldReady = thisUld['time_checked'] != null;
+
     return Container(
       margin: const EdgeInsets.only(top: 12),
       width: double.infinity,
@@ -67,38 +70,39 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                InkWell(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => CoordinatorV2AddAwbDialog(
-                        logic: logic,
-                        flightId: flightId,
-                        uldId: uldId,
-                        dark: dark,
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366f1).withAlpha(20),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.add, color: Color(0xFF6366f1), size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          appLanguage.value == 'es' ? 'Añadir' : 'Add',
-                          style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 11),
+                if (!isUldReady)
+                  InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => CoordinatorV2AddAwbDialog(
+                          logic: logic,
+                          flightId: flightId,
+                          uldId: uldId,
+                          dark: dark,
                         ),
-                      ],
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366f1).withAlpha(20),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.add, color: Color(0xFF6366f1), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            appLanguage.value == 'es' ? 'Añadir' : 'Add',
+                            style: const TextStyle(color: Color(0xFF6366f1), fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -107,9 +111,6 @@ class CoordinatorV2UldAwbs extends StatelessWidget {
             final awbSplit = entry.value;
             final Map<String, dynamic> master = (awbSplit['awbs'] as Map<String, dynamic>?) ?? {};
             final Map<String, dynamic> combined = {...master, ...awbSplit};
-
-            final thisUld = logic.ulds.firstWhere((u) => u['id_uld'].toString() == logic.selectedUldId, orElse: () => <String, dynamic>{});
-            final bool isUldReady = thisUld['time_checked'] != null;
 
             final awbNumber = combined['awb_number']?.toString() ?? '-';
             final pieces = awbSplit['pieces']?.toString() ?? awbSplit['pieces_split']?.toString() ?? '0';

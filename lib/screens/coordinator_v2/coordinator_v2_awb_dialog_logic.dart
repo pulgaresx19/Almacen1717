@@ -484,77 +484,47 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       await supabase.rpc('rpc_save_coordinator_data', params: rpcParams);
 
       if (context.mounted) {
-        Navigator.pop(context, true);
-        showDialog(
-          barrierColor: Colors.black45,
+        final nav = Navigator.of(context);
+        nav.pop(true); // Close the AWB modal
+        
+        if (!nav.mounted) return;
+
+        bool dialogOpen = true;
+        showGeneralDialog(
+          context: nav.context,
           barrierDismissible: false,
-          context: context,
-          builder: (ctx) {
-            Future.delayed(const Duration(milliseconds: 1800), () {
-              if (ctx.mounted) Navigator.pop(ctx);
-            });
+          barrierColor: Colors.black54,
+          transitionDuration: const Duration(milliseconds: 250),
+          pageBuilder: (ctx, anim1, anim2) {
             final isDark = Theme.of(ctx).brightness == Brightness.dark;
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              child: Center(
+            return Center(
+              child: Material(
+                color: Colors.transparent,
                 child: Container(
-                  width: 280,
-                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(40),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
+                  width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  decoration: BoxDecoration(color: isDark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10b981).withAlpha(30),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_circle_rounded,
-                          color: Color(0xFF10b981),
-                          size: 56,
-                        ),
-                      ),
+                      Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
                       const SizedBox(height: 24),
-                      Text(
-                        appLanguage.value == 'es' ? '¡Guardado!' : 'Saved!',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF111827),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text(appLanguage.value == 'es' ? '¡AWB Chequeada!' : 'AWB Checked!', style: TextStyle(color: isDark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                       const SizedBox(height: 8),
-                      Text(
-                        appLanguage.value == 'es'
-                            ? 'El reporte se procesó correctamente.'
-                            : 'The report was processed successfully.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text(appLanguage.value == 'es' ? 'La guía ha sido verificada y los datos se guardaron.' : 'The airway bill has been verified and data saved.', style: TextStyle(color: isDark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
                     ],
                   ),
                 ),
               ),
             );
           },
-        );
+          transitionBuilder: (ctx, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+        ).then((_) => dialogOpen = false);
+
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (dialogOpen) {
+            nav.pop();
+          }
+        });
       }
     } catch (e) {
       debugPrint('Error al guardar reporte: $e');

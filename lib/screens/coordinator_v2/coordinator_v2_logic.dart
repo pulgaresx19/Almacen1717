@@ -366,67 +366,20 @@ class CoordinatorV2Logic extends ChangeNotifier {
   }
 
   Future<void> addNewAwb(String awbNumber, int pieces, int total, double weight, String uldId, String flightId, String remarks, List<String> houseNumbers) async {
-    bool isNewAwb = false;
-    dynamic masterAwbId;
-    num originalExpected = 0;
-    num originalWeight = 0.0;
-
     try {
-      final existingAwb = await supabase
-          .from('awbs')
-          .select('id, total_espected, total_weight')
-          .eq('awb_number', awbNumber)
-          .limit(1);
-      
-      if (existingAwb.isNotEmpty) {
-        masterAwbId = existingAwb.first['id'];
-        originalExpected = existingAwb.first['total_espected'] ?? 0;
-        originalWeight = existingAwb.first['total_weight'] ?? 0.0;
-        
-        await supabase.from('awbs').update({
-          'total_espected': originalExpected + pieces,
-          'total_weight': originalWeight + weight,
-        }).eq('id', masterAwbId);
-        
-      } else {
-        isNewAwb = true;
-        final insertedAwb = await supabase.from('awbs').insert({
-          'awb_number': awbNumber,
-          'total_pieces': total,
-          'total_espected': pieces,
-          'total_weight': weight,
-        }).select('id').single();
-        masterAwbId = insertedAwb['id'];
-      }
-      
-      await supabase.from('awb_splits').insert({
-        'uld_id': int.tryParse(uldId) ?? uldId,
-        'awb_id': masterAwbId,
-        'pieces': pieces,
-        'weight': weight,
-        'status': 'Pending',
-        'flight_id': int.tryParse(flightId) ?? flightId,
-        'house_number': houseNumbers,
-        'remarks': remarks,
-        'is_new': true,
+      final response = await supabase.rpc('rpc_coordinator_add_awb', params: {
+        'p_awb_number': awbNumber,
+        'p_pieces': pieces,
+        'p_total_pieces': total,
+        'p_weight': weight,
+        'p_uld_id': uldId,
+        'p_flight_id': flightId,
+        'p_remarks': remarks,
+        'p_house_numbers': houseNumbers,
       });
+      debugPrint('RPC rpc_coordinator_add_awb response: $response');
     } catch (e) {
-      debugPrint('Error adding new AWB, attempting rollback: $e');
-      // Compensation (Rollback) layer
-      if (masterAwbId != null) {
-        try {
-          if (isNewAwb) {
-            await supabase.from('awbs').delete().eq('id', masterAwbId);
-          } else {
-            await supabase.from('awbs').update({
-              'total_espected': originalExpected,
-              'total_weight': originalWeight,
-            }).eq('id', masterAwbId);
-          }
-        } catch (rollbackError) {
-          debugPrint('Fatal: Rollback failed: $rollbackError');
-        }
-      }
+      debugPrint('Error adding new AWB via RPC: $e');
       rethrow;
     }
   }
