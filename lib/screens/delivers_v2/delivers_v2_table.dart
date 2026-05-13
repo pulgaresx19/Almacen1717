@@ -76,6 +76,7 @@ class _DeliversV2TableState extends State<DeliversV2Table> {
                                     const DataColumn(label: Text('Pieces')),
                                     const DataColumn(label: Text('Weight')),
                                     const DataColumn(label: Text('Remarks')),
+                                    const DataColumn(label: Text('Status')),
                                   ],
                                   rows: List.generate(widget.logic.displayedDelivers.length, (index) {
                                     final u = widget.logic.displayedDelivers[index];
@@ -87,6 +88,22 @@ class _DeliversV2TableState extends State<DeliversV2Table> {
                                     }
 
                                     bool isPriority = u['is_priority'] == true;
+                                    String status = u['status']?.toString() ?? 'Waiting';
+
+                                    Widget statusBadge;
+                                    if (status == 'Completed') {
+                                      statusBadge = Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                                        child: const Text('Completed', style: TextStyle(color: Color(0xFF10b981), fontSize: 12, fontWeight: FontWeight.bold)),
+                                      );
+                                    } else {
+                                      statusBadge = Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(color: const Color(0xFFf59e0b).withAlpha(30), borderRadius: BorderRadius.circular(6)),
+                                        child: Text(status, style: const TextStyle(color: Color(0xFFf59e0b), fontSize: 12, fontWeight: FontWeight.bold)),
+                                      );
+                                    }
 
                                     return DataRow(
                                       onSelectChanged: (selected) {
@@ -106,6 +123,7 @@ class _DeliversV2TableState extends State<DeliversV2Table> {
                                         DataCell(Text(u['total_pieces']?.toString() ?? '0')),
                                         DataCell(Text(u['total_weight'] != null ? '${u['total_weight']} kg' : '0 kg')),
                                         DataCell(Tooltip(message: u['remarks']?.toString() ?? '', child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 120), child: Text(u['remarks']?.toString() ?? '-', overflow: TextOverflow.ellipsis)))),
+                                        DataCell(statusBadge),
                                       ],
                                     );
                                   }),

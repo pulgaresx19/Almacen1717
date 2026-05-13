@@ -18,6 +18,7 @@ class RealtimeService {
   final ValueNotifier<List<Map<String, dynamic>>> system1 = ValueNotifier([]);
   final ValueNotifier<List<Map<String, dynamic>>> system2 = ValueNotifier([]);
   final ValueNotifier<List<Map<String, dynamic>>> ulds = ValueNotifier([]);
+  final ValueNotifier<List<Map<String, dynamic>>> broadcastMessages = ValueNotifier([]);
 
   StreamSubscription? _awbSplitsSub;
   StreamSubscription? _awbsSub;
@@ -27,6 +28,7 @@ class RealtimeService {
   StreamSubscription? _system1Sub;
   StreamSubscription? _system2Sub;
   StreamSubscription? _uldsSub;
+  StreamSubscription? _broadcastMessagesSub;
 
   bool _isInitialized = false;
 
@@ -39,6 +41,12 @@ class RealtimeService {
     });
 
     final todayStr = DateTime.now().toIso8601String().split('T')[0];
+
+    _broadcastMessagesSub = supabase.from('broadcast_messages').stream(primaryKey: ['id'])
+        .gte('created_at', todayStr)
+        .listen((data) {
+      broadcastMessages.value = data;
+    });
 
     _awbsSub = supabase.from('awbs').stream(primaryKey: ['id'])
         .order('awb_number', ascending: true).listen((data) {
@@ -82,6 +90,7 @@ class RealtimeService {
     _system1Sub?.cancel();
     _system2Sub?.cancel();
     _uldsSub?.cancel();
+    _broadcastMessagesSub?.cancel();
     _isInitialized = false;
   }
 }

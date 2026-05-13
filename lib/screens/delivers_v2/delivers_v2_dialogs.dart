@@ -91,6 +91,7 @@ class DeliversV2Dialogs {
       pageBuilder: (ctx, anim1, anim2) {
         bool isEditing = false;
         final Map<String, dynamic> tempU = Map.from(u);
+        final Set<int> expandedItems = {};
         return StatefulBuilder(
           builder: (context, setDrawerState) {
             final borderC = dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB);
@@ -230,8 +231,8 @@ class DeliversV2Dialogs {
                                   const SizedBox(height: 16),
                                   Row(
                                     children: [
+                                      Expanded(child: buildDeliverEditableCard(context, 'Company', 'company', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.business)),
                                       Expanded(child: buildDeliverEditableCard(context, 'Driver Name', 'driver_name', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.person_outline)),
-                                      Expanded(child: buildDeliverEditableCard(context, 'ID Pickup', 'id_pickup', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.badge_outlined)),
                                     ],
                                   ),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
@@ -239,15 +240,15 @@ class DeliversV2Dialogs {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Expanded(child: buildDeliverEditableCard(context, 'Type', 'type', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.local_shipping_outlined, isTypeDropdown: true)),
-                                      Expanded(child: buildDeliverEditableCard(context, 'Company', 'company', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.business)),
+                                      Expanded(child: buildDeliverEditableCard(context, 'ID Pickup', 'id_pickup', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.badge_outlined)),
                                     ],
                                   ),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
                                   Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Expanded(child: buildDeliverEditableCard(context, 'Priority', 'is_priority', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
                                       Expanded(child: buildDeliverEditableCard(context, 'Time', 'time', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.access_time_rounded, isTime: true)),
+                                      Expanded(child: buildDeliverEditableCard(context, 'Priority', 'is_priority', u, isEditing, tempU, setDrawerState, dark, textS, textP, icon: Icons.star_outline, isPriority: true)),
                                     ],
                                   ),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Divider(height: 1)),
@@ -284,66 +285,123 @@ class DeliversV2Dialogs {
                                 children: deliverItems.asMap().entries.map((entry) {
                                   final index = entry.key;
                                   final item = entry.value;
-                                  final type = item['type']?.toString() ?? 'Unknown';
+
                                   final number = item['awb_number']?.toString() ?? item['uld_number']?.toString() ?? 'N/A';
                                   final totalPieces = item['total_pieces']?.toString() ?? '0';
                                   final found = item['found']?.toString() ?? '0';
+                                  final weight = item['total_weight']?.toString() ?? item['weight']?.toString() ?? '-';
                                   final isLast = index == deliverItems.length - 1;
+                                  final isExpanded = expandedItems.contains(index);
+                                  final remarks = item['remarks']?.toString() ?? '';
                                   
                                   return Container(
-                                    padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       border: isLast ? null : Border(bottom: BorderSide(color: borderC)),
                                     ),
-                                    child: Row(
+                                    child: Column(
                                       children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: dark ? Colors.white.withAlpha(10) : Colors.black.withAlpha(5),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(
-                                            type.toUpperCase() == 'ULD' ? Icons.cases_rounded : Icons.inventory_2_rounded,
-                                            color: const Color(0xFF6366f1),
-                                            size: 24,
+                                        InkWell(
+                                          onTap: () {
+                                            setDrawerState(() {
+                                              if (isExpanded) {
+                                                expandedItems.remove(index);
+                                              } else {
+                                                expandedItems.add(index);
+                                              }
+                                            });
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                            child: Row(
+                                              children: [
+                                                Container(
+                                                  width: 32,
+                                                  height: 32,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                    color: dark ? const Color(0xFF1e3a8a).withAlpha(100) : const Color(0xFFdbeafe),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: Text(
+                                                    '${index + 1}',
+                                                    style: TextStyle(
+                                                      color: dark ? const Color(0xFF60a5fa) : const Color(0xFF2563eb),
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 16),
+                                                Expanded(
+                                                  flex: 3,
+                                                  child: Text(
+                                                    number,
+                                                    style: TextStyle(
+                                                      color: textP,
+                                                      fontSize: 15,
+                                                      fontWeight: FontWeight.bold,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  flex: 2,
+                                                  child: Text(
+                                                    '$found/$totalPieces pcs',
+                                                    style: TextStyle(
+                                                      color: textS,
+                                                      fontSize: 14,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  flex: 2,
+                                                  child: Text(
+                                                    weight == '-' ? '-' : '$weight kg',
+                                                    style: TextStyle(
+                                                      color: textS,
+                                                      fontSize: 14,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Icon(
+                                                  isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, 
+                                                  color: textS, 
+                                                  size: 20
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(type.toUpperCase(), style: TextStyle(color: textS, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                                              const SizedBox(height: 4),
-                                              Text(number, style: TextStyle(color: textP, fontSize: 15, fontWeight: FontWeight.bold)),
-                                            ],
+                                        if (isExpanded)
+                                          Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.only(left: 64, right: 16, bottom: 16),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Remarks',
+                                                  style: TextStyle(
+                                                    color: textS,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  remarks.isEmpty ? 'No remarks.' : remarks,
+                                                  style: TextStyle(
+                                                    color: textP,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                          decoration: BoxDecoration(
-                                            color: dark ? const Color(0xFF0f172a) : Colors.white,
-                                            border: Border.all(color: borderC),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text('FOUND / TOTAL', style: TextStyle(color: textS, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                                              const SizedBox(height: 2),
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                                textBaseline: TextBaseline.alphabetic,
-                                                children: [
-                                                  Text(found, style: TextStyle(color: textP, fontSize: 16, fontWeight: FontWeight.bold)),
-                                                  Text(' / $totalPieces', style: TextStyle(color: textS, fontSize: 12)),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
                                       ],
                                     ),
                                   );

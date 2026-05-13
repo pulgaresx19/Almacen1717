@@ -10,7 +10,8 @@ import 'driver_v2_animated_toast.dart';
 import '../../services/realtime_service.dart';
 
 class DriverV2Panel extends StatefulWidget {
-  const DriverV2Panel({super.key});
+  final String searchQuery;
+  const DriverV2Panel({super.key, this.searchQuery = ''});
 
   @override
   State<DriverV2Panel> createState() => _DriverV2PanelState();
@@ -115,6 +116,17 @@ class _DriverV2PanelState extends State<DriverV2Panel> {
 
                   return true;
                 }).toList();
+                
+                if (isMasterDriver && widget.searchQuery.trim().isNotEmpty) {
+                  final q = widget.searchQuery.trim().toLowerCase();
+                  items = items.where((u) {
+                    final c = (u['company']?.toString() ?? '').toLowerCase();
+                    final d = (u['driver_name']?.toString() ?? '').toLowerCase();
+                    final dr = (u['door']?.toString() ?? '').toLowerCase();
+                    final tp = (u['type']?.toString() ?? '').toLowerCase();
+                    return c.contains(q) || d.contains(q) || dr.contains(q) || tp.contains(q);
+                  }).toList();
+                }
                 
                 // Sort by status priority, then by time (oldest first)
                 items.sort((a, b) {

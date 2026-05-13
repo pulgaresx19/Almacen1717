@@ -537,22 +537,19 @@ void showDriverConfirmDialog({
                             builder: (c) => const Center(child: CircularProgressIndicator(color: Color(0xFF10b981))),
                           );
                           
-                          final idStr = deliveryData['id_delivery']?.toString() ?? deliveryData['id_pickup']?.toString() ?? deliveryData['id']?.toString();
+                          final idDelivery = deliveryData['id_delivery']?.toString();
+                          final idPickup = deliveryData['id_pickup']?.toString() ?? deliveryData['id']?.toString();
                           
-                          if (idStr != null && idStr != '-') {
-                            // First attempt with 'deliveries' table using id_pickup
-                            try {
-                              await Supabase.instance.client
-                                  .from('deliveries')
-                                  .update({'status': 'Completed'})
-                                  .eq('id_pickup', idStr);
-                            } catch (_) {
-                              // Fallback if the primary key is 'id_delivery', handled gracefully.
-                              await Supabase.instance.client
-                                  .from('deliveries')
-                                  .update({'status': 'Completed'})
-                                  .eq('id_delivery', idStr);
-                            }
+                          if (idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') {
+                            await Supabase.instance.client
+                                .from('deliveries')
+                                .update({'status': 'Completed'})
+                                .eq('id_delivery', idDelivery);
+                          } else if (idPickup != null && idPickup.isNotEmpty && idPickup != '-') {
+                            await Supabase.instance.client
+                                .from('deliveries')
+                                .update({'status': 'Completed'})
+                                .eq('id_pickup', idPickup);
                           }
 
                           if (!context.mounted) return;
