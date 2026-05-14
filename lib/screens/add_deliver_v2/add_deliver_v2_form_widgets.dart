@@ -2,7 +2,7 @@
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
-  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData? icon, {String hint = '', int? maxLen, bool uppercase = false, bool capitalizeWords = false, bool capitalizeFirst = false, Widget? suffixIcon, int? maxLines = 1, int? minLines, Function(String)? onChanged, bool readOnly = false, bool forceError = false}) {
+  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData? icon, {String hint = '', int? maxLen, bool uppercase = false, bool capitalizeWords = false, bool capitalizeFirst = false, Widget? suffixIcon, int? maxLines = 1, int? minLines, Function(String)? onChanged, bool readOnly = false, bool forceError = false, Widget? customLabelAction}) {
     List<TextInputFormatter> formatters = [];
     if (maxLen != null) formatters.add(LengthLimitingTextInputFormatter(maxLen));
     if (uppercase) formatters.add(TextInputFormatter.withFunction((oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase())));
@@ -125,13 +125,19 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: isError ? Colors.redAccent : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w500)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(color: isError ? Colors.redAccent : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w500)),
+            ?customLabelAction,
+          ],
+        ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           onChanged: (val) {
             if (isError && val.trim().isNotEmpty) setState(() => _missingField = null);
-            if (onChanged != null) onChanged(val);
+            onChanged?.call(val);
           },
           readOnly: readOnly,
           keyboardType: label == 'Time' 

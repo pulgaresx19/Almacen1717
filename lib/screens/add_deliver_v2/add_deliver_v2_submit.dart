@@ -5,59 +5,53 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
   Future<void> _addImportAwb() async {
     bool hasError = false;
     setState(() {
-      _importAwbError = _importAwbNumberCtrl.text.trim().isEmpty;
+      final awbText = _importAwbNumberCtrl.text.trim();
+      _importAwbError = awbText.isEmpty;
+
+      if (!_importAwbError) {
+        final pureDigits = awbText.replaceAll(RegExp(r'[^0-9]'), '');
+        if (pureDigits.length != 11) {
+          _importAwbError = true;
+        }
+      }
+
       _importPiecesError = _importPiecesCtrl.text.trim().isEmpty;
-      _importTotalError = !_isImportUld && _importTotalCtrl.text.trim().isEmpty;
-      hasError = _importAwbError || _importPiecesError || _importTotalError || _importUldExistsError || _importExceedsRemainingError || _importExistsInListError;
+      _importTotalError = _importTotalCtrl.text.trim().isEmpty;
+      hasError =
+          _importAwbError ||
+          _importPiecesError ||
+          _importTotalError ||
+          _importExceedsRemainingError ||
+          _importExistsInListError;
     });
 
     if (hasError) return;
 
-    if (_isImportUld) {
-      final uldNumber = _importAwbNumberCtrl.text.trim().toUpperCase();
-      try {
-        final existingUld = await Supabase.instance.client.from('ulds').select('uld_number').eq('uld_number', uldNumber).maybeSingle();
-        if (existingUld != null) {
-          if (mounted) {
-            setState(() {
-              _importUldExistsError = true;
-            });
-          }
-          return;
-        }
-      } catch (_) {}
-    } else {
-      final int pcs = int.tryParse(_importPiecesCtrl.text) ?? 1;
-      final int tot = int.tryParse(_importTotalCtrl.text) ?? 1;
-      if (tot < pcs) {
-        setState(() {
-          _importTotalLessThanPiecesError = true;
-        });
-        return;
-      }
+    final int pcs = int.tryParse(_importPiecesCtrl.text) ?? 1;
+    final int tot = int.tryParse(_importTotalCtrl.text) ?? 1;
+    if (tot < pcs) {
+      setState(() {
+        _importTotalLessThanPiecesError = true;
+      });
+      return;
     }
 
     setState(() {
-      if (_isImportUld) {
-        _importAwbs.add({
-           'type': 'ULD',
-           'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
-           'pieces': int.tryParse(_importPiecesCtrl.text) ?? 1,
-           'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
-           'is_break': _importIsBreak,
-           'remarks': _importRemarksCtrl.text.trim().isEmpty ? null : _importRemarksCtrl.text.trim(),
-        });
-      } else {
-        _importAwbs.add({
-           'type': 'AWB',
-           'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
-           'pieces': int.tryParse(_importPiecesCtrl.text) ?? 1,
-           'total': int.tryParse(_importTotalCtrl.text) ?? 1,
-           'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
-           'house': _importHouseCtrl.text.split(RegExp(r'\n+')).map((e) => e.trim().toUpperCase()).where((e) => e.isNotEmpty).toList(),
-           'remarks': _importRemarksCtrl.text.trim().isEmpty ? null : _importRemarksCtrl.text.trim(),
-        });
-      }
+      _importAwbs.add({
+        'type': 'AWB',
+        'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
+        'pieces': pcs,
+        'total': tot,
+        'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
+        'house': _importHouseCtrl.text
+            .split(RegExp(r'\n+'))
+            .map((e) => e.trim().toUpperCase())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+        'remarks': _importRemarksCtrl.text.trim().isEmpty
+            ? null
+            : _importRemarksCtrl.text.trim(),
+      });
       _importAwbNumberCtrl.clear();
       _importPiecesCtrl.clear();
       _importTotalCtrl.clear();
@@ -69,6 +63,348 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       _importPiecesError = false;
       _importTotalError = false;
     });
+  }
+
+  Future<void> _addImportStagedAwb() async {
+    bool hasError = false;
+    setState(() {
+      final awbText = _importAwbNumberCtrl.text.trim();
+      _importAwbError = awbText.isEmpty;
+
+      if (!_importAwbError) {
+        final pureDigits = awbText.replaceAll(RegExp(r'[^0-9]'), '');
+        if (pureDigits.length != 11) {
+          _importAwbError = true;
+        }
+      }
+
+      _importPiecesError = _importPiecesCtrl.text.trim().isEmpty;
+      _importTotalError = _importTotalCtrl.text.trim().isEmpty;
+      hasError =
+          _importAwbError ||
+          _importPiecesError ||
+          _importTotalError ||
+          _importExceedsRemainingError ||
+          _importExistsInListError;
+    });
+
+    if (hasError) return;
+
+    final int pcs = int.tryParse(_importPiecesCtrl.text) ?? 1;
+    final int tot = int.tryParse(_importTotalCtrl.text) ?? 1;
+    if (tot < pcs) {
+      setState(() {
+        _importTotalLessThanPiecesError = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _stagedUldAwbs.add({
+        'type': 'AWB',
+        'awbNumber': _importAwbNumberCtrl.text.trim().toUpperCase(),
+        'pieces': pcs,
+        'total': tot,
+        'weight': double.tryParse(_importWeightCtrl.text) ?? 0.0,
+        'house': _importHouseCtrl.text
+            .split(RegExp(r'\n+'))
+            .map((e) => e.trim().toUpperCase())
+            .where((e) => e.isNotEmpty)
+            .toList(),
+        'remarks': _importRemarksCtrl.text.trim().isEmpty
+            ? null
+            : _importRemarksCtrl.text.trim(),
+      });
+      _importAwbNumberCtrl.clear();
+      _importPiecesCtrl.clear();
+      _importTotalCtrl.clear();
+      _importWeightCtrl.clear();
+      _importHouseCtrl.clear();
+      _importUldNoAwbError = false;
+      _importRemarksCtrl.clear();
+      _importTotalLocked = false;
+      _importAwbError = false;
+      _importPiecesError = false;
+      _importTotalError = false;
+    });
+
+    _updateUldTotals();
+  }
+
+  void _updateUldTotals() {
+    int totalPcs = 0;
+    double totalWgt = 0.0;
+    for (var awb in _stagedUldAwbs) {
+      totalPcs += (awb['pieces'] as num?)?.toInt() ?? 0;
+      totalWgt += (awb['weight'] as num?)?.toDouble() ?? 0.0;
+    }
+    if (_importUldPiecesAutoCalc) {
+      _importUldPiecesCtrl.text = totalPcs > 0 ? totalPcs.toString() : '';
+    }
+    if (_importUldWeightAutoCalc) {
+      _importUldWeightCtrl.text = totalWgt > 0 ? totalWgt.toString() : '';
+    }
+  }
+
+  Future<void> _addImportUld() async {
+    bool hasError = false;
+    setState(() {
+      final uldText = _importUldNumberCtrl.text.trim();
+      _importUldNumberError = uldText.isEmpty;
+      _importUldPiecesError = _importUldPiecesCtrl.text.trim().isEmpty;
+      _importUldNoAwbError = _stagedUldAwbs.isEmpty;
+      hasError =
+          _importUldNumberError ||
+          _importUldPiecesError ||
+          _importUldExistsError ||
+          _importUldNoAwbError;
+    });
+
+    if (hasError) return;
+
+    final uldNumber = _importUldNumberCtrl.text.trim().toUpperCase();
+    try {
+      final existingUld = await Supabase.instance.client
+          .from('ulds')
+          .select('uld_number')
+          .eq('uld_number', uldNumber)
+          .maybeSingle();
+      if (existingUld != null) {
+        if (mounted) {
+          setState(() {
+            _importUldExistsError = true;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    setState(() {
+      _importAwbs.add({
+        'type': 'ULD',
+        'awbNumber': uldNumber,
+        'pieces': int.tryParse(_importUldPiecesCtrl.text) ?? 1,
+        'weight': double.tryParse(_importUldWeightCtrl.text) ?? 0.0,
+        'is_break': _importIsBreak,
+        'nested_awbs': List<Map<String, dynamic>>.from(_stagedUldAwbs),
+        'remarks': _importUldRemarksCtrl.text.trim().isEmpty
+            ? null
+            : _importUldRemarksCtrl.text.trim(),
+      });
+
+      _importUldNumberCtrl.clear();
+      _importUldPiecesCtrl.clear();
+      _importUldWeightCtrl.clear();
+      _importUldRemarksCtrl.clear();
+      _importIsBreak = false;
+      _stagedUldAwbs.clear();
+      _showExtraAwbFields = false;
+
+      _importAwbNumberCtrl.clear();
+      _importPiecesCtrl.clear();
+      _importTotalCtrl.clear();
+      _importWeightCtrl.clear();
+      _importHouseCtrl.clear();
+      _importRemarksCtrl.clear();
+    });
+  }
+
+  void _showStagedAwbsDialog(bool dark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF1e293b) : Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'AWBs in this ULD',
+                      style: TextStyle(
+                        color: dark ? Colors.white : Colors.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: dark ? Colors.white54 : Colors.black54,
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                Divider(color: dark ? Colors.white24 : Colors.black12),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _stagedUldAwbs.length,
+                    itemBuilder: (ctx, idx) {
+                      final awb = _stagedUldAwbs[idx];
+
+                      final houseList = awb['house'] as List<dynamic>?;
+                      final remarks = awb['remarks'] as String?;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${idx + 1}. ${awb['awbNumber']}',
+                                          style: TextStyle(
+                                            color: dark
+                                                ? Colors.white
+                                                : Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Pcs: ${awb['pieces']} | Tot: ${awb['total']} | Wgt: ${awb['weight']}',
+                                        style: TextStyle(
+                                          color: dark
+                                              ? Colors.white70
+                                              : Colors.black54,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if ((houseList != null &&
+                                          houseList.isNotEmpty) ||
+                                      (remarks != null &&
+                                          remarks.isNotEmpty)) ...[
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child:
+                                              houseList != null &&
+                                                  houseList.isNotEmpty
+                                              ? Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'House Number(s):',
+                                                      style: TextStyle(
+                                                        color: dark
+                                                            ? Colors.white54
+                                                            : Colors.black45,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    ...houseList.map(
+                                                      (h) => Text(
+                                                        h.toString(),
+                                                        style: TextStyle(
+                                                          color: dark
+                                                              ? Colors.white54
+                                                              : Colors.black45,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                )
+                                              : const SizedBox(),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child:
+                                              remarks != null &&
+                                                  remarks.isNotEmpty
+                                              ? Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Remarks:',
+                                                      style: TextStyle(
+                                                        color: dark
+                                                            ? Colors.white54
+                                                            : Colors.black45,
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      remarks,
+                                                      style: TextStyle(
+                                                        color: dark
+                                                            ? Colors.white54
+                                                            : Colors.black45,
+                                                        fontSize: 12,
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                )
+                                              : const SizedBox(),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.redAccent,
+                              ),
+                              constraints: const BoxConstraints(),
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                setModalState(() {
+                                  _stagedUldAwbs.removeAt(idx);
+                                });
+                                setState(() {
+                                  _updateUldTotals();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showMissingFieldAlert(String fieldName, {String? customMessage}) {
@@ -100,7 +436,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
             ),
             const SizedBox(height: 12),
             Text(
-              customMessage ?? 'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
+              customMessage ??
+                  'The field "$fieldName" is missing.\nPlease provide this information to proceed.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFFcbd5e1),
@@ -161,28 +498,36 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
         _showMissingFieldAlert('Air Waybills (AWBs) or ULDs');
         return;
       }
-      final List<Map<String, dynamic>> combinedToValidate = [..._selectedAwbs, ..._selectedUlds];
+      final List<Map<String, dynamic>> combinedToValidate = [
+        ..._selectedAwbs,
+        ..._selectedUlds,
+      ];
       for (var item in combinedToValidate) {
-        final awbNum = item['awb_number']?.toString() ?? item['AWB-number']?.toString() ?? item['uld_number']?.toString() ?? item['ULD-number']?.toString() ?? '';
+        final awbNum =
+            item['awb_number']?.toString() ??
+            item['AWB-number']?.toString() ??
+            item['uld_number']?.toString() ??
+            item['ULD-number']?.toString() ??
+            '';
         final pcsStr = _deliveryPcsControllers[awbNum]?.text.trim() ?? '';
         final pcs = int.tryParse(pcsStr) ?? 0;
-        
+
         if (pcs <= 0) {
           _showMissingFieldAlert(
-            'Pieces for $awbNum', 
+            'Pieces for $awbNum',
             customMessage: appLanguage.value == 'es'
                 ? 'Las piezas a entregar para la guía o ULD $awbNum tienen un valor numérico no válido ($pcsStr).\nPor favor, introduzca un número mayor a 0 para guardar.'
-                : 'The pieces for item $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.'
+                : 'The pieces for item $awbNum has an invalid value ($pcsStr).\nPlease enter a number greater than 0 to proceed.',
           );
           return;
         }
 
         if (_overLimitErrors[awbNum] == true) {
           _showMissingFieldAlert(
-            'Pieces Exceeded for $awbNum', 
+            'Pieces Exceeded for $awbNum',
             customMessage: appLanguage.value == 'es'
                 ? 'La cantidad de piezas a entregar para $awbNum supera la cantidad de piezas disponibles.\nPor favor, reduzca el número de piezas.'
-                : 'The amount of pieces to deliver for $awbNum exceeds the available pieces.\nPlease reduce the number of pieces.'
+                : 'The amount of pieces to deliver for $awbNum exceeds the available pieces.\nPlease reduce the number of pieces.',
           );
           return;
         }
@@ -206,7 +551,7 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       _isLoading = true;
       _missingField = null;
     });
-    
+
     String doorText = _doorCtrl.text.trim();
     if (doorText.isEmpty) doorText = 'PENDING';
 
@@ -217,7 +562,9 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       if (finalTime.contains(':')) {
         try {
           if (finalTime.toUpperCase().contains('M')) {
-            final dtParsed = DateFormat('hh:mm a').parse(finalTime.toUpperCase());
+            final dtParsed = DateFormat(
+              'hh:mm a',
+            ).parse(finalTime.toUpperCase());
             hours = dtParsed.hour;
             minutes = dtParsed.minute;
           } else {
@@ -228,12 +575,19 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
         } catch (_) {
           final parts = finalTime.split(':');
           hours = int.tryParse(parts[0]) ?? 0;
-          minutes = int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+          minutes =
+              int.tryParse(parts[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
         }
       }
-      final timeDeliverDate = DateTime(nowForDate.year, nowForDate.month, nowForDate.day, hours, minutes);
+      final timeDeliverDate = DateTime(
+        nowForDate.year,
+        nowForDate.month,
+        nowForDate.day,
+        hours,
+        minutes,
+      );
 
-      final listPickup = _typeCtrl.text == 'Import' 
+      final listPickup = _typeCtrl.text == 'Import'
           ? _importAwbs.map((e) {
               final isUld = e['type'] == 'ULD';
               if (isUld) {
@@ -241,37 +595,66 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                   'type': 'ULD',
                   'uld_number': e['awbNumber']?.toString() ?? '',
                   'found': e['pieces']?.toString() ?? '0',
-                  'total_pieces': e['total']?.toString() ?? e['pieces']?.toString() ?? '0',
+                  'total_pieces':
+                      e['total']?.toString() ?? e['pieces']?.toString() ?? '0',
                   'weight': e['weight']?.toString() ?? '0',
                   'remarks': e['remarks']?.toString() ?? '',
-                  'is_break': e['isBreak'] == true,
+                  'is_break': e['is_break'] == true,
+                  'nested_awbs': (e['nested_awbs'] as List? ?? []).map((
+                    nested,
+                  ) {
+                    return {
+                      'type': 'AWB',
+                      'awb_number': nested['awbNumber']?.toString() ?? '',
+                      'found': nested['pieces']?.toString() ?? '0',
+                      'total_pieces':
+                          nested['total']?.toString() ??
+                          nested['pieces']?.toString() ??
+                          '0',
+                      'weight': nested['weight']?.toString() ?? '0',
+                      'house_no': jsonEncode(nested['house'] ?? []),
+                      'remarks': nested['remarks']?.toString() ?? '',
+                    };
+                  }).toList(),
                 };
               } else {
                 return {
                   'type': 'AWB',
                   'awb_number': e['awbNumber']?.toString() ?? '',
                   'found': e['pieces']?.toString() ?? '0',
-                  'total_pieces': e['total']?.toString() ?? e['pieces']?.toString() ?? '0',
+                  'total_pieces':
+                      e['total']?.toString() ?? e['pieces']?.toString() ?? '0',
                   'weight': e['weight']?.toString() ?? '0',
-                  'house_no': e['house']?.toString() ?? '',
+                  'house_no': jsonEncode(e['house'] ?? []),
                   'remarks': e['remarks']?.toString() ?? '',
                 };
               }
             }).toList()
           : [
               ..._selectedAwbs.map((e) {
-                final awbNum = e['awb_number']?.toString() ?? e['AWB-number']?.toString() ?? '';
-                final pcsCtrlText = _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
+                final awbNum =
+                    e['awb_number']?.toString() ??
+                    e['AWB-number']?.toString() ??
+                    '';
+                final pcsCtrlText =
+                    _deliveryPcsControllers[awbNum]?.text.trim() ?? '0';
                 final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
-                final rem = _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
-                
+                final rem =
+                    _deliveryRemarkControllers[awbNum]?.text.trim() ?? '';
+
                 double expectedWeight = 0.0;
                 if (e['data-AWB'] is List) {
                   for (var item in e['data-AWB']) {
-                     expectedWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+                    expectedWeight +=
+                        double.tryParse(item['weight']?.toString() ?? '0') ??
+                        0.0;
                   }
                 } else if (e['data-AWB'] is Map) {
-                     expectedWeight += double.tryParse(e['data-AWB']['weight']?.toString() ?? '0') ?? 0.0;
+                  expectedWeight +=
+                      double.tryParse(
+                        e['data-AWB']['weight']?.toString() ?? '0',
+                      ) ??
+                      0.0;
                 }
 
                 return {
@@ -280,35 +663,53 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                   'found': pcs,
                   'weight': expectedWeight.toStringAsFixed(2),
                   'remarks': rem,
-                  'total_pieces': e['total_pieces']?.toString() ?? e['total']?.toString() ?? e['pieces']?.toString() ?? '0'
+                  'total_pieces':
+                      e['total_pieces']?.toString() ??
+                      e['total']?.toString() ??
+                      e['pieces']?.toString() ??
+                      '0',
                 };
               }),
               ..._selectedUlds.map((e) {
-                 final uNum = e['uld_number']?.toString() ?? e['ULD-number']?.toString() ?? '';
-                 final pcsCtrlText = _deliveryPcsControllers[uNum]?.text.trim() ?? '0';
-                 final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
-                 final rem = _deliveryRemarkControllers[uNum]?.text.trim() ?? '';
-                 return {
-                   'uld_id': e['id_uld'],
-                   'uld_number': uNum,
-                   'found': pcs,
-                   'weight': e['weight_total']?.toString() ?? e['weight']?.toString() ?? '0.00',
-                   'remarks': rem,
-                   'total_pieces': e['total_pieces']?.toString() ?? e['total']?.toString() ?? e['pieces']?.toString() ?? '0'
-                 };
-              })
+                final uNum =
+                    e['uld_number']?.toString() ??
+                    e['ULD-number']?.toString() ??
+                    '';
+                final pcsCtrlText =
+                    _deliveryPcsControllers[uNum]?.text.trim() ?? '0';
+                final pcs = pcsCtrlText.replaceAll(RegExp(r'[^0-9]'), '');
+                final rem = _deliveryRemarkControllers[uNum]?.text.trim() ?? '';
+                return {
+                  'uld_id': e['id_uld'],
+                  'uld_number': uNum,
+                  'found': pcs,
+                  'weight':
+                      e['weight_total']?.toString() ??
+                      e['weight']?.toString() ??
+                      '0.00',
+                  'remarks': rem,
+                  'total_pieces':
+                      e['total_pieces']?.toString() ??
+                      e['total']?.toString() ??
+                      e['pieces']?.toString() ??
+                      '0',
+                };
+              }),
             ];
 
       int totalPieces = 0;
       double totalWeight = 0.0;
       for (var item in listPickup) {
         totalPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
-        totalWeight += double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
+        totalWeight +=
+            double.tryParse(item['weight']?.toString() ?? '0') ?? 0.0;
       }
 
       bool isAllUld = false;
       if (_typeCtrl.text == 'Import') {
-        isAllUld = listPickup.isNotEmpty && listPickup.every((item) => item['type'] == 'ULD');
+        isAllUld =
+            listPickup.isNotEmpty &&
+            listPickup.every((item) => item['type'] == 'ULD');
       } else {
         isAllUld = _selectedAwbs.isEmpty && _selectedUlds.isNotEmpty;
       }
@@ -329,8 +730,10 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
         'id_user': Supabase.instance.client.auth.currentUser?.id,
       };
 
-      await Supabase.instance.client.rpc('rpc_save_delivery', params: {'payload': payload});
-
+      await Supabase.instance.client.rpc(
+        'rpc_save_delivery',
+        params: {'payload': payload},
+      );
 
       if (mounted) {
         showGeneralDialog(
@@ -342,14 +745,20 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
           pageBuilder: (ctx, animation, secondaryAnimation) => const SizedBox(),
           transitionBuilder: (ctx, animation, secondaryAnimation, child) {
             return ScaleTransition(
-              scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              scale: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutBack,
+              ),
               child: FadeTransition(
                 opacity: animation,
                 child: AlertDialog(
                   backgroundColor: const Color(0xFF0f172a),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: const Color(0xFF10b981).withAlpha(50), width: 1),
+                    side: BorderSide(
+                      color: const Color(0xFF10b981).withAlpha(50),
+                      width: 1,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.all(32),
                   content: Column(
@@ -361,19 +770,34 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
                           color: const Color(0xFF10b981).withAlpha(20),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 64),
+                        child: const Icon(
+                          Icons.check_circle_rounded,
+                          color: Color(0xFF10b981),
+                          size: 64,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        appLanguage.value == 'es' ? 'Ã‚Â¡Entrega Creada!' : 'Delivery Created!',
+                        appLanguage.value == 'es'
+                            ? 'Ã‚Â¡Entrega Creada!'
+                            : 'Delivery Created!',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        appLanguage.value == 'es' ? 'Los datos han sido guardados.' : 'Records have been saved.',
+                        appLanguage.value == 'es'
+                            ? 'Los datos han sido guardados.'
+                            : 'Records have been saved.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Color(0xFF94a3b8), fontSize: 14),
+                        style: const TextStyle(
+                          color: Color(0xFF94a3b8),
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -392,13 +816,14 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
-  
 }

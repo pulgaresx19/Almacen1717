@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -51,18 +52,33 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
   final _importWeightCtrl = TextEditingController();
   final _importHouseCtrl = TextEditingController();
   final _importRemarksCtrl = TextEditingController();
+  
+  final _importUldNumberCtrl = TextEditingController();
+  final _importUldPiecesCtrl = TextEditingController();
+  final _importUldWeightCtrl = TextEditingController();
+  final _importUldRemarksCtrl = TextEditingController();
+  
   bool _importTotalLocked = false;
   bool _isImportUld = false;
   bool _importIsBreak = false;
+  bool _importUldPiecesAutoCalc = true;
+  bool _importUldWeightAutoCalc = true;
+  
   bool _importAwbError = false;
   bool _importPiecesError = false;
   bool _importTotalError = false;
   bool _importUldExistsError = false;
+  bool _importUldNoAwbError = false;
+  bool _importUldNumberError = false;
+  bool _importUldPiecesError = false;
   bool _importExceedsRemainingError = false;
   bool _importTotalLessThanPiecesError = false;
   bool _importExistsInListError = false;
   int? _importAwbRemainingPieces;
   final Set<String> _expandedImports = {};
+  
+  final List<Map<String, dynamic>> _stagedUldAwbs = [];
+  bool _showExtraAwbFields = false;
 
   bool _isLoadingAwbs = true;
   final Map<String, bool> _overLimitErrors = {};
@@ -223,6 +239,10 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
     _importWeightCtrl.dispose();
     _importHouseCtrl.dispose();
     _importRemarksCtrl.dispose();
+    _importUldNumberCtrl.dispose();
+    _importUldPiecesCtrl.dispose();
+    _importUldWeightCtrl.dispose();
+    _importUldRemarksCtrl.dispose();
     super.dispose();
   }
   @override
@@ -468,12 +488,11 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Expanded(
-                                flex: 6,
                                 child: _showUldTab ? _buildUldSelector(dark) : _buildAwbSelector(dark),
                               ),
                               const SizedBox(width: 16),
-                              Expanded(
-                                flex: 4,
+                              SizedBox(
+                                width: 680,
                                 child: _typeCtrl.text == 'Import' ? _buildImportAwbRightPane(dark, textP, textS, borderC) : _buildSelectedItemsSummary(dark),
                               ),
                             ],

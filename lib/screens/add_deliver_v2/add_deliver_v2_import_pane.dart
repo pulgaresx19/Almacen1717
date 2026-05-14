@@ -62,14 +62,20 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                                              flex: 3,
                                              child: Text('Pcs: ${awb['pieces']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
                                            ),
-                                           Expanded(
-                                             flex: 3,
-                                             child: Text(isUld ? 'ULD' : 'Tot: ${awb['total']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
-                                           ),
+                                           if (!isUld)
+                                             Expanded(
+                                               flex: 3,
+                                               child: Text('Tot: ${awb['total']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
+                                             ),
                                            Expanded(
                                              flex: 4,
                                              child: Text('Wgt: ${awb['weight'].toString().replaceAll(RegExp(r'\.$|\.0$'), '')}kg', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontWeight: FontWeight.w500)),
                                            ),
+                                           if (isUld)
+                                             Expanded(
+                                               flex: 3,
+                                               child: Text(awb['is_break'] == true ? 'Break' : 'No Break', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: awb['is_break'] == true ? Colors.green : Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                             ),
                                            const SizedBox(width: 4),
                                            IconButton(
                                              constraints: const BoxConstraints(),
@@ -101,33 +107,70 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                                         Row(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(isUld ? 'Is Break?' : 'House Number', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)),
-                                                  const SizedBox(height: 4),
-                                                  Text(isUld 
-                                                    ? (awb['is_break'] == true ? 'Yes' : 'No') 
-                                                    : ((awb['house'] as List?)?.isEmpty ?? true ? 'N/A' : (awb['house'] as List).join('\n')), 
-                                                    style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12)
-                                                  ),
-                                                ],
+                                            if (!isUld) ...[
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text('House Number', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)),
+                                                    const SizedBox(height: 4),
+                                                    Text(((awb['house'] as List?)?.isEmpty ?? true) ? 'N/A' : (awb['house'] as List).join('\n'), 
+                                                      style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12)
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 16),
+                                              const SizedBox(width: 16),
+                                            ],
                                             Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text('Remarks', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 10, fontWeight: FontWeight.bold)),
                                                   const SizedBox(height: 4),
-                                                  Text(awb['remarks'] ?? 'N/A', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12)),
+                                                  Text(awb['remarks']?.toString().isEmpty ?? true ? 'N/A' : awb['remarks'], style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12)),
                                                 ],
                                               ),
                                             ),
                                           ],
                                         ),
+                                        if (isUld && awb['nested_awbs'] != null && (awb['nested_awbs'] as List).isNotEmpty) ...[
+                                          const SizedBox(height: 12),
+                                          Text('Nested AWBs', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 11, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            decoration: BoxDecoration(color: dark ? Colors.black26 : const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(6)),
+                                            child: Column(
+                                              children: (awb['nested_awbs'] as List).map<Widget>((nested) {
+                                                final remark = nested['remarks']?.toString() ?? '';
+                                                return Padding(
+                                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          const Icon(Icons.subdirectory_arrow_right_rounded, size: 14, color: Color(0xFF6366f1)),
+                                                          const SizedBox(width: 6),
+                                                          Expanded(flex: 5, child: Text(nested['awbNumber']?.toString() ?? '', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 12, fontWeight: FontWeight.w600))),
+                                                          Expanded(flex: 3, child: Text('Pcs: ${nested['pieces']}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11))),
+                                                          Expanded(flex: 3, child: Text('Tot: ${nested['total'] ?? 0}', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11))),
+                                                          Expanded(flex: 4, child: Text('Wgt: ${nested['weight'] ?? 0}kg', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11))),
+                                                        ]
+                                                      ),
+                                                      if (remark.isNotEmpty)
+                                                        Padding(
+                                                          padding: const EdgeInsets.only(left: 20, top: 2),
+                                                          child: Text('Remarks: $remark', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280), fontSize: 11, fontStyle: FontStyle.italic)),
+                                                        )
+                                                    ],
+                                                  )
+                                                );
+                                              }).toList()
+                                            )
+                                          )
+                                        ]
                                       ],
                                     ],
                                   )
@@ -163,6 +206,7 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                            _importPiecesError = false;
                            _importTotalError = false;
                            _importUldExistsError = false;
+                           _importUldNoAwbError = false;
                            _importExceedsRemainingError = false;
                            _importAwbRemainingPieces = null;
                            _importTotalLessThanPiecesError = false;
@@ -194,6 +238,7 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                            _importPiecesError = false;
                            _importTotalError = false;
                            _importUldExistsError = false;
+                           _importUldNoAwbError = false;
                            _importExceedsRemainingError = false;
                            _importAwbRemainingPieces = null;
                            _importTotalLessThanPiecesError = false;
@@ -210,7 +255,12 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                        ),
                      ),
                      const Spacer(),
-                     if (_importUldExistsError)
+                     if (_importUldNoAwbError)
+                       Text(
+                         appLanguage.value == 'es' ? 'Añade un AWB al ULD' : 'Add an AWB to ULD',
+                         style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                       )
+                     else if (_importUldExistsError)
                        Text(
                          appLanguage.value == 'es' ? 'El ULD ya existe' : 'ULD already exists',
                          style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
@@ -238,235 +288,423 @@ extension AddDeliverV2ImportPaneExt on AddDeliverV2ScreenState {
                   ]
                 ),
                 const SizedBox(height: 16),
-                Row(
-                   crossAxisAlignment: CrossAxisAlignment.start,
-                   children: [
-                     if (!_isImportUld)
-                       SizedBox(width: 150, child: _buildTextField('AWB Number', _importAwbNumberCtrl, dark, null, hint: '123-4567 8910', forceError: _importAwbError || _importExceedsRemainingError || _importExistsInListError, onChanged: (val) {
-                         if (_importAwbError && val.trim().isNotEmpty) setState(() => _importAwbError = false);
-                         if (_importExceedsRemainingError) setState(() => _importExceedsRemainingError = false);
-                         if (_importExistsInListError) setState(() => _importExistsInListError = false);
-                         
-                         var pureDigits = val.replaceAll(RegExp(r'[^0-9]'), '');
-                         if (pureDigits.length == 11) {
-                           final text = val.trim().toUpperCase();
+                if (!_isImportUld) ...[
+                   // Standard AWB Form
+                   Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                         SizedBox(width: 150, child: _buildTextField('AWB Number', _importAwbNumberCtrl, dark, null, hint: '123-4567 8910', forceError: _importAwbError || _importExceedsRemainingError || _importExistsInListError, onChanged: (val) {
+                           if (_importAwbError && val.trim().isNotEmpty) setState(() => _importAwbError = false);
+                           if (_importExceedsRemainingError) setState(() => _importExceedsRemainingError = false);
+                           if (_importExistsInListError) setState(() => _importExistsInListError = false);
                            
-                           // Check if it already exists in the local list
-                           if (_importAwbs.any((e) => e['type'] == 'AWB' && e['awbNumber'] == text)) {
-                             setState(() {
-                               _importExistsInListError = true;
-                               _importAwbRemainingPieces = null;
-                             });
-                             return;
-                           }
+                           var pureDigits = val.replaceAll(RegExp(r'[^0-9]'), '');
+                           if (pureDigits.length == 11) {
+                             final text = val.trim().toUpperCase();
+                             
+                             // Check if it already exists in the local list
+                             if (_importAwbs.any((e) => e['type'] == 'AWB' && e['awbNumber'] == text)) {
+                               setState(() {
+                                 _importExistsInListError = true;
+                                 _importAwbRemainingPieces = null;
+                               });
+                               return;
+                             }
 
-                           () async {
-                             try {
-                               final res = await Supabase.instance.client.from('awbs').select('*').eq('awb_number', text).maybeSingle();
-                               if (res != null && _importAwbNumberCtrl.text.toUpperCase() == text) {
-                                 final int totalPieces = int.tryParse(res['total_pieces']?.toString() ?? '0') ?? 0;
-                                 final int totalExpected = int.tryParse(res['total_expected']?.toString() ?? res['total_espected']?.toString() ?? '0') ?? 0;
-                                 int remaining = totalPieces - totalExpected;
-                                 if (remaining < 0) remaining = 0;
+                             () async {
+                               try {
+                                 final res = await Supabase.instance.client.from('awbs').select('*').eq('awb_number', text).maybeSingle();
+                                 if (res != null && _importAwbNumberCtrl.text.toUpperCase() == text) {
+                                   final int totalPieces = int.tryParse(res['total_pieces']?.toString() ?? '0') ?? 0;
+                                   final int totalExpected = int.tryParse(res['total_expected']?.toString() ?? res['total_espected']?.toString() ?? '0') ?? 0;
+                                   int remaining = totalPieces - totalExpected;
+                                   if (remaining < 0) remaining = 0;
 
-                                 if (mounted) {
-                                    setState(() {
-                                       if (res['total_pieces'] != null) {
-                                         _importTotalLocked = true;
-                                         _importTotalCtrl.text = res['total_pieces'].toString();
-                                         _importTotalError = false;
-                                       }
-                                       if (remaining == 0) {
-                                         _importExceedsRemainingError = true;
-                                         _importAwbRemainingPieces = null;
-                                       } else {
-                                         _importAwbRemainingPieces = remaining;
-                                         _importExceedsRemainingError = false;
-                                         
-                                         // Update pieces if it exceeds remaining
-                                         final int currentPcs = int.tryParse(_importPiecesCtrl.text) ?? 0;
-                                         if (currentPcs > remaining) {
-                                           _importPiecesCtrl.text = remaining.toString();
+                                   if (mounted) {
+                                      setState(() {
+                                         if (res['total_pieces'] != null) {
+                                           _importTotalLocked = true;
+                                           _importTotalCtrl.text = res['total_pieces'].toString();
+                                           _importTotalError = false;
                                          }
-                                       }
-                                    });
+                                         if (remaining == 0) {
+                                           _importExceedsRemainingError = true;
+                                           _importAwbRemainingPieces = null;
+                                         } else {
+                                           _importAwbRemainingPieces = remaining;
+                                           _importExceedsRemainingError = false;
+                                           
+                                           // Update pieces if it exceeds remaining
+                                           final int currentPcs = int.tryParse(_importPiecesCtrl.text) ?? 0;
+                                           if (currentPcs > remaining) {
+                                             _importPiecesCtrl.text = remaining.toString();
+                                           }
+                                         }
+                                      });
+                                   }
+                                 } else {
+                                   if (mounted) {
+                                     setState(() {
+                                       _importAwbRemainingPieces = null;
+                                     });
+                                   }
                                  }
-                               } else {
+                               } catch (_) {
                                  if (mounted) {
                                    setState(() {
                                      _importAwbRemainingPieces = null;
                                    });
                                  }
                                }
-                             } catch (_) {
-                               if (mounted) {
-                                 setState(() {
-                                   _importAwbRemainingPieces = null;
-                                 });
-                               }
+                             }();
+                           } else {
+                             if (_importTotalLocked || _importAwbRemainingPieces != null || _importExceedsRemainingError || _importExistsInListError) {
+                               setState(() {
+                                 _importTotalLocked = false;
+                                 _importTotalCtrl.clear();
+                                 _importAwbRemainingPieces = null;
+                                 _importExceedsRemainingError = false;
+                                 _importExistsInListError = false;
+                               });
                              }
-                           }();
-                         } else {
-                           if (_importTotalLocked || _importAwbRemainingPieces != null || _importExceedsRemainingError || _importExistsInListError) {
-                             setState(() {
-                               _importTotalLocked = false;
-                               _importTotalCtrl.clear();
-                               _importAwbRemainingPieces = null;
-                               _importExceedsRemainingError = false;
-                               _importExistsInListError = false;
-                             });
                            }
-                         }
-                       }))
-                     else
-                       SizedBox(width: 150, child: _buildTextField('ULD Number', _importAwbNumberCtrl, dark, null, hint: 'PMC12345BA', uppercase: true, maxLen: 10, forceError: _importAwbError || _importUldExistsError || _importExistsInListError, onChanged: (val) {
-                         if (_importAwbError && val.trim().isNotEmpty) setState(() => _importAwbError = false);
-                         if (_importExistsInListError) setState(() => _importExistsInListError = false);
-                         
-                         final text = val.trim().toUpperCase();
-                         if (text.length == 10) {
-                           // Check if it already exists in the local list
-                           if (_importAwbs.any((e) => e['type'] == 'ULD' && e['awbNumber'] == text)) {
-                             setState(() {
-                               _importExistsInListError = true;
-                             });
-                             return;
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 80, child: _buildTextField('Pieces', _importPiecesCtrl, dark, null, hint: '0', maxLen: 5, forceError: _importPiecesError || _importTotalLessThanPiecesError, onChanged: (val) {
+                           if (_importPiecesError && val.trim().isNotEmpty) setState(() => _importPiecesError = false);
+                           if (_importTotalLessThanPiecesError) setState(() => _importTotalLessThanPiecesError = false);
+                           
+                           // Check if it exceeds remaining pieces
+                           if (_importAwbRemainingPieces != null) {
+                             final int currentPcs = int.tryParse(val) ?? 0;
+                             if (currentPcs > _importAwbRemainingPieces!) {
+                               setState(() {
+                                 _importExceedsRemainingError = true;
+                               });
+                             } else {
+                               if (_importExceedsRemainingError) setState(() => _importExceedsRemainingError = false);
+                             }
                            }
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 80, child: _buildTextField('Total', _importTotalCtrl, dark, null, hint: '0', maxLen: 5, readOnly: _importTotalLocked, forceError: _importTotalError || _importTotalLessThanPiecesError, onChanged: (val) {
+                           if (_importTotalError && val.trim().isNotEmpty) setState(() => _importTotalError = false);
+                           if (_importTotalLessThanPiecesError) setState(() => _importTotalLessThanPiecesError = false);
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 80, child: _buildTextField('Weight', _importWeightCtrl, dark, null, hint: '0', maxLen: 5)),
+                         const SizedBox(width: 8),
+                         Expanded(child: _buildTextField('House No.', _importHouseCtrl, dark, null, hint: 'HAWB', maxLines: 3, minLines: 1, uppercase: true)),
+                      ]
+                   ),
+                   const SizedBox(height: 12),
+                   Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                         Expanded(child: _buildTextField('Remarks', _importRemarksCtrl, dark, null, hint: 'Remarks', capitalizeFirst: true)),
+                         const SizedBox(width: 16),
+                         SizedBox(
+                           height: 48,
+                           width: 140,
+                           child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                                foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                                elevation: 0,
+                                side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                              ),
+                              onPressed: _addImportAwb,
+                              icon: const Icon(Icons.add_rounded, size: 20),
+                              label: const Text('Add AWB', style: TextStyle(fontWeight: FontWeight.bold)),
+                           ),
+                         ),
+                      ]
+                   ),
+                ] else ...[
+                   // ULD Master-Detail Layout
+                   Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                         SizedBox(width: 125, child: _buildTextField('ULD Number', _importUldNumberCtrl, dark, null, hint: 'PMC12345BA', uppercase: true, maxLen: 10, forceError: _importUldNumberError || _importUldExistsError, onChanged: (val) {
+                             if (_importUldNumberError && val.trim().isNotEmpty) setState(() => _importUldNumberError = false);
+                             if (_importUldNoAwbError) setState(() => _importUldNoAwbError = false);
+                             if (_importUldExistsError) setState(() => _importUldExistsError = false);
+                         })),
 
-                           () async {
-                             try {
-                               final existingUld = await Supabase.instance.client.from('ulds').select('uld_number').eq('uld_number', text).maybeSingle();
-                               if (existingUld != null && _importAwbNumberCtrl.text.trim().toUpperCase() == text) {
+                         const SizedBox(width: 8),
+                         SizedBox(width: 80, child: _buildTextField('Pcs', _importUldPiecesCtrl, dark, null, hint: '0', maxLen: 5, forceError: _importUldPiecesError, readOnly: _importUldPiecesAutoCalc, customLabelAction: InkWell(
+                           onTap: () {
+                             setState(() {
+                               _importUldPiecesAutoCalc = !_importUldPiecesAutoCalc;
+                               if (_importUldPiecesAutoCalc) _updateUldTotals();
+                             });
+                           },
+                           child: Icon(_importUldPiecesAutoCalc ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 16, color: _importUldPiecesAutoCalc ? const Color(0xFF10b981) : textS),
+                         ), onChanged: (val) {
+                             if (_importUldPiecesError && val.trim().isNotEmpty) setState(() => _importUldPiecesError = false);
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 80, child: _buildTextField('Wgt', _importUldWeightCtrl, dark, null, hint: '0', maxLen: 5, readOnly: _importUldWeightAutoCalc, customLabelAction: InkWell(
+                           onTap: () {
+                             setState(() {
+                               _importUldWeightAutoCalc = !_importUldWeightAutoCalc;
+                               if (_importUldWeightAutoCalc) _updateUldTotals();
+                             });
+                           },
+                           child: Icon(_importUldWeightAutoCalc ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded, size: 16, color: _importUldWeightAutoCalc ? const Color(0xFF10b981) : textS),
+                         ))),
+                         const SizedBox(width: 8),
+                         Expanded(child: _buildTextField('Remarks', _importUldRemarksCtrl, dark, null, hint: 'Notes')),
+                         const SizedBox(width: 8),
+                         SizedBox(
+                           width: 120,
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Text('Is Break?', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+                               const SizedBox(height: 6),
+                               Container(
+                                 height: 48,
+                                 padding: const EdgeInsets.only(left: 8, right: 4),
+                                 decoration: BoxDecoration(
+                                   color: _importIsBreak ? const Color(0xFF10b981).withAlpha(15) : const Color(0xFFef4444).withAlpha(15),
+                                   borderRadius: BorderRadius.circular(8),
+                                   border: Border.all(color: _importIsBreak ? const Color(0xFF10b981).withAlpha(60) : const Color(0xFFef4444).withAlpha(60), width: 1.5)
+                                 ),
+                                 child: Row(
+                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                   children: [
+                                     Expanded(
+                                       child: Text(
+                                         _importIsBreak ? 'BREAK' : 'NO BREAK',
+                                         textAlign: TextAlign.center,
+                                         style: TextStyle(
+                                           color: _importIsBreak ? const Color(0xFF10b981) : const Color(0xFFef4444),
+                                           fontSize: 10,
+                                           fontWeight: FontWeight.bold,
+                                         )
+                                       ),
+                                     ),
+                                     Transform.scale(
+                                       scale: 0.65,
+                                       child: Switch(
+                                         value: _importIsBreak,
+                                         onChanged: (v) => setState(() => _importIsBreak = v),
+                                         activeThumbColor: Colors.white,
+                                         activeTrackColor: const Color(0xFF10b981),
+                                         inactiveThumbColor: Colors.white,
+                                         inactiveTrackColor: const Color(0xFFef4444),
+                                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                       ),
+                                     )
+                                   ]
+                                 )
+                               )
+                             ]
+                           )
+                         ),
+                         const SizedBox(width: 8),
+                         SizedBox(
+                           width: 60,
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               Text('AWBs', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
+                               const SizedBox(height: 6),
+                               GestureDetector(
+                                 onTap: () {
+                                   if (_stagedUldAwbs.isNotEmpty) _showStagedAwbsDialog(dark);
+                                 },
+                                 child: Container(
+                                   height: 48,
+                                   padding: const EdgeInsets.symmetric(horizontal: 10),
+                                   decoration: BoxDecoration(
+                                     color: _stagedUldAwbs.isNotEmpty ? const Color(0xFF10b981).withAlpha(20) : (dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6)),
+                                     borderRadius: BorderRadius.circular(12),
+                                     border: Border.all(color: _stagedUldAwbs.isNotEmpty ? const Color(0xFF10b981).withAlpha(50) : (dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB))),
+                                   ),
+                                   child: Row(
+                                     mainAxisAlignment: MainAxisAlignment.center,
+                                     children: [
+                                       Icon(Icons.inventory_2_outlined, color: _stagedUldAwbs.isNotEmpty ? const Color(0xFF10b981) : textS, size: 16),
+                                       const SizedBox(width: 4),
+                                       Text('${_stagedUldAwbs.length}', style: TextStyle(color: _stagedUldAwbs.isNotEmpty ? const Color(0xFF10b981) : textS, fontWeight: FontWeight.bold, fontSize: 14)),
+                                     ]
+                                   )
+                                 )
+                               )
+                             ],
+                           ),
+                         ),
+                      ]
+                   ),
+                   const SizedBox(height: 16),
+                   Divider(height: 1, color: dark ? Colors.white.withAlpha(15) : const Color(0xFFE5E7EB)),
+                   const SizedBox(height: 16),
+                   Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                         SizedBox(width: 130, child: _buildTextField('AWB Number', _importAwbNumberCtrl, dark, null, hint: '123-4567 8910', forceError: _importAwbError || _importExceedsRemainingError || _importExistsInListError, onChanged: (val) {
+                           if (_importAwbError && val.trim().isNotEmpty) setState(() => _importAwbError = false);
+                           if (_importExceedsRemainingError) setState(() => _importExceedsRemainingError = false);
+                           if (_importExistsInListError) setState(() => _importExistsInListError = false);
+                           
+                           var pureDigits = val.replaceAll(RegExp(r'[^0-9]'), '');
+                           if (pureDigits.length == 11) {
+                             final text = val.trim().toUpperCase();
+                             
+                             // Check if it already exists in the local list OR staged list
+                             if (_importAwbs.any((e) => e['type'] == 'AWB' && e['awbNumber'] == text) || _stagedUldAwbs.any((e) => e['awbNumber'] == text)) {
+                               setState(() {
+                                 _importExistsInListError = true;
+                                 _importAwbRemainingPieces = null;
+                               });
+                               return;
+                             }
+
+                             () async {
+                               try {
+                                 final res = await Supabase.instance.client.from('awbs').select('*').eq('awb_number', text).maybeSingle();
+                                 if (res != null && _importAwbNumberCtrl.text.toUpperCase() == text) {
+                                   final int totalPieces = int.tryParse(res['total_pieces']?.toString() ?? '0') ?? 0;
+                                   final int totalExpected = int.tryParse(res['total_expected']?.toString() ?? res['total_espected']?.toString() ?? '0') ?? 0;
+                                   int remaining = totalPieces - totalExpected;
+                                   if (remaining < 0) remaining = 0;
+
+                                   if (mounted) {
+                                      setState(() {
+                                         if (res['total_pieces'] != null) {
+                                           _importTotalLocked = true;
+                                           _importTotalCtrl.text = res['total_pieces'].toString();
+                                           _importTotalError = false;
+                                         }
+                                         if (remaining == 0) {
+                                           _importExceedsRemainingError = true;
+                                           _importAwbRemainingPieces = null;
+                                         } else {
+                                           _importAwbRemainingPieces = remaining;
+                                           _importExceedsRemainingError = false;
+                                           
+                                           // Update pieces if it exceeds remaining
+                                           final int currentPcs = int.tryParse(_importPiecesCtrl.text) ?? 0;
+                                           if (currentPcs > remaining) {
+                                             _importPiecesCtrl.text = remaining.toString();
+                                           }
+                                         }
+                                      });
+                                   }
+                                 } else {
+                                   if (mounted) {
+                                     setState(() {
+                                       _importAwbRemainingPieces = null;
+                                     });
+                                   }
+                                 }
+                               } catch (_) {
                                  if (mounted) {
                                    setState(() {
-                                     _importUldExistsError = true;
+                                     _importAwbRemainingPieces = null;
                                    });
                                  }
-                               } else {
-                                 if (_importUldExistsError && mounted) setState(() => _importUldExistsError = false);
                                }
-                             } catch (_) {}
-                           }();
-                         } else {
-                           if (_importUldExistsError) setState(() => _importUldExistsError = false);
-                           if (_importExistsInListError) setState(() => _importExistsInListError = false);
-                         }
-                       })),
-                     
-                     const SizedBox(width: 8),
-                     SizedBox(width: 80, child: _buildTextField('Pieces', _importPiecesCtrl, dark, null, hint: '0', forceError: _importPiecesError || _importTotalLessThanPiecesError, onChanged: (val) {
-                       if (_importPiecesError && val.trim().isNotEmpty) setState(() => _importPiecesError = false);
-                       if (_importTotalLessThanPiecesError) setState(() => _importTotalLessThanPiecesError = false);
-                       
-                       // Check if it exceeds remaining pieces
-                       if (_importAwbRemainingPieces != null) {
-                         final int currentPcs = int.tryParse(val) ?? 0;
-                         if (currentPcs > _importAwbRemainingPieces!) {
-                           setState(() {
-                             _importExceedsRemainingError = true;
-                           });
-                         } else {
-                           if (_importExceedsRemainingError) setState(() => _importExceedsRemainingError = false);
-                         }
-                       }
-                     })),
-                     const SizedBox(width: 8),
-                     if (!_isImportUld) ...[
-                       SizedBox(width: 80, child: _buildTextField('Total', _importTotalCtrl, dark, null, hint: '0', readOnly: _importTotalLocked, forceError: _importTotalError || _importTotalLessThanPiecesError, onChanged: (val) {
-                         if (_importTotalError && val.trim().isNotEmpty) setState(() => _importTotalError = false);
-                         if (_importTotalLessThanPiecesError) setState(() => _importTotalLessThanPiecesError = false);
-                       })),
-                       const SizedBox(width: 8),
-                     ],
-                     SizedBox(width: 80, child: _buildTextField('Weight', _importWeightCtrl, dark, null, hint: '0')),
-                     const SizedBox(width: 8),
-                     
-                     if (!_isImportUld)
-                        Expanded(child: _buildTextField('House No.', _importHouseCtrl, dark, null, hint: 'HAWB', maxLines: 3, minLines: 1, uppercase: true))
-                      else
-                        Expanded(child: _buildTextField('Remarks', _importRemarksCtrl, dark, null, hint: 'Remarks', capitalizeFirst: true)),
-                   ]
-                ),
-                const SizedBox(height: 12),
-                Row(
-                   crossAxisAlignment: CrossAxisAlignment.end,
-                   children: [
-                     if (!_isImportUld)
-                       Expanded(child: _buildTextField('Remarks', _importRemarksCtrl, dark, null, hint: 'Remarks', capitalizeFirst: true))
-                     else
-                       SizedBox(
-                         width: 150,
-                         child: Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                             Text('Is Break?', style: TextStyle(color: dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563), fontSize: 12, fontWeight: FontWeight.w500)),
-                             const SizedBox(height: 6),
-                             Container(
-                               height: 48,
-                               decoration: BoxDecoration(
-                                 color: dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB),
-                                 borderRadius: BorderRadius.circular(8),
-                                 border: Border.all(color: dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB))
-                               ),
-                               child: Row(
-                                 children: [
-                                   Expanded(
-                                     child: GestureDetector(
-                                       onTap: () => setState(() => _importIsBreak = false),
-                                       child: Container(
-                                         color: Colors.transparent,
-                                         child: Row(
-                                           mainAxisAlignment: MainAxisAlignment.center,
-                                           children: [
-                                             Icon(!_importIsBreak ? Icons.radio_button_checked : Icons.radio_button_off, color: !_importIsBreak ? const Color(0xFF6366f1) : textS, size: 16),
-                                             const SizedBox(width: 4),
-                                             Text('No', style: TextStyle(color: !_importIsBreak ? textP : textS, fontSize: 12, fontWeight: FontWeight.bold)),
-                                           ]
-                                         )
-                                       )
-                                     )
-                                   ),
-                                   Expanded(
-                                     child: GestureDetector(
-                                       onTap: () => setState(() => _importIsBreak = true),
-                                       child: Container(
-                                         color: Colors.transparent,
-                                         child: Row(
-                                           mainAxisAlignment: MainAxisAlignment.center,
-                                           children: [
-                                             Icon(_importIsBreak ? Icons.radio_button_checked : Icons.radio_button_off, color: _importIsBreak ? const Color(0xFF6366f1) : textS, size: 16),
-                                             const SizedBox(width: 4),
-                                             Text('Yes', style: TextStyle(color: _importIsBreak ? textP : textS, fontSize: 12, fontWeight: FontWeight.bold)),
-                                           ]
-                                         )
-                                       )
-                                     )
-                                   )
-                                 ]
-                               )
-                             )
-                           ]
+                             }();
+                           } else {
+                             if (_importTotalLocked || _importAwbRemainingPieces != null || _importExceedsRemainingError || _importExistsInListError) {
+                               setState(() {
+                                 _importTotalLocked = false;
+                                 _importTotalCtrl.clear();
+                                 _importAwbRemainingPieces = null;
+                                 _importExceedsRemainingError = false;
+                                 _importExistsInListError = false;
+                               });
+                             }
+                           }
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 75, child: _buildTextField('Pcs', _importPiecesCtrl, dark, null, hint: '0', maxLen: 5, forceError: _importPiecesError || _importTotalLessThanPiecesError, onChanged: (val) {
+                           if (_importPiecesError && val.trim().isNotEmpty) setState(() => _importPiecesError = false);
+                           if (_importTotalLessThanPiecesError) setState(() => _importTotalLessThanPiecesError = false);
+                           
+                           // Check if it exceeds remaining pieces
+                           if (_importAwbRemainingPieces != null) {
+                             final int currentPcs = int.tryParse(val) ?? 0;
+                             if (currentPcs > _importAwbRemainingPieces!) {
+                               setState(() {
+                                 _importExceedsRemainingError = true;
+                               });
+                             } else {
+                               if (_importExceedsRemainingError) setState(() => _importExceedsRemainingError = false);
+                             }
+                           }
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 75, child: _buildTextField('Total', _importTotalCtrl, dark, null, hint: '0', maxLen: 5, readOnly: _importTotalLocked, forceError: _importTotalError || _importTotalLessThanPiecesError, onChanged: (val) {
+                           if (_importTotalError && val.trim().isNotEmpty) setState(() => _importTotalError = false);
+                           if (_importTotalLessThanPiecesError) setState(() => _importTotalLessThanPiecesError = false);
+                         })),
+                         const SizedBox(width: 8),
+                         SizedBox(width: 75, child: _buildTextField('Wgt', _importWeightCtrl, dark, null, hint: '0', maxLen: 5)),
+                         const SizedBox(width: 8),
+                         Container(
+                           height: 48,
+                           width: 48,
+                           decoration: BoxDecoration(
+                             color: _showExtraAwbFields ? const Color(0xFF6366f1).withAlpha(30) : (dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB)),
+                             borderRadius: BorderRadius.circular(8),
+                             border: Border.all(color: _showExtraAwbFields ? const Color(0xFF6366f1).withAlpha(60) : (dark ? Colors.white.withAlpha(20) : const Color(0xFFE5E7EB)))
+                           ),
+                           child: IconButton(
+                             icon: Icon(Icons.tune_rounded, color: _showExtraAwbFields ? const Color(0xFF6366f1) : textS, size: 20),
+                             onPressed: () => setState(() => _showExtraAwbFields = !_showExtraAwbFields),
+                             tooltip: 'More fields',
+                           )
+                         ),
+                         const Spacer(),
+                         Container(
+                           height: 48,
+                           width: 48,
+                           decoration: BoxDecoration(
+                             color: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                             shape: BoxShape.circle,
+                             border: Border.all(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                           ),
+                           child: IconButton(
+                             icon: const Icon(Icons.add_rounded, size: 22),
+                             color: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                             tooltip: 'Add AWB',
+                             onPressed: _addImportStagedAwb,
+                           )
+                         ),
+                         const SizedBox(width: 16),
+                         SizedBox(
+                           height: 48,
+                           child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
+                                foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
+                                elevation: 0,
+                                side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                              ),
+                              onPressed: _addImportUld,
+                              icon: const Icon(Icons.pallet, size: 20),
+                              label: const Text('Save ULD', style: TextStyle(fontWeight: FontWeight.bold)),
+                           ),
                          )
-                       ),
-                     if (!_isImportUld) const SizedBox(width: 16) else const Spacer(),
-                     SizedBox(
-                       height: 48,
-                       width: 140,
-                       child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: dark ? const Color(0xFF6366f1).withAlpha(30) : const Color(0xFF6366f1).withAlpha(15),
-                            foregroundColor: dark ? const Color(0xFF818cf8) : const Color(0xFF4F46E5),
-                            elevation: 0,
-                            side: BorderSide(color: dark ? const Color(0xFF6366f1).withAlpha(60) : const Color(0xFF6366f1).withAlpha(40)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                          ),
-                          onPressed: _addImportAwb,
-                          icon: const Icon(Icons.add_rounded, size: 20),
-                          label: Text(_isImportUld ? 'Add ULD' : 'Add AWB', style: const TextStyle(fontWeight: FontWeight.bold)),
-                       ),
-                     ),
-                   ]
-                ),
+                       ]
+                    ),
+                    if (_showExtraAwbFields) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: _buildTextField('House No.', _importHouseCtrl, dark, null, hint: 'HAWB', maxLines: 3, minLines: 1, uppercase: true)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildTextField('Remarks', _importRemarksCtrl, dark, null, hint: 'Remarks', capitalizeFirst: true)),
+                        ]
+                      )
+                    ]
+                 ]
              ]
            )
         )

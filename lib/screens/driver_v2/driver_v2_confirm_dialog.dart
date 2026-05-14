@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show currentUserData;
 import 'driver_v2_awb_dialog.dart';
 import 'driver_v2_import_awb_dialog.dart';
+import 'driver_v2_import_uld_dialog.dart';
 import 'driver_v2_animated_toast.dart';
 
 void showDriverConfirmDialog({
@@ -368,7 +369,8 @@ void showDriverConfirmDialog({
                                 final item = awbsList[index];
                                   
                                 final String rawNumber = item['awb_number']?.toString() ?? item['uld_number']?.toString() ?? item['awb']?.toString() ?? 'N/A';
-                                final String typeLabel = item.containsKey('uld_id') ? 'ULD: ' : 'AWB: ';
+                                final bool isUld = item['type'] == 'ULD' || item.containsKey('uld_id') || item.containsKey('uld_number');
+                                final String typeLabel = isUld ? 'ULD: ' : 'AWB: ';
                                 final awbNumber = '$typeLabel$rawNumber';
                                   
                                 final pieces = item['found']?.toString() ?? '0';
@@ -381,14 +383,25 @@ void showDriverConfirmDialog({
                                     
                                     bool? success;
                                     if (type == 'Import') {
-                                      success = await showDriverImportAwbDialog(
-                                        context: context,
-                                        awbItem: item,
-                                        deliveryData: deliveryData,
-                                        company: company,
-                                        driver: driver,
-                                        dark: dark,
-                                      );
+                                      if (isUld) {
+                                        success = await showDriverImportUldDialog(
+                                          context: context,
+                                          uldItem: item,
+                                          deliveryData: deliveryData,
+                                          company: company,
+                                          driver: driver,
+                                          dark: dark,
+                                        );
+                                      } else {
+                                        success = await showDriverImportAwbDialog(
+                                          context: context,
+                                          awbItem: item,
+                                          deliveryData: deliveryData,
+                                          company: company,
+                                          driver: driver,
+                                          dark: dark,
+                                        );
+                                      }
                                     } else {
                                       success = await showDriverAwbDialog(
                                         context: context,
