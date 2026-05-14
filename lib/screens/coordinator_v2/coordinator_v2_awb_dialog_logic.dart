@@ -24,6 +24,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
   final boxCtrl = TextEditingController();
   final otherCtrl = TextEditingController();
   final piecesDamageCtrl = TextEditingController();
+  final damageRemarkCtrl = TextEditingController();
 
   List<Map<String, dynamic>> addedItems = [];
 
@@ -81,6 +82,9 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
     piecesDamageCtrl.addListener(() {
       notifyListeners();
     });
+    damageRemarkCtrl.addListener(() {
+      notifyListeners();
+    });
     
     _fetchExistingDamage();
   }
@@ -111,6 +115,9 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
           if (res['pieces_damage'] != null) {
             piecesDamageCtrl.text = res['pieces_damage'].toString();
           }
+          if (res['remarks'] != null) {
+            damageRemarkCtrl.text = res['remarks'].toString();
+          }
         }
       }
     } catch (e) {
@@ -139,6 +146,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
     boxCtrl.dispose();
     otherCtrl.dispose();
     piecesDamageCtrl.dispose();
+    damageRemarkCtrl.dispose();
     super.dispose();
   }
 
@@ -156,6 +164,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
       notesCtrl.clear();
       selectedDamages.clear();
       piecesDamageCtrl.clear();
+      damageRemarkCtrl.clear();
       localPhotos.clear();
     }
     notifyListeners();
@@ -455,10 +464,12 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         'p_not_found': notFoundSelected,
         'p_location': finLocation.isNotEmpty ? finLocation : null,
         'p_data_coordinator': dataCoordinator,
-        'p_existing_damage_id': existingDamageReportId != null ? int.tryParse(existingDamageReportId!) : null,
       };
+      final dmgRemarks = damageRemarkCtrl.text.trim();
 
-      if (selectedDamages.isNotEmpty || finalUrls.isNotEmpty || dmgPieces > 0) {
+      rpcParams['p_existing_damage_id'] = existingDamageReportId != null ? int.tryParse(existingDamageReportId!) : null;
+
+      if (selectedDamages.isNotEmpty || finalUrls.isNotEmpty || dmgPieces > 0 || dmgRemarks.isNotEmpty) {
         final fId = combined['flight_id'] ?? awbSplit['flight_id'];
         final uId = combined['uld_id'] ?? awbSplit['uld_id'];
         final aId = combined['awb_id'] ?? awbSplit['awb_id'] ?? combined['id'];
@@ -471,6 +482,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         rpcParams['p_damage_type'] = selectedDamages.isEmpty ? null : selectedDamages;
         rpcParams['p_photo_urls'] = finalUrls.isEmpty ? null : finalUrls;
         rpcParams['p_pieces_damage'] = dmgPieces;
+        rpcParams['p_damage_remarks'] = dmgRemarks.isEmpty ? null : dmgRemarks;
       } else {
         rpcParams['p_flight_id'] = null;
         rpcParams['p_uld_id'] = null;
@@ -479,6 +491,7 @@ class CoordinatorV2AwbDialogLogic extends ChangeNotifier {
         rpcParams['p_damage_type'] = null;
         rpcParams['p_photo_urls'] = null;
         rpcParams['p_pieces_damage'] = 0;
+        rpcParams['p_damage_remarks'] = null;
       }
 
       await supabase.rpc('rpc_save_coordinator_data', params: rpcParams);

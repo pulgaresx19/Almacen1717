@@ -38,6 +38,45 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
     super.dispose();
   }
 
+  void _showDamageRemarkDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: widget.dark ? const Color(0xFF1e293b) : Colors.white,
+          title: Text(appLanguage.value == 'es' ? 'Comentarios de Daño' : 'Damage Remarks', style: TextStyle(color: widget.dark ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: TextField(
+            controller: logic.damageRemarkCtrl,
+            style: TextStyle(color: widget.dark ? Colors.white : Colors.black),
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: appLanguage.value == 'es' ? 'Ingresa detalles específicos del daño...' : 'Enter specific details about the damage...',
+              hintStyle: TextStyle(color: widget.dark ? Colors.white54 : Colors.black54),
+              filled: true,
+              fillColor: widget.dark ? Colors.white.withAlpha(10) : Colors.grey.shade100,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(appLanguage.value == 'es' ? 'Cerrar' : 'Close', style: const TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFef4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(appLanguage.value == 'es' ? 'Guardar' : 'Save'),
+            ),
+          ],
+        );
+      }
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textP = widget.dark ? Colors.white : const Color(0xFF111827);
@@ -240,7 +279,7 @@ class _CoordinatorV2AwbDialogState extends State<CoordinatorV2AwbDialog> {
                         logic.removePhoto(idx);
                       }, (idx) {
                         logic.removeNetworkPhoto(idx);
-                      }, widget.isReadOnly || logic.notFoundSelected, logic.piecesDamageCtrl)
+                      }, widget.isReadOnly || logic.notFoundSelected, logic.piecesDamageCtrl, _showDamageRemarkDialog, logic.damageRemarkCtrl.text.trim().isNotEmpty)
                     else if (logic.selectedType == 3)
                       buildNotesSection(widget.dark, bgCard, textP, textS, logic.notesCtrl, widget.isReadOnly || logic.notFoundSelected)
                     else ...[

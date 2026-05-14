@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show currentUserData;
 import 'driver_v2_awb_dialog.dart';
+import 'driver_v2_import_awb_dialog.dart';
 import 'driver_v2_animated_toast.dart';
 
 void showDriverConfirmDialog({
@@ -51,8 +52,8 @@ void showDriverConfirmDialog({
     barrierDismissible: false, // Prevents closing by tapping outside
     builder: (ctx) {
       return StatefulBuilder(
-        builder: (BuildContext context, StateSetter setState) {
-          final size = MediaQuery.of(context).size;
+        builder: (BuildContext dialogContext, StateSetter setState) {
+          final size = MediaQuery.of(dialogContext).size;
           final allDelivered = awbsList.isNotEmpty && awbsList.every((i) => i['is_delivered_now'] == true);
           
           return Dialog(
@@ -98,10 +99,11 @@ void showDriverConfirmDialog({
                         const Spacer(),
                         IconButton(
                           onPressed: () async {
+                            final nav = Navigator.of(context);
                             // If the delivery is already marked as Completed in the database, just let them out.
                             // Otherwise, they MUST provide a pending reason to exit, even if all items are checked.
                             if (deliveryData['status'] == 'Completed') {
-                              Navigator.pop(ctx);
+                              nav.pop();
                               return;
                             }
                             
@@ -377,19 +379,58 @@ void showDriverConfirmDialog({
                                   onTap: () async {
                                     if (item['is_delivered_now'] == true) return;
                                     
-                                    final success = await showDriverAwbDialog(
-                                      context: context,
-                                      awbItem: item,
-                                      deliveryData: deliveryData,
-                                      company: company,
-                                      driver: driver,
-                                      dark: dark,
-                                    );
+                                    bool? success;
+                                    if (type == 'Import') {
+                                      success = await showDriverImportAwbDialog(
+                                        context: context,
+                                        awbItem: item,
+                                        deliveryData: deliveryData,
+                                        company: company,
+                                        driver: driver,
+                                        dark: dark,
+                                      );
+                                    } else {
+                                      success = await showDriverAwbDialog(
+                                        context: context,
+                                        awbItem: item,
+                                        deliveryData: deliveryData,
+                                        company: company,
+                                        driver: driver,
+                                        dark: dark,
+                                      );
+                                    }
                                     
                                     if (success == true) {
                                       setState(() {
                                         item['is_delivered_now'] = true;
                                       });
+                                      
+                                      // Persist delivered state to database immediately to prevent re-checks
+                                      final currentId = item['awb_id']?.toString() ?? item['uld_id']?.toString() ?? item['id']?.toString() ?? '';
+                                      final newItem = {
+                                        'item_id': currentId,
+                                        'timestamp': DateTime.now().toUtc().toIso8601String(),
+                                      };
+                                      
+                                      List<dynamic> currentDelivered = [];
+                                      if (deliveryData['delivered_items'] is List) {
+                                          currentDelivered = List.from(deliveryData['delivered_items']);
+                                      }
+                                      currentDelivered.add(newItem);
+                                      deliveryData['delivered_items'] = currentDelivered;
+                                      
+                                      final idDelivery = deliveryData['id_delivery']?.toString();
+                                      final idPickup = deliveryData['id_pickup']?.toString() ?? deliveryData['id']?.toString();
+                                      
+                                      try {
+                                        if (idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') {
+                                          await Supabase.instance.client.from('deliveries').update({'delivered_items': currentDelivered}).eq('id_delivery', idDelivery);
+                                        } else if (idPickup != null && idPickup.isNotEmpty && idPickup != '-') {
+                                          await Supabase.instance.client.from('deliveries').update({'delivered_items': currentDelivered}).eq('id_pickup', idPickup);
+                                        }
+                                      } catch (e) {
+                                        // Ignore background sync errors
+                                      }
                                       
                                       if (!context.mounted) return;
                                       // Show a quick fading success icon
@@ -529,8 +570,9 @@ void showDriverConfirmDialog({
                     ),
                     child: ElevatedButton.icon(
                       onPressed: allDelivered ? () async {
+                        final nav = Navigator.of(context);
                         try {
-                          // Show loading indicator
+                          // Show Loading
                           showDialog(
                             context: context,
                             barrierDismissible: false,
@@ -552,76 +594,49 @@ void showDriverConfirmDialog({
                                 .eq('id_pickup', idPickup);
                           }
 
+                          nav.pop(); // Close loading
+                          nav.pop(); // Close the main dialog
+                          
                           if (!context.mounted) return;
-                          Navigator.pop(context); // Close loading
-                          Navigator.pop(ctx);     // Close the main dialog
                           
                           // Show nice animated/curious success dialog
-                          showDialog(
+                          bool dialogOpen = true;
+                          showGeneralDialog(
                             context: context,
-                            builder: (BuildContext successCtx) {
-                              return Dialog(
-                                backgroundColor: Colors.transparent,
-                                child: Container(
-                                  width: 320,
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: dark ? const Color(0xFF1e293b) : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF10b981).withAlpha(30),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 50),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Delivery Completed',
-                                        style: TextStyle(
-                                          color: dark ? Colors.white : Colors.black,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'All items have been successfully delivered and processed.',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: dark ? Colors.white70 : Colors.black54,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 24),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: ElevatedButton(
-                                          onPressed: () => Navigator.pop(successCtx),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF10b981),
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(vertical: 14),
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                            elevation: 0,
-                                          ),
-                                          child: const Text('Awesome!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        ),
-                                      ),
-                                    ],
+                            barrierDismissible: false,
+                            barrierColor: Colors.black54,
+                            transitionDuration: const Duration(milliseconds: 350),
+                            pageBuilder: (pContext, anim1, anim2) {
+                              return Center(
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: Container(
+                                    width: 320, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                                    decoration: BoxDecoration(color: dark ? const Color(0xFF0f172a) : Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))], border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5)),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF10b981).withAlpha(20), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10b981), size: 48)),
+                                        const SizedBox(height: 24),
+                                        Text('Delivery Completed!', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                                        const SizedBox(height: 8),
+                                        Text('All items have been successfully delivered and processed.', style: TextStyle(color: dark ? const Color(0xFF94a3b8) : const Color(0xFF64748b), fontSize: 14, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
                             },
-                          );
+                            transitionBuilder: (pContext, anim1, anim2, child) => Transform.scale(scale: Curves.easeOutBack.transform(anim1.value), child: FadeTransition(opacity: anim1, child: child)),
+                          ).then((_) => dialogOpen = false);
+
+                          await Future.delayed(const Duration(milliseconds: 2000));
+                          if (dialogOpen) {
+                            nav.pop();
+                          }
                         } catch (e) {
+                          nav.pop(); // Close loading
                           if (!context.mounted) return;
-                          Navigator.pop(context); // Close loading
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Error: ${e.toString()}', style: const TextStyle(color: Colors.white)),

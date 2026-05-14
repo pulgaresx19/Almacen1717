@@ -273,6 +273,8 @@ Widget buildDamageSection(
   Function(int) onRemoveNetworkPhoto,
   bool isReadOnly,
   TextEditingController piecesDamageCtrl,
+  VoidCallback onShowRemarkDialog,
+  bool hasDamageRemarks,
 ) {
   final damagesList = ['Torn', 'Crushed', 'Wet', 'Broken', 'Open', 'Missing', 'Cracked', 'Leaking', 'Other'];
   final int totalPhotos = networkPhotos.length + localPhotos.length;
@@ -338,6 +340,32 @@ Widget buildDamageSection(
                   ),
                   const SizedBox(width: 12),
                   if (!isReadOnly) ...[
+                    Opacity(
+                      opacity: hasPieces ? 1.0 : 0.4,
+                      child: InkWell(
+                        onTap: hasPieces ? onShowRemarkDialog : null,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: hasDamageRemarks 
+                                ? const Color(0xFFF59E0B).withAlpha(30)
+                                : (dark ? Colors.white.withAlpha(10) : Colors.white),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: hasDamageRemarks 
+                                    ? const Color(0xFFF59E0B) 
+                                    : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))
+                            ),
+                          ),
+                          child: Icon(
+                            hasDamageRemarks ? Icons.chat_bubble : Icons.chat_bubble_outline, 
+                            size: 16, 
+                            color: const Color(0xFFF59E0B)
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Opacity(
                       opacity: hasPieces ? 1.0 : 0.4,
                       child: InkWell(
