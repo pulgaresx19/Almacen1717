@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show appLanguage, isDarkMode;
 import '../flights_v2/flights_v2_status_logic.dart';
+import '../../services/delivery_math_logic.dart';
 part 'add_deliver_v2_awb_drawer.dart';
 part 'add_deliver_v2_uld_drawer.dart';
 part 'add_deliver_v2_awb_selector.dart';
@@ -113,6 +114,20 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'ulds',
+          callback: (payload) => _fetchDataSilently(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'flights',
+          callback: (payload) {
+            if (mounted) setState(() {});
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'awb_splits',
           callback: (payload) => _fetchDataSilently(),
         )
         .subscribe();

@@ -11,9 +11,13 @@ AS $$
 DECLARE
     v_now timestamptz := now();
     v_now_text text;
+    v_is_priority boolean;
 BEGIN
     -- Obtenemos la hora exacta en formato ISO8601 para mantener consistencia con la App
     v_now_text := to_char(v_now AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+
+    -- Revisar si el ULD es de prioridad
+    SELECT is_priority INTO v_is_priority FROM ulds WHERE id_uld = p_uld_id;
 
     -- Actualizamos el ULD
     UPDATE ulds 
@@ -23,8 +27,8 @@ BEGIN
         discrepancies_summary = p_discrepancies
     WHERE id_uld = p_uld_id;
 
-    -- Actualizamos el vuelo si start_break está nulo
-    IF p_flight_id IS NOT NULL THEN
+    -- Actualizamos el vuelo si start_break está nulo Y el ULD NO es de prioridad
+    IF p_flight_id IS NOT NULL AND coalesce(v_is_priority, false) = false THEN
         UPDATE flights 
         SET start_break = v_now
         WHERE id_flight = p_flight_id 

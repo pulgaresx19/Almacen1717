@@ -1,7 +1,7 @@
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
-  void _showAwbDrawer(BuildContext context, Map<String, dynamic> u, bool dark, int receivedPieces, int expectedPieces, int deliveredPieces, int inProcessPieces, int remainingPieces, int totalPieces, String status) {
+  void _showAwbDrawer(BuildContext context, Map<String, dynamic> u, bool dark, int receivedPieces, int expectedPieces, int deliveredPieces, int inProcessPieces, int remainingPieces, int totalPieces, String status, int onHoldPieces) {
     final Future<List<Map<String, dynamic>>> splitsFuture = Supabase.instance.client
         .from('awb_splits')
         .select('*, ulds(uld_number, is_break), flights(carrier, number, date)')
@@ -483,6 +483,8 @@ extension AddDeliverV2AwbDrawer on AddDeliverV2ScreenState {
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Expected:', style: TextStyle(color: textS)), Text(expectedPieces.toString(), style: TextStyle(color: textP, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Arrived:', style: TextStyle(color: textS)), Text(arrivedPieces.toString(), style: const TextStyle(color: Color(0xFFec4899), fontWeight: FontWeight.bold))]),
+                                  const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('On Hold:', style: TextStyle(color: textS)), Text(onHoldPieces.toString(), style: const TextStyle(color: Color(0xFFf97316), fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
                                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Checked:', style: TextStyle(color: textS)), Text(receivedPieces.toString(), style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold))]),
                                   const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),

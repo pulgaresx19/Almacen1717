@@ -352,9 +352,11 @@ class CoordinatorV2Logic extends ChangeNotifier {
         ulds[idx]['discrepancies_summary'] = finalDiscrepancies;
       }
 
+      final bool isPriority = idx != -1 && ulds[idx]['is_priority'] == true;
+
       if (selectedFlightId != null) {
         final fIdx = flights.indexWhere((f) => f['id_flight']?.toString() == selectedFlightId);
-        if (fIdx != -1 && flights[fIdx]['start_break'] == null) {
+        if (!isPriority && fIdx != -1 && flights[fIdx]['start_break'] == null) {
           flights[fIdx]['start_break'] = nowIso;
         }
       }
@@ -539,17 +541,35 @@ class CoordinatorV2Logic extends ChangeNotifier {
       final String nowIso = DateTime.now().toUtc().toIso8601String();
       await supabase.from('flights').update({
         'is_checked': true,
-        'end_break': nowIso
+        'end_break': nowIso,
+        'is_delivery_enabled': true
       }).eq('id_flight', selectedFlightId!);
       
       int fIdx = flights.indexWhere((f) => f['id_flight']?.toString() == selectedFlightId);
       if (fIdx != -1) {
         flights[fIdx]['is_checked'] = true;
         flights[fIdx]['end_break'] = nowIso;
+        flights[fIdx]['is_delivery_enabled'] = true;
         notifyListeners();
       }
     } catch (e) {
       debugPrint('Error marking flight as checked: $e');
+    }
+  }
+
+  Future<void> toggleFlightDeliveryEnabled(String idFlight, bool newValue) async {
+    try {
+      await supabase.from('flights').update({
+        'is_delivery_enabled': newValue,
+      }).eq('id_flight', idFlight);
+      
+      final idx = flights.indexWhere((f) => f['id_flight']?.toString() == idFlight);
+      if (idx != -1) {
+        flights[idx]['is_delivery_enabled'] = newValue;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error toggling delivery enabled: $e');
     }
   }
 
@@ -560,7 +580,7 @@ class CoordinatorV2Logic extends ChangeNotifier {
       for (var s in splits) {
         final master = s['awbs'] ?? {};
         if (master['awb_number'] == awbNumber || s['awb_number'] == awbNumber) {
-          used += (s['pieces'] as num?)?.toInt() ?? (s['pieces_split'] as num?)?.toInt() ?? 0;
+           used += (s['pieces'] as num?)?.toInt() ?? (s['pieces_split'] as num?)?.toInt() ?? 0;
         }
       }
     }

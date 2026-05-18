@@ -9,6 +9,7 @@ import '../../services/realtime_service.dart';
 import '../flights_v2/flights_v2_status_logic.dart';
 import 'awbs_v2_add_items_screen.dart';
 import 'awbs_v2_history.dart';
+import '../../services/delivery_math_logic.dart';
 
 class AwbsV2Screen extends StatefulWidget {
   final bool isActive;
@@ -264,9 +265,14 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                         ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: ValueListenableBuilder<List<Map<String, dynamic>>>(
-                      valueListenable: _showUldTab ? realtimeService.ulds : realtimeService.awbs,
-                builder: (context, dataList, child) {
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _showUldTab ? realtimeService.ulds : realtimeService.awbs,
+                        realtimeService.flights,
+                        realtimeService.awbSplits,
+                      ]),
+                builder: (context, child) {
+                  final dataList = _showUldTab ? realtimeService.ulds.value : realtimeService.awbs.value;
                   
                   if (dataList.isEmpty) {
                     if (_showUldTab) {
@@ -515,6 +521,7 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                           const DataColumn(label: Text('AWB Number')),
                           const DataColumn(label: Text('Expected')),
                           const DataColumn(label: Text('Arrived')),
+                          const DataColumn(label: Text('On Hold')),
                           const DataColumn(label: Text('Checked')),
                           const DataColumn(label: Text('In Process')),
                           const DataColumn(label: Text('Remaining')),
@@ -526,34 +533,26 @@ class _AwbsV2ScreenState extends State<AwbsV2Screen> {
                         rows: List.generate(awbs.length, (index) {
                           final u = awbs[index];
                           
-                          int expectedPieces = int.tryParse(u['total_espected']?.toString() ?? '0') ?? 0;
-                          int arrivedPieces = int.tryParse(u['pieces_arrived']?.toString() ?? '0') ?? 0;
-                          int receivedPieces = int.tryParse(u['pieces_received']?.toString() ?? '0') ?? 0;
-                          int deliveredPieces = int.tryParse(u['pieces_delivered']?.toString() ?? '0') ?? 0;
-                          int inProcessPieces = int.tryParse(u['pieces_in_process']?.toString() ?? '0') ?? 0;
-                          
-                          int remainingPieces = u['pieces_remaining'] != null 
-                              ? (int.tryParse(u['pieces_remaining'].toString()) ?? 0) 
-                              : (receivedPieces - deliveredPieces - inProcessPieces);
-                          if (remainingPieces < 0) remainingPieces = 0;
+                          final metrics = DeliveryMathLogic.calculateAwbMetrics(u);
                           
                           int totalPieces = int.tryParse(u['total_pieces']?.toString() ?? '0') ?? 0;
                           double totalWeight = double.tryParse(u['total_weight']?.toString() ?? '0') ?? 0.0;
 
                           String status = _getAwbStatusStr(u);
                           return DataRow(
-                            onSelectChanged: (_) => AwbsV2Drawer.show(context, u, dark, 0, expectedPieces, status),
+                            onSelectChanged: (_) => AwbsV2Drawer.show(context, u, dark, 0, metrics['expected']!, status),
                             cells: [
                               DataCell(Text('${index + 1}')),
                               DataCell(Text(u['awb_number']?.toString() ?? '-', style: TextStyle(color: dark ? Colors.white : const Color(0xFF111827), fontWeight: FontWeight.bold))),
-                              DataCell(Text(expectedPieces.toString())),
-                              DataCell(Text(arrivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFec4899)))), // Pieces Arrived (Pink)
-                              DataCell(Text(receivedPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFf59e0b)))), // Pieces Received (Amber)
-                              DataCell(Text(inProcessPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF06b6d4)))), // In Process Pieces (Cyan)
-                              DataCell(Text(remainingPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))), // Pieces Remaining (Purple)
-                              DataCell(Text(deliveredPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))), // Delivered Pieces (Green)
+                              DataCell(Text(metrics['expected'].toString())),
+                              DataCell(Text(metrics['arrived'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFec4899)))), // Pieces Arrived (Pink)
+                              DataCell(Text(metrics['on_hold'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFf97316)))), // On Hold (Orange)
+                              DataCell(Text(metrics['checked'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFf59e0b)))), // Pieces Received (Amber)
+                              DataCell(Text(metrics['in_process'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF06b6d4)))), // In Process Pieces (Cyan)
+                              DataCell(Text(metrics['remaining'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF6366f1)))), // Pieces Remaining (Purple)
+                              DataCell(Text(metrics['delivered'].toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF10b981)))), // Delivered Pieces (Green)
                               DataCell(Text(totalPieces.toString(), style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF3b82f6)))), // Total Pieces (Blue)
-                              DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\\.$|\\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
+                              DataCell(Text('${totalWeight.toString().replaceAll(RegExp(r'\.$|\.0$'), '')} kg', style: const TextStyle(fontWeight: FontWeight.w500))),
                               DataCell(_buildStatusBadge(status)),
                             ],
                           );

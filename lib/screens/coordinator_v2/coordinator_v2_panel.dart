@@ -294,49 +294,115 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
                   ),
                 )
               else ...[
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: widget.logic.flights.map((f) {
-                    final chipId = f['id_flight']?.toString() ?? '';
-                    final isSel = widget.logic.selectedFlightId == chipId && chipId.isNotEmpty;
-                    final isChecked = f['is_checked'] == true;
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: widget.logic.flights.map((f) {
+                          final chipId = f['id_flight']?.toString() ?? '';
+                          final isSel = widget.logic.selectedFlightId == chipId && chipId.isNotEmpty;
+                          final isChecked = f['is_checked'] == true;
 
-                    Color textColor = isSel
-                        ? Colors.white
-                        : (isChecked ? const Color(0xFF10b981) : textP);
-                    Color selColor = isChecked
-                        ? const Color(0xFF10b981)
-                        : const Color(0xFF6366f1);
-                    Color unselBgColor = isChecked
-                        ? const Color(0xFF10b981).withAlpha(15)
-                        : bgCard;
-                    Color borderColor = isSel
-                        ? Colors.transparent
-                        : (isChecked
-                            ? const Color(0xFF10b981).withAlpha(50)
-                            : borderC);
+                          Color textColor = isSel
+                              ? Colors.white
+                              : (isChecked ? const Color(0xFF10b981) : textP);
+                          Color selColor = isChecked
+                              ? const Color(0xFF10b981)
+                              : const Color(0xFF6366f1);
+                          Color unselBgColor = isChecked
+                              ? const Color(0xFF10b981).withAlpha(15)
+                              : bgCard;
+                          Color borderColor = isSel
+                              ? Colors.transparent
+                              : (isChecked
+                                  ? const Color(0xFF10b981).withAlpha(50)
+                                  : borderC);
 
-                    return ChoiceChip(
-                      label: Text(
-                        '${f['carrier'] ?? ''} ${f['number'] ?? ''}',
-                        style: TextStyle(
-                          color: textColor,
-                          fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                        ),
+                          return ChoiceChip(
+                            label: Text(
+                              '${f['carrier'] ?? ''} ${f['number'] ?? ''}',
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                            selected: isSel,
+                            selectedColor: selColor,
+                            backgroundColor: unselBgColor,
+                            showCheckmark: false,
+                            side: BorderSide(color: borderColor),
+                            onSelected: (v) {
+                              if (chipId.isNotEmpty) {
+                                widget.logic.selectFlight(chipId);
+                              }
+                            },
+                          );
+                        }).toList(),
                       ),
-                      selected: isSel,
-                      selectedColor: selColor,
-                      backgroundColor: unselBgColor,
-                      showCheckmark: false,
-                      side: BorderSide(color: borderColor),
-                      onSelected: (v) {
-                        if (chipId.isNotEmpty) {
-                          widget.logic.selectFlight(chipId);
-                        }
-                      },
-                    );
-                  }).toList(),
+                    ),
+                    if (widget.logic.selectedFlightId != null) ...[
+                      const SizedBox(width: 16),
+                      Builder(
+                        builder: (context) {
+                          final fIdx = widget.logic.flights.indexWhere((f) => f['id_flight'].toString() == widget.logic.selectedFlightId);
+                          if (fIdx == -1) return const SizedBox.shrink();
+                          final f = widget.logic.flights[fIdx];
+                          final isEnabled = f['is_delivery_enabled'] == true;
+
+                          return Tooltip(
+                            message: isEnabled 
+                                ? (appLanguage.value == 'es' ? 'Entregas habilitadas para este vuelo' : 'Deliveries enabled for this flight')
+                                : (appLanguage.value == 'es' ? 'Habilitar entregas de este vuelo para los choferes' : 'Enable deliveries of this flight for drivers'),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: isEnabled ? null : () {
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => _buildEnableDeliveryConfirmDialog(context, widget.logic, f),
+                                );
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isEnabled ? const Color(0xFF10b981).withAlpha(20) : (dark ? Colors.white.withAlpha(5) : Colors.black.withAlpha(5)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isEnabled ? const Color(0xFF10b981).withAlpha(50) : borderC,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      isEnabled ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
+                                      size: 16,
+                                      color: isEnabled ? const Color(0xFF10b981) : textS,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isEnabled 
+                                        ? (appLanguage.value == 'es' ? 'Habilitado' : 'Enabled')
+                                        : (appLanguage.value == 'es' ? 'Desbloquear Vuelo' : 'Unlock Flight'),
+                                      style: TextStyle(
+                                        color: isEnabled ? const Color(0xFF10b981) : textS,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
                 ),
                 if (widget.logic.selectedFlightId != null) ...[
                   const SizedBox(height: 16),
@@ -678,6 +744,94 @@ class _CoordinatorV2PanelState extends State<CoordinatorV2Panel> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEnableDeliveryConfirmDialog(BuildContext context, CoordinatorV2Logic logic, Map<String, dynamic> flight) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final bgDialog = dark ? const Color(0xFF0f172a) : Colors.white;
+    final textP = dark ? Colors.white : const Color(0xFF111827);
+    final textS = dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280);
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        width: 400,
+        decoration: BoxDecoration(
+          color: bgDialog,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFf59e0b).withAlpha(50), width: 1.5),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFFf59e0b).withAlpha(20), blurRadius: 20, spreadRadius: 5),
+          ],
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFf59e0b).withAlpha(20),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFf59e0b), size: 32),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              appLanguage.value == 'es' ? '¿Habilitar Entregas?' : 'Enable Deliveries?',
+              style: TextStyle(color: textP, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              appLanguage.value == 'es'
+                  ? '¿Estás seguro de habilitar las entregas para este vuelo? La oficina podrá comenzar a despachar la mercancía a los choferes y esta acción no se puede deshacer.'
+                  : 'Are you sure you want to enable deliveries for this flight? The office will be able to start dispatching cargo to drivers and this action cannot be undone.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: textS, fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      appLanguage.value == 'es' ? 'Cancelar' : 'Cancel',
+                      style: TextStyle(color: textS, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      logic.toggleFlightDeliveryEnabled(flight['id_flight']!.toString(), true);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFf59e0b),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      appLanguage.value == 'es' ? 'Sí, Habilitar' : 'Yes, Enable',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
     );
   }
 }

@@ -23,7 +23,7 @@ void showVerifyDriverDialog({
       bool isProcessingNoShow = false;
 
       return StatefulBuilder(
-        builder: (context, setStateDialog) {
+        builder: (statefulContext, setStateDialog) {
           return Dialog(
             backgroundColor: Colors.transparent,
             insetPadding: const EdgeInsets.all(24),

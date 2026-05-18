@@ -232,14 +232,24 @@ void showDriverConfirmDialog({
                                   'user': currentUserData.value?['full_name'] ?? 'Unknown',
                                 };
                                 
-                                final idStr = deliveryData['id_delivery']?.toString() ?? deliveryData['id_pickup']?.toString() ?? deliveryData['id']?.toString();
+                                final idDelivery = deliveryData['id_delivery']?.toString();
+                                final idPickup = deliveryData['id_pickup']?.toString() ?? deliveryData['id']?.toString();
                                 
-                                if (idStr != null) {
-                                  final response = await Supabase.instance.client
-                                      .from('deliveries')
-                                      .select('report_pending')
-                                      .eq('id_delivery', idStr)
-                                      .maybeSingle();
+                                if ((idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') || (idPickup != null && idPickup.isNotEmpty && idPickup != '-')) {
+                                  Map<String, dynamic>? response;
+                                  if (idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') {
+                                    response = await Supabase.instance.client
+                                        .from('deliveries')
+                                        .select('report_pending')
+                                        .eq('id_delivery', idDelivery)
+                                        .maybeSingle();
+                                  } else {
+                                    response = await Supabase.instance.client
+                                        .from('deliveries')
+                                        .select('report_pending')
+                                        .eq('id_pickup', idPickup!)
+                                        .maybeSingle();
+                                  }
                                       
                                   List<dynamic> currentPending = [];
                                   if (response != null && response['report_pending'] != null) {
@@ -250,13 +260,23 @@ void showDriverConfirmDialog({
                                   
                                   currentPending.add(pendingReport);
                                   
-                                  await Supabase.instance.client
-                                      .from('deliveries')
-                                      .update({
-                                        'status': 'Pending',
-                                        'report_pending': currentPending,
-                                      })
-                                      .eq('id_delivery', idStr);
+                                  if (idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') {
+                                    await Supabase.instance.client
+                                        .from('deliveries')
+                                        .update({
+                                          'status': 'Pending',
+                                          'report_pending': currentPending,
+                                        })
+                                        .eq('id_delivery', idDelivery);
+                                  } else {
+                                    await Supabase.instance.client
+                                        .from('deliveries')
+                                        .update({
+                                          'status': 'Pending',
+                                          'report_pending': currentPending,
+                                        })
+                                        .eq('id_pickup', idPickup!);
+                                  }
                                 }
                                 
                                 if (!context.mounted) return;

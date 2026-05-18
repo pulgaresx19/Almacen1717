@@ -47,43 +47,15 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
     }).toList();
     
     Map<String, int> getAwbCounts(Map<String, dynamic> awb) {
-      int arrivedPieces = int.tryParse(awb['pieces_arrived']?.toString() ?? '0') ?? 0;
-      int receivedPieces = int.tryParse(awb['pieces_received']?.toString() ?? '0') ?? 0;
-
-      int deliveredPieces = 0;
-      if (awb['pieces_delivered'] != null) {
-        deliveredPieces = int.tryParse(awb['pieces_delivered'].toString()) ?? 0;
-      } else if (awb['data-deliver'] != null) {
-        if (awb['data-deliver'] is List) {
-          for (var item in awb['data-deliver']) {
-            if (item is Map && item.containsKey('found')) {
-              deliveredPieces += int.tryParse(item['found']?.toString() ?? '0') ?? 0;
-            }
-          }
-        } else if (awb['data-deliver'] is Map) {
-          deliveredPieces = int.tryParse(awb['data-deliver']['found']?.toString() ?? '0') ?? 0;
-        }
-      }
-
-      int inProcess = int.tryParse(awb['pieces_in_process']?.toString() ?? '0') ?? 0;
-      int remainingPieces = arrivedPieces - deliveredPieces - inProcess;
-      if (remainingPieces < 0) remainingPieces = 0;
-      
-      return {
-        'arrived': arrivedPieces,
-        'received': receivedPieces,
-        'delivered': deliveredPieces,
-        'inProcess': inProcess,
-        'remaining': remainingPieces,
-      };
+      return DeliveryMathLogic.calculateAwbMetrics(awb);
     }
 
     String getAwbStatus(Map<String, dynamic> awb, Map<String, int> counts) {
       String status = awb['status']?.toString() ?? '';
       if (status.isNotEmpty) return status;
-      int receivedPieces = counts['received']!;
+      int receivedPieces = counts['checked']!;
       int deliveredPieces = counts['delivered']!;
-      final int totalValInt = int.tryParse(awb['total_pieces']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
+      final int totalValInt = counts['expected']!;
       if (deliveredPieces >= totalValInt && totalValInt > 0) return 'Delivered';
       if (deliveredPieces > 0) return 'In Process';
       if (receivedPieces > 0) return 'Received';
@@ -193,12 +165,12 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                       }
 
                       final counts = getAwbCounts(awb);
-                      int receivedPieces = counts['received']!;
+                      int receivedPieces = counts['checked']!;
                       int deliveredPieces = counts['delivered']!;
-                      int inProcess = counts['inProcess']!;
+                      int inProcess = counts['in_process']!;
                       int remainingPieces = counts['remaining']!;
                       
-                      final int totalValInt = int.tryParse(awb['total_pieces']?.toString() ?? awb['total']?.toString() ?? '0') ?? 0;
+                      final int totalValInt = counts['expected']!;
                       
                       String status = awb['status']?.toString() ?? '';
                       if (status.isEmpty) {
@@ -353,7 +325,7 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                               alignment: Alignment.centerRight,
                               child: IconButton(
                                 icon: Icon(Icons.info_outline_rounded, color: dark ? const Color(0xFF64748b) : const Color(0xFF9ca3af), size: 16),
-                                onPressed: () => _showAwbDrawer(context, awb, dark, receivedPieces, expectedPieces, deliveredPieces, inProcess, remainingPieces, totalValInt, status),
+                                onPressed: () => _showAwbDrawer(context, awb, dark, receivedPieces, counts['expected']!, deliveredPieces, inProcess, remainingPieces, totalValInt, status, counts['on_hold']!),
                                 tooltip: 'Ver Info',
                               ),
                             ),

@@ -49,8 +49,13 @@ class _DriverBfV2PanelState extends State<DriverBfV2Panel> {
     return ValueListenableBuilder<bool>(
       valueListenable: isDarkMode,
       builder: (context, dark, child) {
-        // Only show deliveries where all_uld == true
-        var items = _deliversList.where((u) => u['all_uld'] == true).toList();
+        // Only show deliveries where all_uld == true and status is waiting or pending
+        var items = _deliversList.where((u) {
+          if (u['all_uld'] != true) return false;
+          final st = (u['status']?.toString() ?? '').toLowerCase();
+          if (st != 'waiting' && st != 'pending') return false;
+          return true;
+        }).toList();
         
         // Apply search query if not empty
         if (widget.searchQuery.trim().isNotEmpty) {
