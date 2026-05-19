@@ -39,7 +39,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
 
   bool _isPriority = false;
   bool _isLoading = false;
-  String? _missingField;
+  final List<String> _missingFields = [];
 
   List<Map<String, dynamic>> _allAwbs = [];
   final List<Map<String, dynamic>> _selectedAwbs = [];
@@ -302,7 +302,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                             const SizedBox(width: 16),
                             Expanded(flex: 4, child: _buildTextField('Driver', _driverCtrl, dark, null, hint: 'John Doe', capitalizeWords: true)),
                             const SizedBox(width: 16),
-                            Expanded(flex: 2, child: _buildTextField('Door', _doorCtrl, dark, null, maxLen: 6, uppercase: true, hint: '05')),
+                            SizedBox(width: 80, child: _buildTextField('Door', _doorCtrl, dark, null, maxLen: 2, hint: '05')),
                             const SizedBox(width: 16),
                             Expanded(flex: 3, child: _buildTextField('ID Pickup', _idPickupCtrl, dark, null, maxLen: 10, uppercase: true, hint: 'ID12345', suffixIcon: IconButton(
                               icon: Icon(Icons.auto_awesome_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
@@ -312,6 +312,7 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                                 final id = String.fromCharCodes(Iterable.generate(10, (_) => chars.codeUnitAt(rnd.nextInt(chars.length))));
                                 setState(() {
                                   _idPickupCtrl.text = id;
+                                  _missingFields.remove('ID Pickup');
                                 });
                               },
                               tooltip: 'Autogenerate ID',
@@ -320,32 +321,47 @@ class AddDeliverV2ScreenState extends State<AddDeliverV2Screen> {
                             SizedBox(width: 185, child: _buildTypeDropdown(dark)),
                             const SizedBox(width: 16),
                             SizedBox(width: 140, child: Builder(builder: (context) {
-                              return _buildTextField('Time', _timeCtrl, dark, null, hint: '14:30', suffixIcon: IconButton(
-                                icon: Icon(Icons.access_time_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
-                                onPressed: () async {
-                                  FocusManager.instance.primaryFocus?.unfocus(); // Deep unfocus to avoid Web Engine text sync bug
-                                  final selected = await showTimePicker(
-                                    context: context, 
-                                    initialTime: TimeOfDay.now(),
-                                    builder: (context, child) {
-                                      return MediaQuery(
-                                        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
-                                        child: child!,
-                                      );
-                                    },
-                                  );
-                                  if (selected != null && mounted) {
-                                    final dtObj = DateTime(2000, 1, 1, selected.hour, selected.minute);
-                                    final newTime = DateFormat('hh:mm a').format(dtObj);
-                                    
-                                    _timeCtrl.clear(); // Force update by clearing first 
-                                    setState(() {
-                                      _timeCtrl.text = newTime;
-                                      _timeCtrl.selection = TextSelection.collapsed(offset: newTime.length);
-                                    });
-                                  }
-                                },
-                              ));
+                              final isWalkIn = _typeCtrl.text == 'Walk-in';
+                              
+                              Future<void> openTimePicker() async {
+                                if (isWalkIn) return;
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                final selected = await showTimePicker(
+                                  context: context, 
+                                  initialTime: TimeOfDay.now(),
+                                  builder: (context, child) {
+                                    return MediaQuery(
+                                      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+                                      child: child!,
+                                    );
+                                  },
+                                );
+                                if (selected != null && mounted) {
+                                  final dtObj = DateTime(2000, 1, 1, selected.hour, selected.minute);
+                                  final newTime = DateFormat('hh:mm a').format(dtObj);
+                                  
+                                  _timeCtrl.clear();
+                                  setState(() {
+                                    _timeCtrl.text = newTime;
+                                    _timeCtrl.selection = TextSelection.collapsed(offset: newTime.length);
+                                  });
+                                }
+                              }
+
+                              return _buildTextField(
+                                'Time', 
+                                _timeCtrl, 
+                                dark, 
+                                null, 
+                                hint: '00:00 AM', 
+                                readOnly: true, 
+                                disabled: isWalkIn,
+                                onTap: openTimePicker,
+                                suffixIcon: IconButton(
+                                  icon: Icon(Icons.access_time_rounded, color: dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF), size: 18),
+                                  onPressed: isWalkIn ? null : openTimePicker,
+                                )
+                              );
                             })),
                             const SizedBox(width: 16),
                             Expanded(flex: 4, child: _buildTextField('Remarks', _remarksCtrl, dark, null, hint: appLanguage.value == 'es' ? 'Notas del conductor...' : 'Driver additional notes...', capitalizeFirst: true)),

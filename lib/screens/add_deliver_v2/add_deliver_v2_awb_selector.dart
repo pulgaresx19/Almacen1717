@@ -170,6 +170,23 @@ extension AddDeliverV2AwbSelectorExt on AddDeliverV2ScreenState {
                       int inProcess = counts['in_process']!;
                       int remainingPieces = counts['remaining']!;
                       
+                      // Deduct pieces that are already selected via a ULD
+                      int piecesSelectedInUlds = 0;
+                      if (awb['awb_splits'] != null) {
+                        for (var split in awb['awb_splits']) {
+                          final uldId = split['uld_id'] ?? split['id_uld'];
+                          if (uldId != null) {
+                            if (_selectedUlds.any((u) => u['id_uld'] == uldId)) {
+                              int p = int.tryParse(split['total_checked']?.toString() ?? split['pieces']?.toString() ?? '0') ?? 0;
+                              piecesSelectedInUlds += p;
+                            }
+                          }
+                        }
+                      }
+                      
+                      remainingPieces -= piecesSelectedInUlds;
+                      if (remainingPieces < 0) remainingPieces = 0;
+                      
                       final int totalValInt = counts['expected']!;
                       
                       String status = awb['status']?.toString() ?? '';

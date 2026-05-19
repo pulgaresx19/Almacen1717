@@ -413,6 +413,100 @@ class DeliversV2Dialogs {
                       ),
                     ),
                   ),
+                  if (u['check_in'] != true)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: borderC)),
+                        color: dark ? Colors.white.withAlpha(5) : const Color(0xFFF9FAFB),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                  try {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (c) => const Center(child: CircularProgressIndicator(color: Colors.redAccent)),
+                                    );
+                                    
+                                    final idDelivery = u['id_delivery']?.toString();
+                                    final idPickup = u['id_pickup']?.toString() ?? u['id']?.toString();
+                                    
+                                    if (idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') {
+                                      await Supabase.instance.client.from('deliveries').update({'status': 'No Show'}).eq('id_delivery', idDelivery);
+                                    } else if (idPickup != null && idPickup.isNotEmpty && idPickup != '-') {
+                                      await Supabase.instance.client.from('deliveries').update({'status': 'No Show'}).eq('id_pickup', idPickup);
+                                    }
+                                    
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // close loading
+                                      Navigator.pop(context); // close drawer
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // close loading
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                                    }
+                                  }
+                              },
+                              icon: const Icon(Icons.person_off_rounded, size: 20),
+                              label: const Text('No-Show', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: BorderSide(color: Colors.redAccent.withAlpha(100)),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                  try {
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (c) => const Center(child: CircularProgressIndicator(color: Color(0xFF6366f1))),
+                                    );
+                                    
+                                    final idDelivery = u['id_delivery']?.toString();
+                                    final idPickup = u['id_pickup']?.toString() ?? u['id']?.toString();
+                                    
+                                    if (idDelivery != null && idDelivery.isNotEmpty && idDelivery != '-') {
+                                      await Supabase.instance.client.from('deliveries').update({'status': 'Waiting', 'check_in': true}).eq('id_delivery', idDelivery);
+                                    } else if (idPickup != null && idPickup.isNotEmpty && idPickup != '-') {
+                                      await Supabase.instance.client.from('deliveries').update({'status': 'Waiting', 'check_in': true}).eq('id_pickup', idPickup);
+                                    }
+                                    
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // close loading
+                                      Navigator.pop(context); // close drawer
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // close loading
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                                    }
+                                  }
+                              },
+                              icon: const Icon(Icons.how_to_reg_rounded, size: 20),
+                              label: const Text('Check-In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF6366f1),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -524,7 +618,7 @@ class DeliversV2Dialogs {
       );
     } else if (isTypeDropdown) {
       String currentType = tempU[key]?.toString() ?? 'Walk-in';
-      if (!['Walk-in', 'Transfer', 'Priority Load'].contains(currentType)) currentType = 'Walk-in';
+      if (!['Walk-in', 'Transfer', 'Priority Load', 'Appointment'].contains(currentType)) currentType = 'Walk-in';
       editor = Container(
         height: 32,
         width: double.infinity,
@@ -540,6 +634,7 @@ class DeliversV2Dialogs {
               DropdownMenuItem(value: 'Walk-in', child: Text('Walk-in')),
               DropdownMenuItem(value: 'Transfer', child: Text('Transfer')),
               DropdownMenuItem(value: 'Priority Load', child: Text('Priority Load')),
+              DropdownMenuItem(value: 'Appointment', child: Text('Appointment')),
             ],
             onChanged: (v) {
               if (v != null) {

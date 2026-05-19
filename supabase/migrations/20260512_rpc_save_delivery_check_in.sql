@@ -23,7 +23,8 @@ BEGIN
         total_weight, 
         all_uld,
         id_user,
-        check_in
+        check_in,
+        status
     ) VALUES (
         payload->>'company',
         payload->>'driver_name',
@@ -38,11 +39,14 @@ BEGIN
         (payload->>'total_weight')::numeric,
         (payload->>'all_uld')::boolean,
         (payload->>'id_user')::uuid,
-        -- Set check_in to true for everything EXCEPT 'Appointment'
-        CASE 
+        COALESCE((payload->>'check_in')::boolean, CASE 
             WHEN payload->>'type' IN ('Walk-in', 'Transfer', 'Import', 'Priority Load') THEN true
             ELSE false 
-        END
+        END),
+        COALESCE(payload->>'status', CASE 
+            WHEN payload->>'type' IN ('Walk-in', 'Transfer', 'Import', 'Priority Load') THEN 'Waiting'
+            ELSE 'Scheduled' 
+        END)
     );
 
     -- 2. Update AWBs and ULDs if type is not 'Import'
@@ -68,6 +72,12 @@ BEGIN
                 UPDATE ulds 
                 SET in_process = true
                 WHERE id_uld = item_uld_id;
+
+                -- Also update the pieces_in_process for all AWBs inside this ULD
+                UPDATE awbs
+                SET pieces_in_process = COALESCE(awbs.pieces_in_process, 0) + COALESCE(s.pieces, 0)
+                FROM awb_splits s
+                WHERE s.uld_id = item_uld_id AND awbs.id = s.awb_id;
             END IF;
         END LOOP;
     END IF;

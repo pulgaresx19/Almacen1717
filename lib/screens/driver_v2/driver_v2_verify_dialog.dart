@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart' show currentUserData, scaffoldMessengerKey;
 import 'driver_v2_confirm_dialog.dart';
 import 'driver_v2_verify_card.dart';
+import 'driver_v2_door_dialog.dart';
 
 void showVerifyDriverDialog({
   required BuildContext context,
@@ -63,7 +64,18 @@ void showVerifyDriverDialog({
                   if (ctx.mounted) setStateDialog(() => isProcessingNoShow = false);
                 }
               },
-              onConfirm: () {
+              onConfirm: () async {
+                if (door == 'PENDING') {
+                  final newDoor = await showAssignDoorDialog(
+                    context: context,
+                    dark: dark,
+                    deliveryData: deliveryData,
+                  );
+                  if (newDoor == null) return; // User cancelled
+                  deliveryData['door'] = newDoor;
+                }
+                
+                if (!ctx.mounted) return;
                 Navigator.pop(ctx);
                 showDriverConfirmDialog(
                   context: context,

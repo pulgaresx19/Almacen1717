@@ -475,16 +475,33 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
   }
 
   Future<void> _submitPayload() async {
+    _missingFields.clear();
+    
     if (_truckCompanyCtrl.text.trim().isEmpty) {
-      setState(() => _missingField = 'Truck Company');
-      return;
+      _missingFields.add('Truck Company');
     }
     if (_driverCtrl.text.trim().isEmpty) {
-      setState(() => _missingField = 'Driver');
-      return;
+      _missingFields.add('Driver');
     }
     if (_idPickupCtrl.text.trim().isEmpty) {
-      setState(() => _missingField = 'ID Pickup');
+      _missingFields.add('ID Pickup');
+    }
+
+    bool isScheduled = false;
+    String finalTime = _timeCtrl.text.trim();
+    if (_typeCtrl.text == 'Appointment') {
+      isScheduled = true;
+      if (finalTime.isEmpty || finalTime == 'NOW' || finalTime == '00:00 AM') {
+        _missingFields.add('Time');
+      }
+    } else {
+      if (finalTime.isNotEmpty && finalTime != 'NOW' && finalTime != '00:00 AM') {
+        isScheduled = true;
+      }
+    }
+
+    if (_missingFields.isNotEmpty) {
+      setState(() {});
       return;
     }
 
@@ -534,14 +551,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
       }
     }
 
-    String finalTime = _timeCtrl.text.trim();
-    if (_typeCtrl.text == 'Appointment') {
-      if (finalTime.isEmpty || finalTime == 'NOW') {
-        setState(() => _missingField = 'Time');
-        return;
-      }
-    } else {
-      if (finalTime.isEmpty || finalTime == 'NOW') {
+    if (_typeCtrl.text != 'Appointment') {
+      if (finalTime.isEmpty || finalTime == 'NOW' || finalTime == '00:00 AM') {
         final now = DateTime.now();
         finalTime = DateFormat('hh:mm a').format(now);
       }
@@ -549,11 +560,14 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
 
     setState(() {
       _isLoading = true;
-      _missingField = null;
     });
 
     String doorText = _doorCtrl.text.trim();
-    if (doorText.isEmpty) doorText = 'PENDING';
+    if (doorText.isEmpty) {
+      doorText = 'PENDING';
+    } else if (doorText == '0' || doorText == '00') {
+      doorText = 'RAMP';
+    }
 
     try {
       final nowForDate = DateTime.now();
@@ -727,6 +741,8 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
         'total_pieces': totalPieces,
         'total_weight': totalWeight,
         'all_uld': isAllUld,
+        'check_in': !isScheduled,
+        'status': isScheduled ? 'Scheduled' : 'Waiting',
         'id_user': Supabase.instance.client.auth.currentUser?.id,
       };
 
@@ -751,55 +767,61 @@ extension AddDeliverV2SubmitExt on AddDeliverV2ScreenState {
               ),
               child: FadeTransition(
                 opacity: animation,
-                child: AlertDialog(
-                  backgroundColor: const Color(0xFF0f172a),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(
-                      color: const Color(0xFF10b981).withAlpha(50),
-                      width: 1,
+                child: Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: 300,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0f172a),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(color: const Color(0xFF10b981).withAlpha(40), blurRadius: 40, offset: const Offset(0, 10))
+                        ],
+                        border: Border.all(color: const Color(0xFF10b981).withAlpha(50), width: 1.5),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10b981).withAlpha(20),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF10b981),
+                              size: 48,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            appLanguage.value == 'es'
+                                ? '¡Entrega Creada!'
+                                : 'Delivery Created!',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            appLanguage.value == 'es'
+                                ? 'Los datos han sido guardados.'
+                                : 'Records have been saved.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF94a3b8),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  contentPadding: const EdgeInsets.all(32),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10b981).withAlpha(20),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_circle_rounded,
-                          color: Color(0xFF10b981),
-                          size: 64,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        appLanguage.value == 'es'
-                            ? 'Ã‚Â¡Entrega Creada!'
-                            : 'Delivery Created!',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        appLanguage.value == 'es'
-                            ? 'Los datos han sido guardados.'
-                            : 'Records have been saved.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF94a3b8),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),

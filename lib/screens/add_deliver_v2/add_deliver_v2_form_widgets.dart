@@ -2,7 +2,7 @@
 part of 'add_deliver_v2_screen.dart';
 
 extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
-  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData? icon, {String hint = '', int? maxLen, bool uppercase = false, bool capitalizeWords = false, bool capitalizeFirst = false, Widget? suffixIcon, int? maxLines = 1, int? minLines, Function(String)? onChanged, bool readOnly = false, bool forceError = false, Widget? customLabelAction}) {
+  Widget _buildTextField(String label, TextEditingController controller, bool dark, IconData? icon, {String hint = '', int? maxLen, bool uppercase = false, bool capitalizeWords = false, bool capitalizeFirst = false, Widget? suffixIcon, int? maxLines = 1, int? minLines, Function(String)? onChanged, bool readOnly = false, bool disabled = false, bool forceError = false, Widget? customLabelAction, VoidCallback? onTap}) {
     List<TextInputFormatter> formatters = [];
     if (maxLen != null) formatters.add(LengthLimitingTextInputFormatter(maxLen));
     if (uppercase) formatters.add(TextInputFormatter.withFunction((oldValue, newValue) => newValue.copyWith(text: newValue.text.toUpperCase())));
@@ -33,7 +33,7 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
       }));
     }
     
-    if (label == 'Pieces' || label == 'Total') {
+    if (label == 'Pieces' || label == 'Total' || label == 'Door') {
       formatters.add(FilteringTextInputFormatter.digitsOnly);
     }
 
@@ -120,7 +120,7 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
       }));
     }
 
-    bool isError = _missingField == label || forceError;
+    bool isError = _missingFields.contains(label) || forceError;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,23 +129,26 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(label, style: TextStyle(color: isError ? Colors.redAccent : (dark ? const Color(0xFFcbd5e1) : const Color(0xFF4B5563)), fontSize: 12, fontWeight: FontWeight.w500)),
-            ?customLabelAction,
+            customLabelAction ?? const SizedBox(),
           ],
         ),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
+          onTap: onTap,
           onChanged: (val) {
-            if (isError && val.trim().isNotEmpty) setState(() => _missingField = null);
+            if (isError && val.trim().isNotEmpty) {
+              setState(() => _missingFields.remove(label));
+            }
             onChanged?.call(val);
           },
           readOnly: readOnly,
           keyboardType: label == 'Time' 
               ? TextInputType.datetime 
-              : (label == 'Pieces' || label == 'Total' || label == 'Weight' 
+              : (label == 'Pieces' || label == 'Total' || label == 'Weight' || label == 'Door'
                   ? TextInputType.number 
                   : (maxLines == null || maxLines > 1 ? TextInputType.multiline : TextInputType.text)),
-          style: TextStyle(color: isError ? Colors.redAccent : (readOnly ? (dark ? const Color(0xFF94a3b8) : const Color(0xFF6B7280)) : (dark ? Colors.white : const Color(0xFF111827))), fontSize: 13),
+          style: TextStyle(color: isError ? Colors.redAccent : (disabled ? (dark ? const Color(0xFF64748B) : const Color(0xFF9CA3AF)) : (dark ? Colors.white : const Color(0xFF111827))), fontSize: 13),
           inputFormatters: formatters.isNotEmpty ? formatters : null,
           textCapitalization: uppercase ? TextCapitalization.characters : TextCapitalization.none,
           maxLines: maxLines,
@@ -156,12 +159,12 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
             prefixIcon: icon != null ? Icon(icon, color: isError ? Colors.redAccent : (dark ? const Color(0xFF94a3b8) : const Color(0xFF9CA3AF)), size: 18) : null,
             suffixIcon: suffixIcon,
             filled: true,
-            fillColor: isError ? Colors.redAccent.withAlpha(10) : (dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isError ? Colors.redAccent.withAlpha(150) : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)))),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isError ? Colors.redAccent.withAlpha(150) : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB)))),
+            fillColor: isError ? Colors.redAccent.withAlpha(10) : (disabled ? (dark ? Colors.white.withAlpha(5) : const Color(0xFFF3F4F6)) : (dark ? Colors.white.withAlpha(10) : const Color(0xFFF9FAFB))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isError ? Colors.redAccent.withAlpha(150) : (disabled ? Colors.transparent : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isError ? Colors.redAccent.withAlpha(150) : (disabled ? Colors.transparent : (dark ? Colors.white.withAlpha(25) : const Color(0xFFE5E7EB))))),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: isError ? Colors.redAccent : (dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5)), width: 1.5),
+              borderSide: BorderSide(color: isError ? Colors.redAccent : (disabled ? Colors.transparent : (dark ? const Color(0xFF6366f1) : const Color(0xFF4F46E5))), width: 1.5),
             ),
           ),
         ),
@@ -219,9 +222,9 @@ extension AddDeliverV2FormWidgetsExt on AddDeliverV2ScreenState {
               setState(() {
                  _typeCtrl.text = val;
                  if (val == 'Appointment') {
-                   if (_timeCtrl.text == 'NOW') _timeCtrl.clear();
+                   _timeCtrl.clear();
                  } else {
-                   if (_timeCtrl.text.isEmpty) _timeCtrl.text = 'NOW';
+                   _timeCtrl.text = 'NOW';
                  }
               });
             }

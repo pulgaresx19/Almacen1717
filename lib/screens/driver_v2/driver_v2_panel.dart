@@ -7,6 +7,7 @@ import 'driver_v2_verify_dialog.dart';
 import 'driver_v2_verify_card.dart';
 import 'driver_v2_confirm_dialog.dart';
 import 'driver_v2_animated_toast.dart';
+import 'driver_v2_door_dialog.dart';
 import '../../services/realtime_service.dart';
 
 class DriverV2Panel extends StatefulWidget {
@@ -326,11 +327,22 @@ class _DriverV2PanelState extends State<DriverV2Panel> {
           },
           isLoadingNoShow: _isLoadingNoShow,
           onNoShow: () => _handleNoShow(_assignedDelivery!),
-          onConfirm: () {
+          onConfirm: () async {
             final company = _assignedDelivery!['company']?.toString() ?? '-';
             final driver = _assignedDelivery!['driver_name']?.toString() ?? '-';
             final currentDelivery = _assignedDelivery!;
             
+            if (currentDelivery['door']?.toString() == 'PENDING') {
+              final newDoor = await showAssignDoorDialog(
+                context: context,
+                dark: dark,
+                deliveryData: currentDelivery,
+              );
+              if (newDoor == null) return; // User cancelled
+              currentDelivery['door'] = newDoor;
+            }
+            
+            if (!mounted) return;
             setState(() {
               _skippedDeliveries.clear();
               _assignedDelivery = null;

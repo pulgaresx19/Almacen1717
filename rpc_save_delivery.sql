@@ -21,7 +21,8 @@ BEGIN
         list_deliver, 
         total_pieces, 
         total_weight, 
-        all_uld
+        all_uld,
+        status
     ) VALUES (
         payload->>'company',
         payload->>'driver_name',
@@ -60,6 +61,12 @@ BEGIN
                 UPDATE ulds 
                 SET in_process = true
                 WHERE id_uld = item_uld_id;
+
+                -- Also update the pieces_in_process for all AWBs inside this ULD
+                UPDATE awbs
+                SET pieces_in_process = COALESCE(awbs.pieces_in_process, 0) + COALESCE(s.pieces, 0)
+                FROM awb_splits s
+                WHERE s.uld_id = item_uld_id AND awbs.id = s.awb_id;
             END IF;
         END LOOP;
     END IF;

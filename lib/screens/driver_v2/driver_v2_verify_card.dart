@@ -173,7 +173,10 @@ class DriverV2VerifyCard extends StatelessWidget {
                                 children: [
                                   const Text('DOOR', style: TextStyle(color: Color(0xFFfacc15), fontSize: 12, fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 4),
-                                  Text(door, style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
+                                  if (door == 'PENDING')
+                                    const Icon(Icons.hourglass_empty_rounded, color: Color(0xFFfacc15), size: 28)
+                                  else
+                                    Text(door, style: TextStyle(color: textP, fontSize: 24, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
